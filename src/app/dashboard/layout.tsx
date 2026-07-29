@@ -9,7 +9,13 @@ import styles from "@/components/dashboard/dashboard.module.css";
 const STAFF_TABS = [
   { href: "/dashboard", label: "Projetos" },
   { href: "/dashboard/solicitacoes", label: "Solicitações" },
+];
+
+const ADMIN_TABS = [
+  ...STAFF_TABS,
   { href: "/dashboard/usuarios", label: "Usuários" },
+  { href: "/dashboard/pecas", label: "Peças" },
+  { href: "/dashboard/financeiro", label: "Financeiro" },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -26,6 +32,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   const isStaff = user.role === "MECHANIC" || user.role === "ADMIN";
+  const tabs = user.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS;
 
   return (
     <div className={styles.page}>
@@ -34,12 +41,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <span className={styles.brand}>BOX.</span>
           {isStaff && (
             <nav className={styles.tabs}>
-              {STAFF_TABS.map((tab) => (
-                <Link
-                  key={tab.href}
-                  href={tab.href}
-                  className={`${styles.tab} ${pathname === tab.href ? styles.tabActive : ""}`}
-                >
+              {tabs.map((tab) => (
+                <Link key={tab.href} href={tab.href} className={`${styles.tab} ${pathname === tab.href ? styles.tabActive : ""}`}>
                   {tab.label}
                 </Link>
               ))}

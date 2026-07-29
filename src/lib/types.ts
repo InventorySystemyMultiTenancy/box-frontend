@@ -120,12 +120,16 @@ export interface Approval {
   partId?: string | null;
   title: string;
   description: string;
+  laborValue?: number | null;
+  partsValue?: number | null;
   estimatedValue?: number | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
   responseNote?: string | null;
+  stockAppliedAt?: string | null;
   createdAt: string;
   respondedAt?: string | null;
   media: Media[];
+  partUsages?: ProblemPartUsage[];
 }
 
 export interface ServiceOrder {
@@ -145,11 +149,44 @@ export interface ServiceOrder {
   media: Media[];
 }
 
+export interface InventoryPart {
+  id: string;
+  name: string;
+  sku?: string | null;
+  description?: string | null;
+  unitCost: number;
+  stockQty: number;
+  photoUrl?: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProblemPartUsage {
+  id: string;
+  inventoryPartId: string;
+  quantity: number;
+  unitCostSnapshot: number;
+  inventoryPart: InventoryPart;
+}
+
+export interface FinancialEntry {
+  id: string;
+  type: "INCOME" | "EXPENSE";
+  category: string;
+  description: string;
+  amount: number;
+  occurredAt: string;
+  createdAt: string;
+}
+
 export type QuoteRequestStatus = "PENDING" | "ACCEPTED" | "DECLINED";
 
 export interface QuoteRequest {
   id: string;
   problemDescription: string;
+  problemKey?: string | null;
+  problemName?: string | null;
   preferredDates: string;
   status: QuoteRequestStatus;
   scheduledAt?: string | null;

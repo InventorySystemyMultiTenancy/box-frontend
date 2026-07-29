@@ -8,7 +8,7 @@ import MechanicUsersPanel from "@/components/dashboard/MechanicUsersPanel";
 export default function UsuariosPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
+  const isStaff = user?.role === "ADMIN";
 
   useEffect(() => {
     if (user && !isStaff) router.replace("/dashboard");

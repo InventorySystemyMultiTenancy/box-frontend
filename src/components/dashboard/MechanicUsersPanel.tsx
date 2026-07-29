@@ -1,36 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
+import { User } from "@/lib/types";
 import styles from "./dashboard.module.css";
 
-/** Cadastro de novos usuários (clientes ou outros mecânicos) pela equipe. */
 export default function MechanicUsersPanel() {
   const { token } = useAuth();
-  const [userForm, setUserForm] = useState({ name: "", email: "", password: "", phone: "", role: "CUSTOMER" as "CUSTOMER" | "MECHANIC" });
-  const [userMessage, setUserMessage] = useState<string | null>(null);
-  const [userBusy, setUserBusy] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [userForm, setUserForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    phone: "",
+    role: "CUSTOMER" as "CUSTOMER" | "MECHANIC" | "ADMIN",
+  });
+  const [message, setMessage] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  function loadUsers() {
+    if (!token) return;
+    api.users(token).then(({ users }) => setUsers(users as User[]));
+  }
+
+  useEffect(loadUsers, [token]);
 
   async function createUser(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
-    setUserBusy(true);
-    setUserMessage(null);
+    setBusy(true);
+    setMessage(null);
     try {
       const { user: created } = await api.createUser({ ...userForm, phone: userForm.phone || undefined }, token);
+      setUsers((prev) => [created as User, ...prev]);
       setUserForm({ name: "", email: "", password: "", phone: "", role: "CUSTOMER" });
-      setUserMessage(`${created.name} criado como ${created.role === "MECHANIC" ? "mecânico" : "cliente"}.`);
+      setMessage("Usuário criado.");
     } catch {
-      setUserMessage("Não foi possível criar o usuário.");
+      setMessage("Não foi possível criar o usuário.");
     } finally {
-      setUserBusy(false);
+      setBusy(false);
     }
+  }
+
+  async function updateUser(user: User, role: User["role"]) {
+    if (!token) return;
+    const { user: updated } = await api.updateUser(user.id, { role }, token);
+    setUsers((prev) => prev.map((item) => (item.id === user.id ? (updated as User) : item)));
   }
 
   return (
     <div className={styles.content}>
-      <div className={styles.sectionTitle}>Cadastrar novo usuário</div>
+      <div className={styles.sectionTitle}>Administração de usuários</div>
       <div className={styles.panel}>
         <form className={styles.formGrid} onSubmit={createUser}>
           <label>
@@ -39,22 +60,11 @@ export default function MechanicUsersPanel() {
           </label>
           <label>
             E-mail
-            <input
-              type="email"
-              value={userForm.email}
-              onChange={(e) => setUserForm((prev) => ({ ...prev, email: e.target.value }))}
-              required
-            />
+            <input type="email" value={userForm.email} onChange={(e) => setUserForm((prev) => ({ ...prev, email: e.target.value }))} required />
           </label>
           <label>
             Senha
-            <input
-              type="password"
-              minLength={6}
-              value={userForm.password}
-              onChange={(e) => setUserForm((prev) => ({ ...prev, password: e.target.value }))}
-              required
-            />
+            <input type="password" minLength={6} value={userForm.password} onChange={(e) => setUserForm((prev) => ({ ...prev, password: e.target.value }))} required />
           </label>
           <label>
             Telefone
@@ -62,19 +72,34 @@ export default function MechanicUsersPanel() {
           </label>
           <label className={styles.fullField}>
             Perfil
-            <select
-              value={userForm.role}
-              onChange={(e) => setUserForm((prev) => ({ ...prev, role: e.target.value as "CUSTOMER" | "MECHANIC" }))}
-            >
+            <select value={userForm.role} onChange={(e) => setUserForm((prev) => ({ ...prev, role: e.target.value as User["role"] }))}>
               <option value="CUSTOMER">Cliente</option>
               <option value="MECHANIC">Mecânico</option>
+              <option value="ADMIN">Admin</option>
             </select>
           </label>
-          {userMessage && <div className={styles.formMessage}>{userMessage}</div>}
-          <button className={styles.actionButton} type="submit" disabled={userBusy}>
-            {userBusy ? "Criando..." : "Criar usuário"}
+          {message && <div className={styles.formMessage}>{message}</div>}
+          <button className={styles.actionButton} type="submit" disabled={busy}>
+            {busy ? "Criando..." : "Criar usuário"}
           </button>
         </form>
+      </div>
+
+      <div className={styles.sectionTitle}>Usuários existentes</div>
+      <div className={styles.ordersList}>
+        {users.map((user) => (
+          <div key={user.id} className={styles.orderRow}>
+            <div className={styles.orderRowInfo}>
+              <strong>{user.name}</strong>
+              <span>{user.email}</span>
+            </div>
+            <select value={user.role} onChange={(e) => updateUser(user, e.target.value as User["role"])}>
+              <option value="CUSTOMER">Cliente</option>
+              <option value="MECHANIC">Mecânico</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+          </div>
+        ))}
       </div>
     </div>
   );

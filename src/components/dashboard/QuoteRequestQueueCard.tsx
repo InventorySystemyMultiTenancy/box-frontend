@@ -48,6 +48,7 @@ export default function QuoteRequestQueueCard({
       <p>{request.problemDescription}</p>
       <div className={styles.partMeta} style={{ marginTop: "0.6rem" }}>
         <span>Cliente: {request.customer.name}</span>
+        {request.problemName && <span>Área relatada: {request.problemName}</span>}
         <span>Dias sugeridos: {request.preferredDates}</span>
       </div>
 

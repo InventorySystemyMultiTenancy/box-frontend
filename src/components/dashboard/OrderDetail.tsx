@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
-import { Approval, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
+import { Approval, InventoryPart, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
@@ -39,13 +39,18 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     name: "Motor",
     description: "",
     wearLevel: "",
-    estimatedValue: "",
+    laborValue: "",
+    inventoryPartId: "",
+    quantity: "1",
     files: [] as File[],
   });
+  const [priceForm, setPriceForm] = useState({ laborValue: "", inventoryPartId: "", quantity: "1" });
+  const [inventoryParts, setInventoryParts] = useState<InventoryPart[]>([]);
   const [problemMessage, setProblemMessage] = useState<string | null>(null);
   const [problemBusy, setProblemBusy] = useState(false);
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
     if (!token) return;
@@ -54,6 +59,11 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
       .then(({ order }) => setOrder(order as ServiceOrder))
       .catch(() => setFetchError("Não foi possível carregar esta ordem de serviço."));
   }, [token, orderId]);
+
+  useEffect(() => {
+    if (!token || !isAdmin) return;
+    api.inventoryParts(token).then(({ parts }) => setInventoryParts(parts as InventoryPart[]));
+  }, [token, isAdmin]);
 
   useEffect(() => {
     if (!token || !orderId) return;
@@ -127,7 +137,16 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     setProblemBusy(true);
     setProblemMessage(null);
     try {
-      const result = await api.createProblem(order.id, problemForm, token);
+      const result = await api.createProblem(
+        order.id,
+        {
+          ...problemForm,
+          partUsages: problemForm.inventoryPartId
+            ? [{ inventoryPartId: problemForm.inventoryPartId, quantity: Number(problemForm.quantity) || 1 }]
+            : [],
+        },
+        token
+      );
       const part = result.part as VehiclePart;
       const approval = result.approval as Approval;
       const event = result.event as TimelineEvent;
@@ -144,7 +163,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         };
       });
       setJustArrivedId(event.id);
-      setProblemForm((prev) => ({ ...prev, description: "", wearLevel: "", estimatedValue: "", files: [] }));
+      setProblemForm((prev) => ({ ...prev, description: "", wearLevel: "", laborValue: "", inventoryPartId: "", quantity: "1", files: [] }));
       setProblemMessage("Problema identificado cadastrado.");
     } catch {
       setProblemMessage("Não foi possível cadastrar o problema.");
@@ -181,6 +200,39 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     setOrder((prev) => (prev ? { ...prev, status: "READY_FOR_PICKUP", progress: 100 } : prev));
   }
 
+  async function pricePendingProblem(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token || !order || !pendingApproval) return;
+    const usage = priceForm.inventoryPartId
+      ? [{ inventoryPartId: priceForm.inventoryPartId, quantity: Number(priceForm.quantity) || 1 }]
+      : [];
+    const result = await api.priceProblem(
+      order.id,
+      pendingApproval.id,
+      {
+        laborValue: Number(priceForm.laborValue) || 0,
+        partUsages: usage,
+      },
+      token
+    );
+    const approval = result.approval as Approval;
+    const part = result.part as VehiclePart | null;
+    const event = result.event as TimelineEvent;
+    setOrder((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        status: "AWAITING_APPROVAL",
+        progress: 35,
+        approvals: prev.approvals.map((a) => (a.id === approval.id ? approval : a)),
+        parts: part ? prev.parts.map((p) => (p.id === part.id ? part : p)) : prev.parts,
+        timelineEvents: prev.timelineEvents.some((t) => t.id === event.id) ? prev.timelineEvents : [...prev.timelineEvents, event],
+      };
+    });
+    setJustArrivedId(event.id);
+    setPriceForm({ laborValue: "", inventoryPartId: "", quantity: "1" });
+  }
+
   if (fetchError) return <div className={styles.empty}>{fetchError}</div>;
   if (!order) return <div className={styles.empty}>Carregando ordem de serviço...</div>;
 
@@ -189,6 +241,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   const blockedForPickup = unresolvedParts.length > 0 || Boolean(pendingApproval);
   const isReady = order.status === "READY_FOR_PICKUP";
   const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
+  const pendingNeedsPrice = pendingApproval && pendingApproval.estimatedValue == null;
 
   return (
     <div>
@@ -235,7 +288,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         </div>
       )}
 
-      {isStaff && canRegisterProblems && (
+      {isAdmin && canRegisterProblems && (
         <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
           <h2>Finalização</h2>
           {blockedForPickup ? (
@@ -265,16 +318,58 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         </div>
 
         <div>
-          {pendingApproval && (
+          {pendingApproval && pendingApproval.estimatedValue != null && (
             <ApprovalCard
               approval={pendingApproval}
               onRespond={(status, responseNote) => respondApproval(pendingApproval.id, status, responseNote)}
             />
           )}
 
+          {isAdmin && pendingNeedsPrice && (
+            <div className={styles.panel}>
+              <h2>Precificar problema</h2>
+              <form className={styles.formGrid} onSubmit={pricePendingProblem}>
+                <label>
+                  Mão de obra
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={priceForm.laborValue}
+                    onChange={(e) => setPriceForm((prev) => ({ ...prev, laborValue: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Peça utilizada
+                  <select value={priceForm.inventoryPartId} onChange={(e) => setPriceForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}>
+                    <option value="">Nenhuma peça</option>
+                    {inventoryParts.map((part) => (
+                      <option key={part.id} value={part.id}>
+                        {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Quantidade
+                  <input
+                    type="number"
+                    min="1"
+                    value={priceForm.quantity}
+                    onChange={(e) => setPriceForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                  />
+                </label>
+                <button className={styles.actionButton} type="submit">
+                  Enviar orçamento ao cliente
+                </button>
+              </form>
+            </div>
+          )}
+
           {isStaff && canRegisterProblems && (
             <div className={styles.panel}>
-              <h2>Novo problema identificado</h2>
+              <h2>{isAdmin ? "Diagnóstico com preço" : "Novo problema diagnosticado"}</h2>
               <form className={styles.formGrid} onSubmit={createProblem}>
                 <label>
                   Componente
@@ -314,16 +409,43 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
                     onChange={(e) => setProblemForm((prev) => ({ ...prev, wearLevel: e.target.value }))}
                   />
                 </label>
-                <label>
-                  Valor estimado
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={problemForm.estimatedValue}
-                    onChange={(e) => setProblemForm((prev) => ({ ...prev, estimatedValue: e.target.value }))}
-                  />
-                </label>
+                {isAdmin && (
+                  <>
+                    <label>
+                      Mão de obra
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={problemForm.laborValue}
+                        onChange={(e) => setProblemForm((prev) => ({ ...prev, laborValue: e.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      Peça utilizada
+                      <select
+                        value={problemForm.inventoryPartId}
+                        onChange={(e) => setProblemForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}
+                      >
+                        <option value="">Nenhuma peça</option>
+                        {inventoryParts.map((part) => (
+                          <option key={part.id} value={part.id}>
+                            {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Quantidade
+                      <input
+                        type="number"
+                        min="1"
+                        value={problemForm.quantity}
+                        onChange={(e) => setProblemForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                      />
+                    </label>
+                  </>
+                )}
                 <label className={styles.fullField}>
                   Imagens do problema
                   <input
@@ -350,7 +472,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
               approvals={order.approvals}
               canRespond={user?.role === "CUSTOMER"}
               onRespondApproval={respondApproval}
-              canResolve={isStaff}
+              canResolve={isAdmin}
               onResolvePart={resolvePart}
             />
           </div>

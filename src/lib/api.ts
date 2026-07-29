@@ -37,8 +37,10 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  users: (token: string) => request<{ users: unknown[] }>("/api/auth/users", {}, token),
+
   createUser: (
-    payload: { name: string; email: string; password: string; phone?: string; role: "CUSTOMER" | "MECHANIC" },
+    payload: { name: string; email: string; password: string; phone?: string; role: "CUSTOMER" | "MECHANIC" | "ADMIN" },
     token: string
   ) =>
     request<{ user: { id: string; name: string; email: string; role: string; phone?: string | null } }>(
@@ -47,6 +49,17 @@ export const api = {
         method: "POST",
         body: JSON.stringify(payload),
       },
+      token
+    ),
+
+  updateUser: (
+    id: string,
+    payload: { name?: string; email?: string; password?: string; phone?: string | null; role?: "CUSTOMER" | "MECHANIC" | "ADMIN" },
+    token: string
+  ) =>
+    request<{ user: unknown }>(
+      `/api/auth/users/${id}`,
+      { method: "PATCH", body: JSON.stringify(payload) },
       token
     ),
 
@@ -70,7 +83,16 @@ export const api = {
 
   createProblem: (
     orderId: string,
-    payload: { key: string; name: string; description: string; wearLevel?: string; estimatedValue?: string; files: File[] },
+    payload: {
+      key: string;
+      name: string;
+      description: string;
+      wearLevel?: string;
+      estimatedValue?: string;
+      laborValue?: string;
+      partUsages?: { inventoryPartId: string; quantity: number }[];
+      files: File[];
+    },
     token: string
   ) => {
     const form = new FormData();
@@ -79,6 +101,8 @@ export const api = {
     form.append("description", payload.description);
     if (payload.wearLevel) form.append("wearLevel", payload.wearLevel);
     if (payload.estimatedValue) form.append("estimatedValue", payload.estimatedValue);
+    if (payload.laborValue) form.append("laborValue", payload.laborValue);
+    if (payload.partUsages) form.append("partUsages", JSON.stringify(payload.partUsages));
     payload.files.forEach((file) => form.append("files", file));
 
     return request<{ part: unknown; approval: unknown; event: unknown }>(
@@ -95,12 +119,52 @@ export const api = {
       token
     ),
 
+  priceProblem: (
+    orderId: string,
+    approvalId: string,
+    payload: { name?: string; description?: string; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] },
+    token: string
+  ) =>
+    request<{ approval: unknown; part: unknown; event: unknown }>(
+      `/api/service-orders/${orderId}/parts/problems/${approvalId}/pricing`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+      token
+    ),
+
+  inventoryParts: (token: string) => request<{ parts: unknown[] }>("/api/inventory-parts", {}, token),
+
+  saveInventoryPart: (
+    payload: { id?: string; name: string; sku?: string; description?: string; unitCost: string; stockQty: string; active?: boolean; photo?: File | null },
+    token: string
+  ) => {
+    const form = new FormData();
+    form.append("name", payload.name);
+    if (payload.sku) form.append("sku", payload.sku);
+    if (payload.description) form.append("description", payload.description);
+    form.append("unitCost", payload.unitCost);
+    form.append("stockQty", payload.stockQty);
+    if (payload.active != null) form.append("active", String(payload.active));
+    if (payload.photo) form.append("photo", payload.photo);
+    return request<{ part: unknown }>(
+      payload.id ? `/api/inventory-parts/${payload.id}` : "/api/inventory-parts",
+      { method: payload.id ? "PATCH" : "POST", body: form },
+      token
+    );
+  },
+
+  financeSummary: (token: string) => request<{ summary: unknown; entries: unknown[] }>("/api/finance/summary", {}, token),
+
+  createExpense: (payload: { category: string; description: string; amount: number; occurredAt?: string }, token: string) =>
+    request<{ entry: unknown }>("/api/finance/expenses", { method: "POST", body: JSON.stringify(payload) }, token),
+
   quoteRequests: (token: string, status?: string) =>
     request<{ requests: unknown[] }>(`/api/quote-requests${status ? `?status=${status}` : ""}`, {}, token),
 
   createQuoteRequest: (
     payload: {
       vehicle: { brand: string; model: string; year: number; engine?: string; plate?: string; mileage?: number };
+      problemKey?: string;
+      problemName?: string;
       problemDescription: string;
       preferredDates: string;
     },

@@ -5,6 +5,22 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import styles from "./dashboard.module.css";
 
+const PART_OPTIONS = [
+  { key: "motor", label: "Motor" },
+  { key: "freios", label: "Freios" },
+  { key: "suspensao", label: "Suspensão" },
+  { key: "transmissao", label: "Transmissão" },
+  { key: "escapamento", label: "Escapamento" },
+  { key: "eletrica", label: "Elétrica" },
+  { key: "arcondicionado", label: "Ar-condicionado" },
+  { key: "direcao", label: "Direção" },
+  { key: "pneus", label: "Pneus / rodas" },
+  { key: "bateria", label: "Bateria" },
+  { key: "arrefecimento", label: "Arrefecimento" },
+  { key: "combustivel", label: "Combustível" },
+  { key: "carroceria", label: "Carroceria / vidros" },
+];
+
 export default function RequestQuoteForm({ onCreated }: { onCreated: () => void }) {
   const { token } = useAuth();
   const [form, setForm] = useState({
@@ -14,6 +30,8 @@ export default function RequestQuoteForm({ onCreated }: { onCreated: () => void 
     engine: "",
     plate: "",
     mileage: "",
+    problemKey: "",
+    problemName: "",
     problemDescription: "",
     preferredDates: "",
   });
@@ -36,6 +54,8 @@ export default function RequestQuoteForm({ onCreated }: { onCreated: () => void 
             plate: form.plate || undefined,
             mileage: form.mileage ? Number(form.mileage) : undefined,
           },
+          problemKey: form.problemKey || undefined,
+          problemName: form.problemName || undefined,
           problemDescription: form.problemDescription,
           preferredDates: form.preferredDates,
         },
@@ -89,6 +109,24 @@ export default function RequestQuoteForm({ onCreated }: { onCreated: () => void 
             onChange={(e) => setForm((f) => ({ ...f, mileage: e.target.value }))}
             placeholder="opcional"
           />
+        </label>
+        <label className={styles.fullField}>
+          Onde parece estar o problema?
+          <select
+            value={form.problemKey}
+            onChange={(e) => {
+              const option = PART_OPTIONS.find((part) => part.key === e.target.value);
+              setForm((f) => ({ ...f, problemKey: e.target.value, problemName: option?.label ?? "" }));
+            }}
+            required
+          >
+            <option value="">Escolha a área do carro</option>
+            {PART_OPTIONS.map((part) => (
+              <option key={part.key} value={part.key}>
+                {part.label}
+              </option>
+            ))}
+          </select>
         </label>
         <label className={styles.fullField}>
           Qual o problema identificado?

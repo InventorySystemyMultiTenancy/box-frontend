@@ -6,25 +6,53 @@ import { Approval, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/l
 import styles from "./dashboard.module.css";
 
 const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
-  motor: { x: 120, y: 70 },
-  eletrica: { x: 85, y: 66 },
-  arcondicionado: { x: 170, y: 58 },
-  transmissao: { x: 205, y: 98 },
-  escapamento: { x: 340, y: 103 },
-  freios: { x: 98, y: 120 },
-  suspensao: { x: 300, y: 139 },
-  direcao: { x: 150, y: 90 },
-  pneus: { x: 98, y: 140 },
-  bateria: { x: 70, y: 60 },
-  arrefecimento: { x: 135, y: 65 },
-  combustivel: { x: 260, y: 100 },
-  carroceria: { x: 200, y: 55 },
+  motor: { x: 200, y: 58 },
+  arrefecimento: { x: 200, y: 42 },
+  bateria: { x: 148, y: 54 },
+  eletrica: { x: 252, y: 74 },
+  arcondicionado: { x: 200, y: 92 },
+  direcao: { x: 156, y: 104 },
+  freios: { x: 126, y: 104 },
+  suspensao: { x: 274, y: 126 },
+  transmissao: { x: 200, y: 128 },
+  escapamento: { x: 200, y: 206 },
+  pneus: { x: 86, y: 82 },
+  combustivel: { x: 254, y: 182 },
+  carroceria: { x: 200, y: 154 },
 };
 
 const UNRESOLVED_STATUSES = new Set(["CRITICAL", "WARNING", "IN_PROGRESS"]);
 
 function mediaUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
+}
+
+function normalize(text: string) {
+  return text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+}
+
+function positionForPart(part: VehiclePart) {
+  const base = HOTSPOT_POSITIONS[part.key] ?? HOTSPOT_POSITIONS.carroceria;
+  const text = normalize(`${part.name} ${part.note ?? ""}`);
+  const pos = { ...base };
+
+  if (/dianteir|frente|capo|radiador|parachoque dianteiro/.test(text)) pos.y = Math.min(pos.y, 82);
+  if (/traseir|atras|porta malas|tanque|parachoque traseiro/.test(text)) pos.y = Math.max(pos.y, 190);
+  if (/esquerd|motorista/.test(text)) pos.x = Math.min(pos.x, 126);
+  if (/direit|passageiro/.test(text)) pos.x = Math.max(pos.x, 274);
+  if (/vidro|para-brisa|parabrisa/.test(text)) {
+    pos.x = /lateral|porta/.test(text) ? (/direit|passageiro/.test(text) ? 274 : 126) : 200;
+    pos.y = /traseir|atras/.test(text) ? 174 : 104;
+  }
+  if (/roda|pneu/.test(text)) {
+    pos.x = /direit|passageiro/.test(text) ? 314 : 86;
+    pos.y = /traseir|atras/.test(text) ? 196 : 82;
+  }
+
+  return pos;
 }
 
 export default function VehicleSchematic({
@@ -53,8 +81,6 @@ export default function VehicleSchematic({
   const [resolving, setResolving] = useState(false);
   const active = withPosition.find((p) => p.id === activeId) ?? defaultPart;
 
-  // Vínculo direto (aprovação criada já apontando para a peça); cai para o casamento
-  // por mídia compartilhada só em dados antigos que não tinham esse vínculo.
   const activeMediaIds = new Set(active?.media.map((media) => media.id) ?? []);
   const activeApproval = approvals.find((approval) =>
     active ? approval.partId === active.id || approval.media.some((media) => activeMediaIds.has(media.id)) : false
@@ -89,32 +115,54 @@ export default function VehicleSchematic({
   return (
     <div>
       <div className={styles.carWrap}>
-        <svg viewBox="0 0 400 170" role="group" aria-label="Diagrama esquemático do veículo com pontos de manutenção">
-          <path
-            d="M30,118 L30,96 Q30,88 40,85 L75,85 L102,54 Q107,49 114,49 L224,49 Q231,49 236,54 L263,85 L358,85 Q368,85 368,96 L368,118 Z"
-            fill="none"
-            stroke="var(--text-muted)"
-            strokeWidth={1.5}
-          />
-          <circle cx={98} cy={120} r={21} fill="var(--bg)" stroke="var(--text-muted)" strokeWidth={1.5} />
-          <circle cx={300} cy={120} r={21} fill="var(--bg)" stroke="var(--text-muted)" strokeWidth={1.5} />
-          <circle cx={98} cy={120} r={9} fill="none" stroke="var(--border-strong)" strokeWidth={1.5} />
-          <circle cx={300} cy={120} r={9} fill="none" stroke="var(--border-strong)" strokeWidth={1.5} />
+        <svg viewBox="0 0 400 260" role="group" aria-label="Visão superior cirúrgica do veículo com pontos de manutenção">
+          <defs>
+            <linearGradient id="glass" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent-cian)" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="var(--accent-cian)" stopOpacity="0.08" />
+            </linearGradient>
+          </defs>
+
+          <rect x="92" y="46" width="216" height="174" rx="46" fill="var(--bg-elevated)" stroke="var(--border-strong)" strokeWidth="1.5" />
+          <path d="M138 46 Q200 18 262 46" fill="none" stroke="var(--border-strong)" strokeWidth="1.4" />
+          <path d="M122 218 Q200 242 278 218" fill="none" stroke="var(--border-strong)" strokeWidth="1.4" />
+
+          <rect x="104" y="66" width="34" height="52" rx="12" fill="var(--bg)" stroke="var(--border-strong)" />
+          <rect x="262" y="66" width="34" height="52" rx="12" fill="var(--bg)" stroke="var(--border-strong)" />
+          <rect x="104" y="158" width="34" height="52" rx="12" fill="var(--bg)" stroke="var(--border-strong)" />
+          <rect x="262" y="158" width="34" height="52" rx="12" fill="var(--bg)" stroke="var(--border-strong)" />
+
+          <line x1="121" y1="92" x2="279" y2="92" stroke="var(--border)" strokeWidth="5" />
+          <line x1="121" y1="184" x2="279" y2="184" stroke="var(--border)" strokeWidth="5" />
+          <line x1="200" y1="58" x2="200" y2="208" stroke="var(--border-strong)" strokeWidth="2" strokeDasharray="5 5" />
+
+          <path d="M150 86 L250 86 L268 122 L250 160 L150 160 L132 122 Z" fill="url(#glass)" stroke="var(--accent-cian)" strokeOpacity="0.45" />
+          <path d="M160 94 L240 94 L250 122 L240 150 L160 150 L150 122 Z" fill="none" stroke="var(--border)" />
+          <line x1="150" y1="122" x2="250" y2="122" stroke="var(--border)" />
+
+          <rect x="158" y="38" width="84" height="42" rx="16" fill="none" stroke="var(--accent-cobre)" strokeOpacity="0.55" />
+          <circle cx="178" cy="58" r="10" fill="none" stroke="var(--border-strong)" />
+          <circle cx="222" cy="58" r="10" fill="none" stroke="var(--border-strong)" />
+          <path d="M168 196 Q200 210 232 196" fill="none" stroke="var(--accent-cobre)" strokeOpacity="0.55" strokeWidth="2" />
+          <circle cx="200" cy="205" r="11" fill="none" stroke="var(--border-strong)" />
+
+          <path d="M126 88 L148 72 M274 88 L252 72 M126 184 L148 198 M274 184 L252 198" stroke="var(--border-strong)" strokeWidth="1.5" />
+          <path d="M186 78 L214 78 M184 170 L216 170 M190 78 L190 170 M210 78 L210 170" stroke="var(--grid-line)" strokeWidth="1.3" />
 
           {withPosition.map((part) => {
-            const pos = HOTSPOT_POSITIONS[part.key];
+            const pos = positionForPart(part);
             const isActive = part.id === active?.id;
+            const tone = PART_STATUS_TONE[part.status];
+            const fill = isActive ? "var(--accent-cian)" : tone === "crit" ? "var(--critical)" : tone === "warn" ? "var(--warning)" : "var(--accent-cobre)";
             return (
               <g key={part.id}>
-                {isActive && (
-                  <circle cx={pos.x} cy={pos.y} r={12} fill="none" stroke="var(--accent-cian)" strokeWidth={1.5} opacity={0.5} />
-                )}
+                {isActive && <circle cx={pos.x} cy={pos.y} r={14} fill="none" stroke="var(--accent-cian)" strokeWidth={1.6} opacity={0.55} />}
                 <circle
                   className={styles.hotspot}
                   cx={pos.x}
                   cy={pos.y}
-                  r={isActive ? 8 : 6.5}
-                  fill={isActive ? "var(--accent-cian)" : "var(--accent-cobre)"}
+                  r={isActive ? 8.5 : 7}
+                  fill={fill}
                   tabIndex={0}
                   role="button"
                   aria-label={part.name}
@@ -181,9 +229,20 @@ export default function VehicleSchematic({
                 </span>
               </div>
               <p>{activeApproval.description}</p>
+              {activeApproval.partUsages && activeApproval.partUsages.length > 0 && (
+                <div className={styles.partUsageList}>
+                  {activeApproval.partUsages.map((usage) => (
+                    <span key={usage.id}>
+                      {usage.quantity}x {usage.inventoryPart.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {activeApproval.laborValue != null && <div className={styles.value}>Mão de obra: R$ {activeApproval.laborValue.toFixed(2)}</div>}
+              {activeApproval.partsValue != null && <div className={styles.value}>Peças: R$ {activeApproval.partsValue.toFixed(2)}</div>}
               {activeApproval.estimatedValue != null && <div className={styles.value}>R$ {activeApproval.estimatedValue.toFixed(2)}</div>}
               {activeApproval.responseNote && <p className={styles.responseNote}>{activeApproval.responseNote}</p>}
-              {canRespond && activeApproval.status === "PENDING" && (
+              {canRespond && activeApproval.status === "PENDING" && activeApproval.estimatedValue != null && (
                 <>
                   <textarea
                     className={styles.rejectReason}
