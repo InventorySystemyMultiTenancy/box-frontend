@@ -221,7 +221,7 @@ export function FinalCta() {
   return (
     <section className={styles.section} id="orcamento">
       <Reveal>
-        <div className={styles.ctaBand} style={{ background: "var(--accent-cobre-soft)" }}>
+        <div className={styles.ctaBand}>
           <div>
             <span className="eyebrow">Orçamento</span>
             <h2>Monte seu orçamento antes de falar com alguém.</h2>
