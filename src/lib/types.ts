@@ -1,6 +1,7 @@
 // Espelha src/lib/constants.ts do backendmecanic — mudar em um lado exige mudar no outro.
 
 export const SERVICE_ORDER_STATUSES = [
+  "SCHEDULED",
   "RECEIVED",
   "AWAITING_DIAGNOSIS",
   "DIAGNOSIS_DONE",
@@ -16,6 +17,7 @@ export const SERVICE_ORDER_STATUSES = [
 export type ServiceOrderStatus = (typeof SERVICE_ORDER_STATUSES)[number];
 
 export const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
+  SCHEDULED: "Agendado — aguardando veículo",
   RECEIVED: "Veículo recebido",
   AWAITING_DIAGNOSIS: "Aguardando diagnóstico",
   DIAGNOSIS_DONE: "Diagnóstico concluído",
@@ -32,6 +34,7 @@ export const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
 // Tom visual de cada status: neutro (recebido), info (em progresso), alerta (parado
 // esperando o cliente) ou sucesso (concluído) — mesma regra de 4 cores do dashboard.
 export const STATUS_TONE: Record<ServiceOrderStatus, "muted" | "info" | "warn" | "ok"> = {
+  SCHEDULED: "warn",
   RECEIVED: "muted",
   AWAITING_DIAGNOSIS: "info",
   DIAGNOSIS_DONE: "info",
@@ -131,6 +134,7 @@ export interface ServiceOrder {
   progress: number;
   estimatedMin?: number | null;
   estimatedMax?: number | null;
+  scheduledAt?: string | null;
   receivedAt: string;
   completedAt?: string | null;
   vehicle: Vehicle;
@@ -138,4 +142,22 @@ export interface ServiceOrder {
   parts: VehiclePart[];
   approvals: Approval[];
   media: Media[];
+}
+
+export type QuoteRequestStatus = "PENDING" | "ACCEPTED" | "DECLINED";
+
+export interface QuoteRequest {
+  id: string;
+  problemDescription: string;
+  preferredDates: string;
+  status: QuoteRequestStatus;
+  scheduledAt?: string | null;
+  initialValue?: number | null;
+  declineReason?: string | null;
+  createdAt: string;
+  respondedAt?: string | null;
+  customer: { id: string; name: string; email: string; phone?: string | null };
+  mechanic?: { id: string; name: string } | null;
+  vehicle: Vehicle;
+  serviceOrder?: { id: string; code: string; status: ServiceOrderStatus } | null;
 }

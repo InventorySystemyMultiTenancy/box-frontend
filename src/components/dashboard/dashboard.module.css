@@ -480,3 +480,113 @@
   color: var(--text-muted);
   font-family: var(--font-display);
 }
+
+/* mecânico: fila de solicitações + lista de projetos */
+.sectionTitle {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+.sectionTitle + .sectionTitle {
+  margin-top: 2.2rem;
+}
+
+.queueGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.queueCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  border-left: 3px solid var(--warning);
+}
+.queueCard h3 {
+  font-family: var(--font-display);
+  font-size: 0.92rem;
+}
+.queueCard p {
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+}
+
+.miniForm {
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.miniForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.miniForm input,
+.miniForm textarea {
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 0.5rem 0.6rem;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+}
+
+.ordersList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+}
+.orderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  border-left: 0;
+  border-right: 0;
+  border-top: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+.orderRow:last-child { border-bottom: none; }
+.orderRow:hover { background: var(--bg-panel); }
+.orderRowActive { background: var(--accent-cian-soft); }
+.orderRowInfo strong {
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  display: block;
+}
+.orderRowInfo span {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.detailWrap {
+  margin-top: 1.6rem;
+  padding-top: 1.6rem;
+  border-top: 1px solid var(--border-strong);
+}

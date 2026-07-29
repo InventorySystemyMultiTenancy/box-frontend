@@ -62,6 +62,12 @@ export const api = {
       body: JSON.stringify({ status, responseNote }),
     }, token),
 
+  updateOrderStatus: (orderId: string, status: string, token: string) =>
+    request<{ order: unknown }>(`/api/service-orders/${orderId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }, token),
+
   createProblem: (
     orderId: string,
     payload: { key: string; name: string; description: string; wearLevel?: string; estimatedValue?: string; files: File[] },
@@ -81,6 +87,32 @@ export const api = {
       token
     );
   },
+
+  quoteRequests: (token: string, status?: string) =>
+    request<{ requests: unknown[] }>(`/api/quote-requests${status ? `?status=${status}` : ""}`, {}, token),
+
+  createQuoteRequest: (
+    payload: {
+      vehicle: { brand: string; model: string; year: number; engine?: string; plate?: string; mileage?: number };
+      problemDescription: string;
+      preferredDates: string;
+    },
+    token: string
+  ) => request<{ request: unknown }>("/api/quote-requests", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  acceptQuoteRequest: (id: string, payload: { scheduledAt: string; initialValue?: number }, token: string) =>
+    request<{ request: unknown }>(
+      `/api/quote-requests/${id}/accept`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+      token
+    ),
+
+  declineQuoteRequest: (id: string, payload: { declineReason?: string }, token: string) =>
+    request<{ request: unknown }>(
+      `/api/quote-requests/${id}/decline`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+      token
+    ),
 };
 
 export { API_URL };
