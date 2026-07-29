@@ -15,6 +15,35 @@
   font-family: var(--font-display);
   font-weight: 750;
 }
+.topbarLeft {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+}
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.tab {
+  font-family: var(--font-display);
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.45rem 0.8rem;
+  border-radius: 7px;
+}
+.tab:hover {
+  color: var(--text);
+  background: var(--bg-panel);
+}
+.tabActive {
+  color: var(--accent-cian);
+  background: var(--accent-cian-soft);
+}
+.tabActive:hover {
+  color: var(--accent-cian);
+}
 .topbarRight {
   display: flex;
   align-items: center;
@@ -384,6 +413,45 @@
   background: var(--critical-soft);
   color: var(--critical);
   font-size: 0.82rem;
+}
+
+/* veículo pronto para retirada — painel verde com "led" pulsando atrás do esquema */
+.panelReady {
+  border-color: var(--success);
+}
+.readyBanner {
+  margin-bottom: 0.9rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.86rem;
+}
+.panelReady .carWrap {
+  border-color: var(--success);
+  overflow: hidden;
+}
+.panelReady .carWrap::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(circle, rgba(76, 187, 124, 0.5) 0%, transparent 70%);
+  animation: ledPulse 2.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+.panelReady .carWrap svg {
+  position: relative;
+  z-index: 1;
+}
+@keyframes ledPulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.94); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .panelReady .carWrap::before { animation: none; opacity: 0.55; }
 }
 
 /* esquema do veículo */

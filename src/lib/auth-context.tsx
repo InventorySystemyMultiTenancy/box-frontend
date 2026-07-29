@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.localStorage.removeItem(STORAGE_KEY);
     setToken(null);
     setUser(null);
-    router.push("/login");
+    router.push("/");
   }, [router]);
 
   return <AuthContext.Provider value={{ user, token, loading, login, registerCustomer, logout }}>{children}</AuthContext.Provider>;

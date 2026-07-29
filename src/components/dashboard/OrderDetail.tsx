@@ -159,10 +159,36 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     setOrder((prev) => (prev ? { ...prev, status: "RECEIVED" } : prev));
   }
 
+  async function resolvePart(partId: string) {
+    if (!token || !order) return;
+    const result = await api.resolvePart(order.id, partId, token);
+    const part = result.part as VehiclePart;
+    const event = result.event as TimelineEvent;
+    setOrder((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        parts: prev.parts.map((p) => (p.id === part.id ? part : p)),
+        timelineEvents: prev.timelineEvents.some((t) => t.id === event.id) ? prev.timelineEvents : [...prev.timelineEvents, event],
+      };
+    });
+    setJustArrivedId(event.id);
+  }
+
+  async function markReadyForPickup() {
+    if (!token || !order) return;
+    await api.updateOrderStatus(order.id, "READY_FOR_PICKUP", token);
+    setOrder((prev) => (prev ? { ...prev, status: "READY_FOR_PICKUP", progress: 100 } : prev));
+  }
+
   if (fetchError) return <div className={styles.empty}>{fetchError}</div>;
   if (!order) return <div className={styles.empty}>Carregando ordem de serviço...</div>;
 
   const pendingApproval = order.approvals.find((a) => a.status === "PENDING");
+  const unresolvedParts = order.parts.filter((p) => p.status === "CRITICAL" || p.status === "WARNING" || p.status === "IN_PROGRESS");
+  const blockedForPickup = unresolvedParts.length > 0 || Boolean(pendingApproval);
+  const isReady = order.status === "READY_FOR_PICKUP";
+  const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
 
   return (
     <div>
@@ -209,6 +235,29 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         </div>
       )}
 
+      {isStaff && canRegisterProblems && (
+        <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
+          <h2>Finalização</h2>
+          {blockedForPickup ? (
+            <p>
+              {unresolvedParts.length > 0
+                ? `Ainda há ${unresolvedParts.length} problema${unresolvedParts.length > 1 ? "s" : ""} aguardando aprovação ou reparo`
+                : "Ainda há uma aprovação pendente"}{" "}
+              antes de liberar o veículo.
+            </p>
+          ) : (
+            <>
+              <p>Todos os problemas identificados foram resolvidos.</p>
+              <div className={styles.approvalActions}>
+                <button className={styles.btnApprove} onClick={markReadyForPickup}>
+                  Veículo pronto para retirada
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       <div className={styles.columns}>
         <div className={styles.panel}>
           <h2>Timeline da manutenção</h2>
@@ -223,7 +272,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
             />
           )}
 
-          {isStaff && order.status !== "SCHEDULED" && (
+          {isStaff && canRegisterProblems && (
             <div className={styles.panel}>
               <h2>Novo problema identificado</h2>
               <form className={styles.formGrid} onSubmit={createProblem}>
@@ -293,13 +342,16 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
             </div>
           )}
 
-          <div className={styles.panel}>
+          <div className={`${styles.panel} ${isReady ? styles.panelReady : ""}`}>
             <h2>Modelo do veículo</h2>
+            {isReady && <div className={styles.readyBanner}>Veículo pronto e em ótimo estado — pode retirar!</div>}
             <VehicleSchematic
               parts={order.parts}
               approvals={order.approvals}
               canRespond={user?.role === "CUSTOMER"}
               onRespondApproval={respondApproval}
+              canResolve={isStaff}
+              onResolvePart={resolvePart}
             />
           </div>
         </div>

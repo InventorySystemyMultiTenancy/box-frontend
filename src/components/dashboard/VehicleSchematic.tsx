@@ -21,6 +21,8 @@ const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
   carroceria: { x: 200, y: 55 },
 };
 
+const UNRESOLVED_STATUSES = new Set(["CRITICAL", "WARNING", "IN_PROGRESS"]);
+
 function mediaUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
 }
@@ -30,11 +32,15 @@ export default function VehicleSchematic({
   approvals = [],
   canRespond = false,
   onRespondApproval,
+  canResolve = false,
+  onResolvePart,
 }: {
   parts: VehiclePart[];
   approvals?: Approval[];
   canRespond?: boolean;
   onRespondApproval?: (approvalId: string, status: "APPROVED" | "REJECTED", responseNote?: string) => Promise<void>;
+  canResolve?: boolean;
+  onResolvePart?: (partId: string) => Promise<void>;
 }) {
   const withPosition = useMemo(() => parts.filter((p) => HOTSPOT_POSITIONS[p.key]), [parts]);
 
@@ -44,9 +50,15 @@ export default function VehicleSchematic({
   const [activeId, setActiveId] = useState<string | undefined>(defaultPart?.id);
   const [rejectNote, setRejectNote] = useState("");
   const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
+  const [resolving, setResolving] = useState(false);
   const active = withPosition.find((p) => p.id === activeId) ?? defaultPart;
+
+  // Vínculo direto (aprovação criada já apontando para a peça); cai para o casamento
+  // por mídia compartilhada só em dados antigos que não tinham esse vínculo.
   const activeMediaIds = new Set(active?.media.map((media) => media.id) ?? []);
-  const activeApproval = approvals.find((approval) => approval.media.some((media) => activeMediaIds.has(media.id)));
+  const activeApproval = approvals.find((approval) =>
+    active ? approval.partId === active.id || approval.media.some((media) => activeMediaIds.has(media.id)) : false
+  );
 
   async function respond(status: "APPROVED" | "REJECTED") {
     if (!activeApproval || !onRespondApproval) return;
@@ -57,6 +69,16 @@ export default function VehicleSchematic({
       setRejectNote("");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function resolve() {
+    if (!active || !onResolvePart) return;
+    setResolving(true);
+    try {
+      await onResolvePart(active.id);
+    } finally {
+      setResolving(false);
     }
   }
 
@@ -179,6 +201,13 @@ export default function VehicleSchematic({
                   </div>
                 </>
               )}
+            </div>
+          )}
+          {canResolve && UNRESOLVED_STATUSES.has(active.status) && (
+            <div className={styles.approvalActions}>
+              <button className={styles.btnApprove} disabled={resolving} onClick={resolve}>
+                {resolving ? "Marcando..." : "Marcar problema como resolvido"}
+              </button>
             </div>
           )}
         </div>

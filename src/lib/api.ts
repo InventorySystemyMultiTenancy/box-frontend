@@ -88,6 +88,13 @@ export const api = {
     );
   },
 
+  resolvePart: (orderId: string, partId: string, token: string) =>
+    request<{ part: unknown; event: unknown }>(
+      `/api/service-orders/${orderId}/parts/${partId}/resolve`,
+      { method: "POST" },
+      token
+    ),
+
   quoteRequests: (token: string, status?: string) =>
     request<{ requests: unknown[] }>(`/api/quote-requests${status ? `?status=${status}` : ""}`, {}, token),
 

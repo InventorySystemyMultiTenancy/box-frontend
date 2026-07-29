@@ -24,7 +24,7 @@ export const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   AWAITING_APPROVAL: "Aguardando aprovação",
   PARTS_REQUESTED: "Peças solicitadas",
   PARTS_RECEIVED: "Peças recebidas",
-  IN_PROGRESS: "Manutenção em andamento",
+  IN_PROGRESS: "Reparação em andamento",
   TESTING: "Testes",
   WASHING: "Lavagem",
   FINISHED: "Finalizado",
@@ -117,6 +117,7 @@ export interface VehiclePart {
 
 export interface Approval {
   id: string;
+  partId?: string | null;
   title: string;
   description: string;
   estimatedValue?: number | null;
