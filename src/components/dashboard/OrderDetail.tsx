@@ -27,6 +27,18 @@ const PART_OPTIONS = [
   { key: "carroceria", label: "Carroceria" },
 ];
 
+const POSITION_REQUIRED_PARTS = new Set(["pneus", "freios", "suspensao"]);
+
+const AXLE_LABEL: Record<string, string> = {
+  dianteiro: "dianteiro",
+  traseiro: "traseiro",
+};
+
+const SIDE_LABEL: Record<string, string> = {
+  esquerdo: "lado esquerdo",
+  direito: "lado direito",
+};
+
 /** Painel completo de uma ordem de serviço — status, timeline, aprovação e esquema do
  * veículo. Usado tanto na área do cliente quanto no projeto selecionado pelo mecânico. */
 export default function OrderDetail({ orderId }: { orderId: string }) {
@@ -42,6 +54,8 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     laborValue: "",
     inventoryPartId: "",
     quantity: "1",
+    axle: "dianteiro",
+    side: "esquerdo",
     files: [] as File[],
   });
   const [priceForm, setPriceForm] = useState({ laborValue: "", inventoryPartId: "", quantity: "1" });
@@ -134,6 +148,10 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   async function createProblem(e: React.FormEvent) {
     e.preventDefault();
     if (!token || !order) return;
+    const requiresPosition = POSITION_REQUIRED_PARTS.has(problemForm.key);
+    const positionText = requiresPosition ? `${AXLE_LABEL[problemForm.axle]} ${SIDE_LABEL[problemForm.side]}` : "";
+    const displayName = positionText ? `${problemForm.name} ${positionText}` : problemForm.name;
+    const description = positionText ? `Local: ${positionText}. ${problemForm.description}` : problemForm.description;
     setProblemBusy(true);
     setProblemMessage(null);
     try {
@@ -141,6 +159,8 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         order.id,
         {
           ...problemForm,
+          name: displayName,
+          description,
           partUsages: problemForm.inventoryPartId
             ? [{ inventoryPartId: problemForm.inventoryPartId, quantity: Number(problemForm.quantity) || 1 }]
             : [],
@@ -187,6 +207,25 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
       if (!prev) return prev;
       return {
         ...prev,
+        parts: prev.parts.map((p) => (p.id === part.id ? part : p)),
+        timelineEvents: prev.timelineEvents.some((t) => t.id === event.id) ? prev.timelineEvents : [...prev.timelineEvents, event],
+      };
+    });
+    setJustArrivedId(event.id);
+  }
+
+  async function startPart(partId: string) {
+    if (!token || !order) return;
+    const result = await api.startPart(order.id, partId, token);
+    const part = result.part as VehiclePart;
+    const event = result.event as TimelineEvent;
+    const updatedOrder = result.order as Partial<ServiceOrder> | undefined;
+    setOrder((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        status: updatedOrder?.status ?? "IN_PROGRESS",
+        progress: updatedOrder?.progress ?? 65,
         parts: prev.parts.map((p) => (p.id === part.id ? part : p)),
         timelineEvents: prev.timelineEvents.some((t) => t.id === event.id) ? prev.timelineEvents : [...prev.timelineEvents, event],
       };
@@ -391,6 +430,24 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
                   Nome exibido
                   <input value={problemForm.name} onChange={(e) => setProblemForm((prev) => ({ ...prev, name: e.target.value }))} required />
                 </label>
+                {POSITION_REQUIRED_PARTS.has(problemForm.key) && (
+                  <>
+                    <label>
+                      Eixo
+                      <select value={problemForm.axle} onChange={(e) => setProblemForm((prev) => ({ ...prev, axle: e.target.value }))}>
+                        <option value="dianteiro">Dianteiro</option>
+                        <option value="traseiro">Traseiro</option>
+                      </select>
+                    </label>
+                    <label>
+                      Lado
+                      <select value={problemForm.side} onChange={(e) => setProblemForm((prev) => ({ ...prev, side: e.target.value }))}>
+                        <option value="esquerdo">Esquerdo</option>
+                        <option value="direito">Direito</option>
+                      </select>
+                    </label>
+                  </>
+                )}
                 <label className={styles.fullField}>
                   Descrição do problema
                   <textarea
@@ -472,7 +529,8 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
               approvals={order.approvals}
               canRespond={user?.role === "CUSTOMER"}
               onRespondApproval={respondApproval}
-              canResolve={isAdmin}
+              canManageMaintenance={isStaff}
+              onStartPart={startPart}
               onResolvePart={resolvePart}
             />
           </div>

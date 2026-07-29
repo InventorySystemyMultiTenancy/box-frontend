@@ -119,6 +119,13 @@ export const api = {
       token
     ),
 
+  startPart: (orderId: string, partId: string, token: string) =>
+    request<{ part: unknown; event: unknown; order: unknown }>(
+      `/api/service-orders/${orderId}/parts/${partId}/start`,
+      { method: "POST" },
+      token
+    ),
+
   priceProblem: (
     orderId: string,
     approvalId: string,

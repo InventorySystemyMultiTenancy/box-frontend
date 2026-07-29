@@ -6,17 +6,17 @@ import { Approval, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/l
 import styles from "./dashboard.module.css";
 
 const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
-  motor: { x: 150, y: 118 },
-  arrefecimento: { x: 150, y: 76 },
-  bateria: { x: 96, y: 124 },
-  eletrica: { x: 204, y: 134 },
+  motor: { x: 150, y: 92 },
+  arrefecimento: { x: 150, y: 58 },
+  bateria: { x: 96, y: 116 },
+  eletrica: { x: 204, y: 118 },
   arcondicionado: { x: 150, y: 180 },
   direcao: { x: 104, y: 208 },
-  freios: { x: 78, y: 164 },
+  freios: { x: 51, y: 176 },
   suspensao: { x: 222, y: 338 },
   transmissao: { x: 150, y: 266 },
   escapamento: { x: 150, y: 442 },
-  pneus: { x: 58, y: 360 },
+  pneus: { x: 51, y: 364 },
   combustivel: { x: 212, y: 398 },
   carroceria: { x: 150, y: 300 },
 };
@@ -39,6 +39,8 @@ function positionForPart(part: VehiclePart) {
   const text = normalize(`${part.name} ${part.note ?? ""}`);
   const pos = { ...base };
 
+  if (part.key === "motor") return { x: 150, y: 92 };
+
   if (/dianteir|frente|capo|radiador|parachoque dianteiro/.test(text)) pos.y = Math.min(pos.y, 132);
   if (/traseir|atras|porta malas|tanque|parachoque traseiro/.test(text)) pos.y = Math.max(pos.y, 392);
   if (/esquerd|motorista/.test(text)) pos.x = Math.min(pos.x, 86);
@@ -49,7 +51,7 @@ function positionForPart(part: VehiclePart) {
     pos.y = /traseir|atras/.test(text) ? 408 : /lateral|porta/.test(text) ? 250 : 154;
   }
 
-  if (/roda|pneu/.test(text)) {
+  if (/roda|pneu|freio|suspensao/.test(text) || ["pneus", "freios", "suspensao"].includes(part.key)) {
     pos.x = /direit|passageiro/.test(text) ? 249 : 51;
     pos.y = /dianteir|frente/.test(text) ? 176 : 364;
   }
@@ -62,14 +64,16 @@ export default function VehicleSchematic({
   approvals = [],
   canRespond = false,
   onRespondApproval,
-  canResolve = false,
+  canManageMaintenance = false,
+  onStartPart,
   onResolvePart,
 }: {
   parts: VehiclePart[];
   approvals?: Approval[];
   canRespond?: boolean;
   onRespondApproval?: (approvalId: string, status: "APPROVED" | "REJECTED", responseNote?: string) => Promise<void>;
-  canResolve?: boolean;
+  canManageMaintenance?: boolean;
+  onStartPart?: (partId: string) => Promise<void>;
   onResolvePart?: (partId: string) => Promise<void>;
 }) {
   const withPosition = useMemo(() => parts.filter((p) => HOTSPOT_POSITIONS[p.key]), [parts]);
@@ -80,6 +84,7 @@ export default function VehicleSchematic({
   const [activeId, setActiveId] = useState<string | undefined>(defaultPart?.id);
   const [rejectNote, setRejectNote] = useState("");
   const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
+  const [starting, setStarting] = useState(false);
   const [resolving, setResolving] = useState(false);
   const active = withPosition.find((p) => p.id === activeId) ?? defaultPart;
 
@@ -107,6 +112,16 @@ export default function VehicleSchematic({
       await onResolvePart(active.id);
     } finally {
       setResolving(false);
+    }
+  }
+
+  async function start() {
+    if (!active || !onStartPart) return;
+    setStarting(true);
+    try {
+      await onStartPart(active.id);
+    } finally {
+      setStarting(false);
     }
   }
 
@@ -252,11 +267,21 @@ export default function VehicleSchematic({
               )}
             </div>
           )}
-          {canResolve && UNRESOLVED_STATUSES.has(active.status) && (
+          {canManageMaintenance && UNRESOLVED_STATUSES.has(active.status) && (
             <div className={styles.approvalActions}>
-              <button className={styles.btnApprove} disabled={resolving} onClick={resolve}>
-                {resolving ? "Marcando..." : "Marcar problema como resolvido"}
-              </button>
+              {active.status === "IN_PROGRESS" ? (
+                <button className={styles.btnApprove} disabled={resolving} onClick={resolve}>
+                  {resolving ? "Concluindo..." : "Problema concluído"}
+                </button>
+              ) : (
+                <button
+                  className={styles.btnApprove}
+                  disabled={starting || activeApproval?.status === "PENDING" || activeApproval?.status === "REJECTED"}
+                  onClick={start}
+                >
+                  {starting ? "Iniciando..." : "Iniciar manutenção"}
+                </button>
+              )}
             </div>
           )}
         </div>
