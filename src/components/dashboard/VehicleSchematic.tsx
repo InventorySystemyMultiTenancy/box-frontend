@@ -6,19 +6,19 @@ import { Approval, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/l
 import styles from "./dashboard.module.css";
 
 const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
-  motor: { x: 320, y: 118 },
-  arrefecimento: { x: 358, y: 120 },
-  bateria: { x: 302, y: 92 },
-  eletrica: { x: 242, y: 94 },
-  arcondicionado: { x: 278, y: 138 },
-  direcao: { x: 218, y: 116 },
-  freios: { x: 154, y: 160 },
-  suspensao: { x: 160, y: 190 },
-  transmissao: { x: 244, y: 158 },
-  escapamento: { x: 214, y: 214 },
-  pneus: { x: 128, y: 204 },
-  combustivel: { x: 274, y: 212 },
-  carroceria: { x: 246, y: 176 },
+  motor: { x: 150, y: 118 },
+  arrefecimento: { x: 150, y: 76 },
+  bateria: { x: 96, y: 124 },
+  eletrica: { x: 204, y: 134 },
+  arcondicionado: { x: 150, y: 180 },
+  direcao: { x: 104, y: 208 },
+  freios: { x: 78, y: 164 },
+  suspensao: { x: 222, y: 338 },
+  transmissao: { x: 150, y: 266 },
+  escapamento: { x: 150, y: 442 },
+  pneus: { x: 58, y: 360 },
+  combustivel: { x: 212, y: 398 },
+  carroceria: { x: 150, y: 300 },
 };
 
 const UNRESOLVED_STATUSES = new Set(["CRITICAL", "WARNING", "IN_PROGRESS"]);
@@ -39,19 +39,19 @@ function positionForPart(part: VehiclePart) {
   const text = normalize(`${part.name} ${part.note ?? ""}`);
   const pos = { ...base };
 
-  if (/dianteir|frente|capo|radiador|parachoque dianteiro/.test(text)) pos.x = Math.max(pos.x, 318);
-  if (/traseir|atras|porta malas|tanque|parachoque traseiro/.test(text)) pos.x = Math.min(pos.x, 124);
-  if (/esquerd|motorista/.test(text)) pos.y = Math.min(pos.y, 104);
-  if (/direit|passageiro/.test(text)) pos.y = Math.max(pos.y, 206);
+  if (/dianteir|frente|capo|radiador|parachoque dianteiro/.test(text)) pos.y = Math.min(pos.y, 132);
+  if (/traseir|atras|porta malas|tanque|parachoque traseiro/.test(text)) pos.y = Math.max(pos.y, 392);
+  if (/esquerd|motorista/.test(text)) pos.x = Math.min(pos.x, 86);
+  if (/direit|passageiro/.test(text)) pos.x = Math.max(pos.x, 214);
 
   if (/vidro|para-brisa|parabrisa/.test(text)) {
-    pos.x = /traseir|atras/.test(text) ? 170 : 252;
-    pos.y = /lateral|porta/.test(text) ? (/direit|passageiro/.test(text) ? 194 : 102) : 138;
+    pos.x = /lateral|porta|esquerd|direit|motorista|passageiro/.test(text) ? (/direit|passageiro/.test(text) ? 222 : 78) : 150;
+    pos.y = /traseir|atras/.test(text) ? 408 : /lateral|porta/.test(text) ? 250 : 154;
   }
 
   if (/roda|pneu/.test(text)) {
-    pos.x = /traseir|atras/.test(text) ? 116 : 346;
-    pos.y = /direit|passageiro/.test(text) ? 218 : 88;
+    pos.x = /direit|passageiro/.test(text) ? 249 : 51;
+    pos.y = /dianteir|frente/.test(text) ? 176 : 364;
   }
 
   return pos;
@@ -117,59 +117,85 @@ export default function VehicleSchematic({
   return (
     <div>
       <div className={styles.carWrap}>
-        <svg viewBox="0 0 520 300" role="group" aria-label="Modelo wireframe do veículo com pontos de manutenção">
+        <svg viewBox="0 0 300 520" role="group" aria-label="Modelo raio-x do veiculo visto de cima com pontos de manutencao">
           <defs>
-            <linearGradient id="xrayBody" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stopColor="#48d7ff" stopOpacity="0.24" />
-              <stop offset="55%" stopColor="#178ca7" stopOpacity="0.11" />
-              <stop offset="100%" stopColor="#48d7ff" stopOpacity="0.06" />
+            <linearGradient id="xrayGreen" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#c8ff2f" stopOpacity="0.3" />
+              <stop offset="48%" stopColor="#86f300" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#c8ff2f" stopOpacity="0.2" />
             </linearGradient>
-            <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <filter id="greenGlow" x="-35%" y="-35%" width="170%" height="170%">
+              <feGaussianBlur stdDeviation="2.2" result="blur" />
               <feMerge>
                 <feMergeNode in="blur" />
                 <feMergeNode in="SourceGraphic" />
               </feMerge>
             </filter>
+            <pattern id="wireGrid" width="10" height="10" patternUnits="userSpaceOnUse">
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#b6ff24" strokeOpacity="0.18" strokeWidth="0.7" />
+            </pattern>
           </defs>
 
-          <g filter="url(#cyanGlow)" stroke="#4bd6ff" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="0" y="0" width="300" height="520" fill="transparent" />
+          <g filter="url(#greenGlow)" stroke="#b6ff24" strokeLinecap="round" strokeLinejoin="round">
             <path
-              d="M58 205 C74 128 116 83 189 67 L306 57 C382 52 452 88 479 150 C492 181 480 211 444 227 L314 246 C225 258 134 250 82 226 C64 218 56 214 58 205 Z"
-              fill="url(#xrayBody)"
-              strokeOpacity="0.82"
-              strokeWidth="1.7"
+              d="M86 478 C66 446 58 391 59 322 L62 161 C64 91 91 43 150 31 C209 43 236 91 238 161 L241 322 C242 391 234 446 214 478 C193 493 107 493 86 478 Z"
+              fill="url(#xrayGreen)"
+              strokeOpacity="0.88"
+              strokeWidth="1.9"
             />
-            <path d="M104 169 C136 105 180 82 260 78 L334 79 C377 83 417 107 439 148" fill="none" strokeOpacity="0.45" strokeWidth="1.2" />
-            <path d="M86 216 C172 238 277 240 417 216" fill="none" strokeOpacity="0.4" strokeWidth="1.1" />
-            <path d="M154 111 L231 90 L324 92 L382 128 L344 179 L215 190 L146 155 Z" fill="none" strokeOpacity="0.55" strokeWidth="1.4" />
-            <path d="M202 116 L252 100 L315 103 L349 130 L322 162 L235 169 L182 148 Z" fill="#29c7df" fillOpacity="0.1" strokeOpacity="0.45" strokeWidth="1.1" />
-            <path d="M110 194 L203 204 L310 201 L427 181" fill="none" strokeOpacity="0.35" strokeWidth="1.1" />
-            <path d="M122 139 L194 158 L343 150 L437 121" fill="none" strokeOpacity="0.35" strokeWidth="1.1" />
+            <path d="M82 92 C103 55 128 43 150 40 C172 43 197 55 218 92" fill="none" strokeOpacity="0.65" strokeWidth="1.1" />
+            <path d="M69 438 C94 470 206 470 231 438" fill="none" strokeOpacity="0.65" strokeWidth="1.1" />
+            <path d="M75 160 L225 160 M70 342 L230 342 M82 414 L218 414" fill="none" strokeOpacity="0.5" strokeWidth="1" />
 
-            <ellipse cx="106" cy="104" rx="30" ry="42" transform="rotate(-17 106 104)" fill="none" strokeOpacity="0.8" strokeWidth="2" />
-            <ellipse cx="378" cy="86" rx="30" ry="42" transform="rotate(-76 378 86)" fill="none" strokeOpacity="0.75" strokeWidth="2" />
-            <ellipse cx="132" cy="223" rx="33" ry="47" transform="rotate(-70 132 223)" fill="none" strokeOpacity="0.85" strokeWidth="2.2" />
-            <ellipse cx="405" cy="205" rx="32" ry="46" transform="rotate(-77 405 205)" fill="none" strokeOpacity="0.85" strokeWidth="2.2" />
-            <ellipse cx="106" cy="104" rx="17" ry="26" transform="rotate(-17 106 104)" fill="none" strokeOpacity="0.35" strokeWidth="1" />
-            <ellipse cx="378" cy="86" rx="16" ry="24" transform="rotate(-76 378 86)" fill="none" strokeOpacity="0.35" strokeWidth="1" />
-            <ellipse cx="132" cy="223" rx="18" ry="28" transform="rotate(-70 132 223)" fill="none" strokeOpacity="0.35" strokeWidth="1" />
-            <ellipse cx="405" cy="205" rx="18" ry="28" transform="rotate(-77 405 205)" fill="none" strokeOpacity="0.35" strokeWidth="1" />
+            <path d="M105 92 L195 92 L213 156 L190 205 L110 205 L87 156 Z" fill="url(#wireGrid)" strokeOpacity="0.8" strokeWidth="1.4" />
+            <path d="M99 219 L139 205 L161 205 L201 219 L212 323 L176 355 L124 355 L88 323 Z" fill="url(#wireGrid)" strokeOpacity="0.65" strokeWidth="1.2" />
+            <path d="M108 232 L138 222 L138 292 L106 300 Z M162 222 L192 232 L194 300 L162 292 Z" fill="none" strokeOpacity="0.55" strokeWidth="1" />
+            <path d="M104 322 L136 310 L136 378 L103 389 Z M164 310 L196 322 L197 389 L164 378 Z" fill="none" strokeOpacity="0.55" strokeWidth="1" />
+            <path d="M118 118 L182 118 M116 141 L184 141 M150 96 L150 430" fill="none" strokeOpacity="0.45" strokeDasharray="4 6" strokeWidth="1" />
+            <path d="M92 186 C110 173 128 168 150 168 C172 168 190 173 208 186" fill="none" strokeOpacity="0.42" strokeWidth="1" />
+            <path d="M95 401 L205 401 L215 445 L85 445 Z" fill="url(#wireGrid)" strokeOpacity="0.55" strokeWidth="1.2" />
 
-            <path d="M125 107 L192 125 M158 219 L242 186 M348 92 L321 127 M378 206 L324 179" fill="none" strokeOpacity="0.32" strokeWidth="1.4" />
-            <path d="M283 94 C288 118 287 143 279 168 M231 102 C236 126 236 153 229 181" fill="none" strokeOpacity="0.32" strokeWidth="1" />
-            <path d="M294 118 L332 137 M287 151 L324 165 M188 132 L221 145" fill="none" strokeOpacity="0.3" strokeWidth="1" />
-            <path d="M316 104 C352 112 385 130 425 157 M299 180 C340 182 382 175 432 157" fill="none" strokeOpacity="0.28" strokeWidth="1" />
+            <rect x="37" y="133" width="28" height="86" rx="14" fill="none" strokeOpacity="0.82" strokeWidth="2" />
+            <rect x="235" y="133" width="28" height="86" rx="14" fill="none" strokeOpacity="0.82" strokeWidth="2" />
+            <rect x="37" y="320" width="28" height="90" rx="14" fill="none" strokeOpacity="0.88" strokeWidth="2" />
+            <rect x="235" y="320" width="28" height="90" rx="14" fill="none" strokeOpacity="0.88" strokeWidth="2" />
+            <rect x="46" y="146" width="10" height="60" rx="5" fill="none" strokeOpacity="0.45" strokeWidth="0.9" />
+            <rect x="244" y="146" width="10" height="60" rx="5" fill="none" strokeOpacity="0.45" strokeWidth="0.9" />
+            <rect x="46" y="334" width="10" height="62" rx="5" fill="none" strokeOpacity="0.45" strokeWidth="0.9" />
+            <rect x="244" y="334" width="10" height="62" rx="5" fill="none" strokeOpacity="0.45" strokeWidth="0.9" />
+
+            <path d="M65 176 L235 176 M65 365 L235 365" fill="none" strokeOpacity="0.42" strokeWidth="1.4" />
+            <path d="M92 132 C120 120 180 120 208 132 M94 438 C121 454 179 454 206 438" fill="none" strokeOpacity="0.55" strokeWidth="1" />
+            <path d="M76 181 C95 199 205 199 224 181 M78 368 C101 386 199 386 222 368" fill="none" strokeOpacity="0.32" strokeWidth="0.9" />
+            {Array.from({ length: 9 }).map((_, i) => (
+              <path
+                key={`rib-${i}`}
+                d={`M${82 + i * 17} 78 C${90 + i * 13} 122 ${90 + i * 13} 405 ${82 + i * 17} 459`}
+                fill="none"
+                strokeOpacity="0.24"
+                strokeWidth="0.45"
+              />
+            ))}
+            {Array.from({ length: 12 }).map((_, i) => (
+              <path
+                key={`cross-${i}`}
+                d={`M70 ${105 + i * 29} C111 ${97 + i * 29} 189 ${97 + i * 29} 230 ${105 + i * 29}`}
+                fill="none"
+                strokeOpacity="0.24"
+                strokeWidth="0.45"
+              />
+            ))}
           </g>
 
           {withPosition.map((part) => {
             const pos = positionForPart(part);
             const isActive = part.id === active?.id;
             const tone = PART_STATUS_TONE[part.status];
-            const fill = isActive ? "var(--accent-cian)" : tone === "crit" ? "var(--critical)" : tone === "warn" ? "var(--warning)" : "var(--accent-cobre)";
+            const fill = isActive ? "#b6ff24" : tone === "crit" ? "var(--critical)" : tone === "warn" ? "var(--warning)" : "var(--accent-cobre)";
             return (
               <g key={part.id}>
-                {isActive && <circle cx={pos.x} cy={pos.y} r={14} fill="none" stroke="var(--accent-cian)" strokeWidth={1.6} opacity={0.55} />}
+                {isActive && <circle cx={pos.x} cy={pos.y} r={14} fill="none" stroke="#b6ff24" strokeWidth={1.6} opacity={0.55} />}
                 <circle
                   className={styles.hotspot}
                   cx={pos.x}

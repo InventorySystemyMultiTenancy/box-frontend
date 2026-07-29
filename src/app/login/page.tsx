@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
@@ -50,6 +51,9 @@ export default function LoginPage() {
   return (
     <div className={styles.wrap}>
       <form className={styles.card} onSubmit={handleSubmit}>
+        <Link href="/" className={styles.backLink}>
+          Voltar ao site
+        </Link>
         <div className={styles.brand}>BOX.</div>
         <h1 className={styles.title}>{mode === "login" ? "Área do cliente" : "Criar conta de cliente"}</h1>
         <p className={styles.lede}>
