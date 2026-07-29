@@ -118,6 +118,7 @@ export interface Approval {
   description: string;
   estimatedValue?: number | null;
   status: "PENDING" | "APPROVED" | "REJECTED";
+  responseNote?: string | null;
   createdAt: string;
   respondedAt?: string | null;
   media: Media[];

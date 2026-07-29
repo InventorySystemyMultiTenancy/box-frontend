@@ -1,11 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/lib/types";
+import { API_URL } from "@/lib/api";
+import { Approval, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/lib/types";
 import styles from "./dashboard.module.css";
 
-// Mesmas coordenadas esquemáticas descritas na especificação de experiência —
-// só os componentes que a ordem de serviço realmente possui viram um ponto clicável.
 const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
   motor: { x: 120, y: 70 },
   eletrica: { x: 85, y: 66 },
@@ -22,14 +21,44 @@ const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
   carroceria: { x: 200, y: 55 },
 };
 
-export default function VehicleSchematic({ parts }: { parts: VehiclePart[] }) {
+function mediaUrl(url: string) {
+  return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
+}
+
+export default function VehicleSchematic({
+  parts,
+  approvals = [],
+  canRespond = false,
+  onRespondApproval,
+}: {
+  parts: VehiclePart[];
+  approvals?: Approval[];
+  canRespond?: boolean;
+  onRespondApproval?: (approvalId: string, status: "APPROVED" | "REJECTED", responseNote?: string) => Promise<void>;
+}) {
   const withPosition = useMemo(() => parts.filter((p) => HOTSPOT_POSITIONS[p.key]), [parts]);
 
   const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, IN_PROGRESS: 2, DONE: 3, NOT_INSPECTED: 4 };
   const defaultPart = [...withPosition].sort((a, b) => priorityOrder[a.status] - priorityOrder[b.status])[0];
 
   const [activeId, setActiveId] = useState<string | undefined>(defaultPart?.id);
+  const [rejectNote, setRejectNote] = useState("");
+  const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
   const active = withPosition.find((p) => p.id === activeId) ?? defaultPart;
+  const activeMediaIds = new Set(active?.media.map((media) => media.id) ?? []);
+  const activeApproval = approvals.find((approval) => approval.media.some((media) => activeMediaIds.has(media.id)));
+
+  async function respond(status: "APPROVED" | "REJECTED") {
+    if (!activeApproval || !onRespondApproval) return;
+    if (status === "REJECTED" && !rejectNote.trim()) return;
+    setBusy(status);
+    try {
+      await onRespondApproval(activeApproval.id, status, status === "REJECTED" ? rejectNote : undefined);
+      setRejectNote("");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   if (withPosition.length === 0) {
     return <p className={styles.tlSub}>Nenhum componente inspecionado ainda.</p>;
@@ -96,6 +125,62 @@ export default function VehicleSchematic({ parts }: { parts: VehiclePart[] }) {
             {active.responsible && <span>Responsável: {active.responsible.name}</span>}
             {active.warranty && <span>Garantia: {active.warranty}</span>}
           </div>
+          {active.media.length > 0 && (
+            <div className={styles.mediaGrid}>
+              {active.media.map((media) =>
+                media.type === "PHOTO" ? (
+                  <a key={media.id} href={mediaUrl(media.url)} target="_blank" rel="noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={mediaUrl(media.url)} alt={media.label ?? active.name} />
+                  </a>
+                ) : (
+                  <a key={media.id} href={mediaUrl(media.url)} target="_blank" rel="noreferrer">
+                    {media.label ?? "Arquivo anexado"}
+                  </a>
+                )
+              )}
+            </div>
+          )}
+          {activeApproval && (
+            <div className={styles.problemApproval}>
+              <div className={styles.problemApprovalHead}>
+                <strong>{activeApproval.title}</strong>
+                <span
+                  className={`${styles.badge} ${
+                    activeApproval.status === "APPROVED"
+                      ? styles["tone-ok"]
+                      : activeApproval.status === "REJECTED"
+                        ? styles["tone-crit"]
+                        : styles["tone-warn"]
+                  }`}
+                >
+                  <i className={styles.dot} />
+                  {activeApproval.status === "APPROVED" ? "Aprovado" : activeApproval.status === "REJECTED" ? "Reprovado" : "Pendente"}
+                </span>
+              </div>
+              <p>{activeApproval.description}</p>
+              {activeApproval.estimatedValue != null && <div className={styles.value}>R$ {activeApproval.estimatedValue.toFixed(2)}</div>}
+              {activeApproval.responseNote && <p className={styles.responseNote}>{activeApproval.responseNote}</p>}
+              {canRespond && activeApproval.status === "PENDING" && (
+                <>
+                  <textarea
+                    className={styles.rejectReason}
+                    placeholder="Motivo da reprovação, se for recusar"
+                    value={rejectNote}
+                    onChange={(e) => setRejectNote(e.target.value)}
+                  />
+                  <div className={styles.approvalActions}>
+                    <button className={styles.btnApprove} disabled={busy !== null} onClick={() => respond("APPROVED")}>
+                      {busy === "APPROVED" ? "Aprovando..." : "Aprovar serviço"}
+                    </button>
+                    <button className={styles.btnReject} disabled={busy !== null || !rejectNote.trim()} onClick={() => respond("REJECTED")}>
+                      {busy === "REJECTED" ? "Reprovando..." : "Reprovar"}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

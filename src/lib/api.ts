@@ -7,10 +7,11 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}, token?: string | null): Promise<T> {
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
-      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
@@ -30,17 +31,56 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
 
+  registerCustomer: (payload: { name: string; email: string; password: string; phone?: string }) =>
+    request<{ token: string; user: { id: string; name: string; email: string; role: string } }>("/api/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  createUser: (
+    payload: { name: string; email: string; password: string; phone?: string; role: "CUSTOMER" | "MECHANIC" },
+    token: string
+  ) =>
+    request<{ user: { id: string; name: string; email: string; role: string; phone?: string | null } }>(
+      "/api/auth/users",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+      token
+    ),
+
   me: (token: string) => request<{ user: { id: string; name: string; email: string; role: string } }>("/api/auth/me", {}, token),
 
   serviceOrders: (token: string) => request<{ orders: unknown[] }>("/api/service-orders", {}, token),
 
   serviceOrder: (id: string, token: string) => request<{ order: unknown }>(`/api/service-orders/${id}`, {}, token),
 
-  respondApproval: (orderId: string, approvalId: string, status: "APPROVED" | "REJECTED", token: string) =>
+  respondApproval: (orderId: string, approvalId: string, status: "APPROVED" | "REJECTED", token: string, responseNote?: string) =>
     request(`/api/service-orders/${orderId}/approvals/${approvalId}`, {
       method: "PATCH",
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, responseNote }),
     }, token),
+
+  createProblem: (
+    orderId: string,
+    payload: { key: string; name: string; description: string; wearLevel?: string; estimatedValue?: string; files: File[] },
+    token: string
+  ) => {
+    const form = new FormData();
+    form.append("key", payload.key);
+    form.append("name", payload.name);
+    form.append("description", payload.description);
+    if (payload.wearLevel) form.append("wearLevel", payload.wearLevel);
+    if (payload.estimatedValue) form.append("estimatedValue", payload.estimatedValue);
+    payload.files.forEach((file) => form.append("files", file));
+
+    return request<{ part: unknown; approval: unknown; event: unknown }>(
+      `/api/service-orders/${orderId}/parts/problems`,
+      { method: "POST", body: form },
+      token
+    );
+  },
 };
 
 export { API_URL };

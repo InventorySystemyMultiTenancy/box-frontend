@@ -16,6 +16,7 @@ interface AuthContextValue {
   token: string | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  registerCustomer: (payload: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => void;
 }
 
@@ -51,6 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user as AuthUser);
   }, []);
 
+  const registerCustomer = useCallback(async (payload: { name: string; email: string; password: string; phone?: string }) => {
+    const { token, user } = await api.registerCustomer(payload);
+    window.localStorage.setItem(STORAGE_KEY, token);
+    setToken(token);
+    setUser(user as AuthUser);
+  }, []);
+
   const logout = useCallback(() => {
     window.localStorage.removeItem(STORAGE_KEY);
     setToken(null);
@@ -58,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   }, [router]);
 
-  return <AuthContext.Provider value={{ user, token, loading, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, token, loading, login, registerCustomer, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
