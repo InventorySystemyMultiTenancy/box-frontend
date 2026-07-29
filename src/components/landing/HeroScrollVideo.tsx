@@ -16,7 +16,10 @@ export default function HeroScrollVideo({ children }: { children?: ReactNode }) 
   const trackRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const durationRef = useRef(0);
+  const targetTimeRef = useRef(0);
+  const renderedTimeRef = useRef(0);
   const tickingRef = useRef(false);
+  const smoothingRef = useRef(0);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -31,6 +34,8 @@ export default function HeroScrollVideo({ children }: { children?: ReactNode }) 
       video.play().then(() => video.pause()).catch(() => {});
       const initialTime = prefersReducedMotion() ? video.duration * 0.5 : 0;
       video.currentTime = initialTime;
+      targetTimeRef.current = initialTime;
+      renderedTimeRef.current = initialTime;
       setReady(true);
     }
 
@@ -41,28 +46,60 @@ export default function HeroScrollVideo({ children }: { children?: ReactNode }) 
   useEffect(() => {
     if (prefersReducedMotion()) return;
 
-    function updateFrame() {
-      tickingRef.current = false;
+    function applySmoothedFrame() {
       const track = trackRef.current;
       const video = videoRef.current;
       const duration = durationRef.current;
-      if (!track || !video || !duration) return;
+      if (!track || !video || !duration) {
+        smoothingRef.current = 0;
+        return;
+      }
+
+      const nextTime = renderedTimeRef.current + (targetTimeRef.current - renderedTimeRef.current) * 0.18;
+      renderedTimeRef.current = nextTime;
+
+      if (Math.abs(video.currentTime - nextTime) > 0.025) {
+        video.currentTime = nextTime;
+      }
+
+      if (Math.abs(targetTimeRef.current - nextTime) > 0.01) {
+        smoothingRef.current = requestAnimationFrame(applySmoothedFrame);
+      } else {
+        renderedTimeRef.current = targetTimeRef.current;
+        smoothingRef.current = 0;
+      }
+    }
+
+    function updateTargetFrame() {
+      tickingRef.current = false;
+      const track = trackRef.current;
+      const duration = durationRef.current;
+      if (!track || !duration) return;
 
       const rect = track.getBoundingClientRect();
       const total = rect.height - window.innerHeight;
       const progress = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
-      video.currentTime = progress * duration;
+      targetTimeRef.current = progress * duration;
+
+      if (!smoothingRef.current) {
+        smoothingRef.current = requestAnimationFrame(applySmoothedFrame);
+      }
     }
 
     function onScroll() {
       if (tickingRef.current) return;
       tickingRef.current = true;
-      requestAnimationFrame(updateFrame);
+      requestAnimationFrame(updateTargetFrame);
     }
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    updateFrame();
-    return () => window.removeEventListener("scroll", onScroll);
+    window.addEventListener("resize", onScroll);
+    updateTargetFrame();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (smoothingRef.current) cancelAnimationFrame(smoothingRef.current);
+    };
   }, []);
 
   return (
@@ -77,8 +114,8 @@ export default function HeroScrollVideo({ children }: { children?: ReactNode }) 
           preload="auto"
         />
         <div className={styles.scrim} />
-        {children}
       </div>
+      <div className={styles.content}>{children}</div>
     </div>
   );
 }

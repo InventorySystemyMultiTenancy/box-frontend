@@ -1,14 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Link from "next/link";
+import { ReactNode } from "react";
+import HeroScrollVideo from "./HeroScrollVideo";
 import styles from "./landing.module.css";
 
-// O vídeo de scroll-scrubbing só existe no cliente — carregado sob demanda (ver seção
-// de performance da especificação: nenhum peso de mídia no bundle inicial do servidor).
-const HeroScrollVideo = dynamic(() => import("./HeroScrollVideo"), { ssr: false });
-
-export default function HeroSection() {
+export default function HeroSection({ children }: { children?: ReactNode }) {
   return (
     <div className={styles.heroWrap}>
       <nav className={styles.nav}>
@@ -24,7 +21,7 @@ export default function HeroSection() {
         </div>
       </nav>
       <HeroScrollVideo>
-        <div className={styles.heroOverlay}>
+        <section className={styles.heroOverlay}>
           <span className={styles.heroLive}>
             <i /> 3 VEÍCULOS EM MANUTENÇÃO AGORA
           </span>
@@ -41,7 +38,8 @@ export default function HeroSection() {
               Agendar visita
             </a>
           </div>
-        </div>
+        </section>
+        <div className={styles.heroContent}>{children}</div>
       </HeroScrollVideo>
     </div>
   );

@@ -1,6 +1,8 @@
 .scrollTrack {
   position: relative;
-  height: 320vh;
+  min-height: 100vh;
+  background: #0b0d10;
+  isolation: isolate;
 }
 
 .sticky {
@@ -9,6 +11,8 @@
   height: 100vh;
   overflow: hidden;
   background: #0b0d10;
+  z-index: 0;
+  contain: paint;
 }
 
 .video {
@@ -19,6 +23,7 @@
   object-fit: cover;
   opacity: 0;
   transition: opacity 0.5s ease;
+  will-change: opacity;
 }
 .video.ready {
   opacity: 1;
@@ -28,11 +33,14 @@
 .scrim {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(11, 13, 16, 0.35) 0%, rgba(11, 13, 16, 0.15) 40%, rgba(11, 13, 16, 0.55) 100%);
+  background:
+    linear-gradient(180deg, rgba(11, 13, 16, 0.38) 0%, rgba(11, 13, 16, 0.2) 42%, rgba(11, 13, 16, 0.72) 100%),
+    radial-gradient(circle at 16% 38%, rgba(11, 13, 16, 0.18), transparent 34%);
 }
 
-@media (max-width: 760px) {
-  .scrollTrack {
-    height: 100vh;
-  }
+.content {
+  position: relative;
+  z-index: 1;
+  margin-top: -100vh;
+  min-height: 100vh;
 }

@@ -9,6 +9,7 @@
   justify-content: space-between;
   padding: 1.1rem clamp(1.25rem, 4vw, 3rem);
   font-family: var(--font-display);
+  background: linear-gradient(180deg, rgba(11, 13, 16, 0.68), rgba(11, 13, 16, 0));
 }
 .navBrand {
   font-weight: 750;
@@ -42,17 +43,21 @@
   color: #fff;
 }
 .heroOverlay {
-  position: absolute;
-  inset: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  padding: 0 clamp(1.25rem, 6vw, 5rem);
+  min-height: 100vh;
+  padding: 5.5rem clamp(1.25rem, 6vw, 5rem) 4rem;
   pointer-events: none;
 }
 .heroOverlay > * {
   pointer-events: auto;
+}
+.heroContent {
+  position: relative;
+  padding-bottom: 1px;
 }
 .heroLive {
   display: inline-flex;
@@ -125,6 +130,7 @@
   padding: clamp(3.5rem, 8vw, 6rem) clamp(1.25rem, 6vw, 5rem);
   max-width: 1280px;
   margin: 0 auto;
+  color: #fff;
 }
 .sectionHead {
   max-width: 56ch;
@@ -136,7 +142,7 @@
 }
 .sectionHead p {
   margin-top: 0.8rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.72);
   font-family: var(--font-body);
   font-size: 1.02rem;
 }
@@ -155,7 +161,7 @@
 }
 .stat .l {
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.66);
   font-family: var(--font-display);
   margin-top: 0.2rem;
 }
@@ -166,11 +172,12 @@
   gap: 1.1rem;
 }
 .card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
   padding: 1.4rem 1.5rem;
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow);
+  background: rgba(12, 15, 18, 0.72);
+  box-shadow: 0 12px 40px -24px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(16px);
 }
 .card h3 {
   font-size: 1rem;
@@ -180,7 +187,7 @@
 .card p {
   margin-top: 0.5rem;
   font-size: 0.88rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.68);
   font-family: var(--font-body);
 }
 
@@ -188,17 +195,19 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
   overflow: hidden;
   margin-top: 0.5rem;
+  box-shadow: 0 12px 40px -24px rgba(0, 0, 0, 0.8);
 }
 @media (max-width: 760px) {
   .processFlow { grid-template-columns: 1fr; }
 }
 .processStep {
-  background: var(--bg-elevated);
+  background: rgba(12, 15, 18, 0.72);
+  backdrop-filter: blur(16px);
   padding: 1.5rem 1.4rem;
 }
 .processStep .n {
@@ -214,7 +223,7 @@
 .processStep p {
   margin-top: 0.4rem;
   font-size: 0.84rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .testimonial {
@@ -224,13 +233,13 @@
 .testimonial p {
   font-family: var(--font-body);
   font-size: 1.05rem;
-  color: var(--text);
+  color: #fff;
 }
 .testimonial footer {
   margin-top: 0.8rem;
   font-family: var(--font-display);
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.66);
 }
 
 .teamGrid {
@@ -257,7 +266,7 @@
 }
 .teamCard p {
   font-size: 0.8rem;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.66);
   margin-top: 0.15rem;
 }
 
@@ -273,14 +282,17 @@
 }
 
 .ctaBand {
-  background: var(--bg-panel);
-  border-radius: 16px;
+  background: rgba(12, 15, 18, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
   padding: clamp(2rem, 5vw, 3.5rem);
   display: flex;
   flex-wrap: wrap;
   gap: 1.5rem;
   align-items: center;
   justify-content: space-between;
+  box-shadow: 0 12px 40px -24px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(16px);
 }
 .ctaBand h2 {
   font-size: clamp(1.5rem, 2.6vw, 2rem);
@@ -289,10 +301,10 @@
 
 .footer {
   padding: 2.5rem clamp(1.25rem, 6vw, 5rem);
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.62);
   font-size: 0.82rem;
   font-family: var(--font-display);
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .reveal {
