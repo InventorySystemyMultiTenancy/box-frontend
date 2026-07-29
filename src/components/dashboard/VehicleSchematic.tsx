@@ -140,7 +140,7 @@ export default function VehicleSchematic({
           <rect x="0" y="0" width="300" height="520" fill="transparent" />
           {referenceImageOk ? (
             <image
-              href="/vehicle-xray-top.png"
+              href="/vehicle-xray-top.jpeg"
               x="22"
               y="10"
               width="256"
