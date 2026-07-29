@@ -81,7 +81,6 @@ export default function VehicleSchematic({
   const [rejectNote, setRejectNote] = useState("");
   const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
   const [resolving, setResolving] = useState(false);
-  const [referenceImageOk, setReferenceImageOk] = useState(true);
   const active = withPosition.find((p) => p.id === activeId) ?? defaultPart;
 
   const activeMediaIds = new Set(active?.media.map((media) => media.id) ?? []);
@@ -138,69 +137,7 @@ export default function VehicleSchematic({
           </defs>
 
           <rect x="0" y="0" width="300" height="520" fill="transparent" />
-          {referenceImageOk ? (
-            <image
-              href="/vehicle-xray-top.jpeg"
-              x="22"
-              y="10"
-              width="256"
-              height="500"
-              preserveAspectRatio="xMidYMid meet"
-              onError={() => setReferenceImageOk(false)}
-            />
-          ) : (
-            <g filter="url(#greenGlow)" stroke="#b6ff24" strokeLinecap="round" strokeLinejoin="round">
-              <path
-                d="M78 456 C68 423 65 377 67 318 L70 150 C72 97 94 62 128 48 L172 48 C206 62 228 97 230 150 L233 318 C235 377 232 423 222 456 C207 476 93 476 78 456 Z"
-                fill="url(#xrayGreen)"
-                strokeOpacity="0.9"
-                strokeWidth="2"
-              />
-              <path d="M92 78 C111 57 128 51 150 51 C172 51 189 57 208 78" fill="none" strokeOpacity="0.72" strokeWidth="1.2" />
-              <path d="M76 430 C102 462 198 462 224 430" fill="none" strokeOpacity="0.72" strokeWidth="1.2" />
-              <path d="M70 154 L230 154 M68 317 L232 317 M77 405 L223 405" fill="none" strokeOpacity="0.58" strokeWidth="1.1" />
-
-              <path d="M104 88 L196 88 L215 150 L193 199 L107 199 L85 150 Z" fill="url(#wireGrid)" strokeOpacity="0.85" strokeWidth="1.5" />
-              <path d="M93 218 L119 201 L181 201 L207 218 L218 309 L184 340 L116 340 L82 309 Z" fill="url(#wireGrid)" strokeOpacity="0.68" strokeWidth="1.25" />
-              <path d="M100 228 L137 215 L137 291 L98 303 Z M163 215 L200 228 L202 303 L163 291 Z" fill="none" strokeOpacity="0.58" strokeWidth="1" />
-              <path d="M101 324 L137 311 L137 379 L99 391 Z M163 311 L199 324 L201 391 L163 379 Z" fill="none" strokeOpacity="0.58" strokeWidth="1" />
-              <path d="M91 398 L209 398 L220 439 L80 439 Z" fill="url(#wireGrid)" strokeOpacity="0.6" strokeWidth="1.2" />
-              <path d="M112 116 L188 116 M111 139 L189 139 M150 82 L150 442" fill="none" strokeOpacity="0.45" strokeDasharray="4 6" strokeWidth="1" />
-              <path d="M88 184 C107 171 128 166 150 166 C172 166 193 171 212 184" fill="none" strokeOpacity="0.44" strokeWidth="1" />
-
-              <rect x="30" y="132" width="31" height="91" rx="13" fill="none" strokeOpacity="0.88" strokeWidth="2.2" />
-              <rect x="239" y="132" width="31" height="91" rx="13" fill="none" strokeOpacity="0.88" strokeWidth="2.2" />
-              <rect x="30" y="319" width="31" height="94" rx="13" fill="none" strokeOpacity="0.9" strokeWidth="2.2" />
-              <rect x="239" y="319" width="31" height="94" rx="13" fill="none" strokeOpacity="0.9" strokeWidth="2.2" />
-              <rect x="40" y="147" width="11" height="61" rx="5" fill="none" strokeOpacity="0.48" strokeWidth="0.9" />
-              <rect x="249" y="147" width="11" height="61" rx="5" fill="none" strokeOpacity="0.48" strokeWidth="0.9" />
-              <rect x="40" y="334" width="11" height="64" rx="5" fill="none" strokeOpacity="0.48" strokeWidth="0.9" />
-              <rect x="249" y="334" width="11" height="64" rx="5" fill="none" strokeOpacity="0.48" strokeWidth="0.9" />
-
-              <path d="M61 176 L239 176 M61 364 L239 364" fill="none" strokeOpacity="0.45" strokeWidth="1.5" />
-              <path d="M91 131 C119 119 181 119 209 131 M90 430 C119 446 181 446 210 430" fill="none" strokeOpacity="0.58" strokeWidth="1" />
-              <path d="M75 181 C96 199 204 199 225 181 M75 368 C99 386 201 386 225 368" fill="none" strokeOpacity="0.34" strokeWidth="0.9" />
-              <path d="M70 253 L230 253 M76 282 L224 282" fill="none" strokeOpacity="0.28" strokeWidth="0.8" />
-              {Array.from({ length: 9 }).map((_, i) => (
-                <path
-                  key={`rib-${i}`}
-                  d={`M${80 + i * 17.5} 75 C${88 + i * 13.8} 125 ${88 + i * 13.8} 405 ${80 + i * 17.5} 457`}
-                  fill="none"
-                  strokeOpacity="0.24"
-                  strokeWidth="0.45"
-                />
-              ))}
-              {Array.from({ length: 12 }).map((_, i) => (
-                <path
-                  key={`cross-${i}`}
-                  d={`M70 ${104 + i * 29} C112 ${96 + i * 29} 188 ${96 + i * 29} 230 ${104 + i * 29}`}
-                  fill="none"
-                  strokeOpacity="0.24"
-                  strokeWidth="0.45"
-                />
-              ))}
-            </g>
-          )}
+          <image href="/vehicle-xray-top.jpg" x="0" y="0" width="300" height="520" preserveAspectRatio="xMidYMid slice" />
 
           {withPosition.map((part) => {
             const pos = positionForPart(part);
