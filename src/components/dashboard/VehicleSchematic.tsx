@@ -6,19 +6,19 @@ import { Approval, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/l
 import styles from "./dashboard.module.css";
 
 const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
-  motor: { x: 200, y: 58 },
-  arrefecimento: { x: 200, y: 42 },
-  bateria: { x: 148, y: 54 },
-  eletrica: { x: 252, y: 74 },
-  arcondicionado: { x: 200, y: 92 },
-  direcao: { x: 156, y: 104 },
-  freios: { x: 126, y: 104 },
-  suspensao: { x: 274, y: 126 },
-  transmissao: { x: 200, y: 128 },
-  escapamento: { x: 200, y: 206 },
-  pneus: { x: 86, y: 82 },
-  combustivel: { x: 254, y: 182 },
-  carroceria: { x: 200, y: 154 },
+  motor: { x: 320, y: 118 },
+  arrefecimento: { x: 358, y: 120 },
+  bateria: { x: 302, y: 92 },
+  eletrica: { x: 242, y: 94 },
+  arcondicionado: { x: 278, y: 138 },
+  direcao: { x: 218, y: 116 },
+  freios: { x: 154, y: 160 },
+  suspensao: { x: 160, y: 190 },
+  transmissao: { x: 244, y: 158 },
+  escapamento: { x: 214, y: 214 },
+  pneus: { x: 128, y: 204 },
+  combustivel: { x: 274, y: 212 },
+  carroceria: { x: 246, y: 176 },
 };
 
 const UNRESOLVED_STATUSES = new Set(["CRITICAL", "WARNING", "IN_PROGRESS"]);
@@ -39,17 +39,19 @@ function positionForPart(part: VehiclePart) {
   const text = normalize(`${part.name} ${part.note ?? ""}`);
   const pos = { ...base };
 
-  if (/dianteir|frente|capo|radiador|parachoque dianteiro/.test(text)) pos.y = Math.min(pos.y, 82);
-  if (/traseir|atras|porta malas|tanque|parachoque traseiro/.test(text)) pos.y = Math.max(pos.y, 190);
-  if (/esquerd|motorista/.test(text)) pos.x = Math.min(pos.x, 126);
-  if (/direit|passageiro/.test(text)) pos.x = Math.max(pos.x, 274);
+  if (/dianteir|frente|capo|radiador|parachoque dianteiro/.test(text)) pos.x = Math.max(pos.x, 318);
+  if (/traseir|atras|porta malas|tanque|parachoque traseiro/.test(text)) pos.x = Math.min(pos.x, 124);
+  if (/esquerd|motorista/.test(text)) pos.y = Math.min(pos.y, 104);
+  if (/direit|passageiro/.test(text)) pos.y = Math.max(pos.y, 206);
+
   if (/vidro|para-brisa|parabrisa/.test(text)) {
-    pos.x = /lateral|porta/.test(text) ? (/direit|passageiro/.test(text) ? 274 : 126) : 200;
-    pos.y = /traseir|atras/.test(text) ? 174 : 104;
+    pos.x = /traseir|atras/.test(text) ? 170 : 252;
+    pos.y = /lateral|porta/.test(text) ? (/direit|passageiro/.test(text) ? 194 : 102) : 138;
   }
+
   if (/roda|pneu/.test(text)) {
-    pos.x = /direit|passageiro/.test(text) ? 314 : 86;
-    pos.y = /traseir|atras/.test(text) ? 196 : 82;
+    pos.x = /traseir|atras/.test(text) ? 116 : 346;
+    pos.y = /direit|passageiro/.test(text) ? 218 : 88;
   }
 
   return pos;
@@ -115,39 +117,50 @@ export default function VehicleSchematic({
   return (
     <div>
       <div className={styles.carWrap}>
-        <svg viewBox="0 0 400 260" role="group" aria-label="Visão superior cirúrgica do veículo com pontos de manutenção">
+        <svg viewBox="0 0 520 300" role="group" aria-label="Modelo wireframe do veículo com pontos de manutenção">
           <defs>
-            <linearGradient id="glass" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--accent-cian)" stopOpacity="0.22" />
-              <stop offset="100%" stopColor="var(--accent-cian)" stopOpacity="0.08" />
+            <linearGradient id="xrayBody" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stopColor="#48d7ff" stopOpacity="0.24" />
+              <stop offset="55%" stopColor="#178ca7" stopOpacity="0.11" />
+              <stop offset="100%" stopColor="#48d7ff" stopOpacity="0.06" />
             </linearGradient>
+            <filter id="cyanGlow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
-          <rect x="92" y="46" width="216" height="174" rx="46" fill="var(--bg-elevated)" stroke="var(--border-strong)" strokeWidth="1.5" />
-          <path d="M138 46 Q200 18 262 46" fill="none" stroke="var(--border-strong)" strokeWidth="1.4" />
-          <path d="M122 218 Q200 242 278 218" fill="none" stroke="var(--border-strong)" strokeWidth="1.4" />
+          <g filter="url(#cyanGlow)" stroke="#4bd6ff" strokeLinecap="round" strokeLinejoin="round">
+            <path
+              d="M58 205 C74 128 116 83 189 67 L306 57 C382 52 452 88 479 150 C492 181 480 211 444 227 L314 246 C225 258 134 250 82 226 C64 218 56 214 58 205 Z"
+              fill="url(#xrayBody)"
+              strokeOpacity="0.82"
+              strokeWidth="1.7"
+            />
+            <path d="M104 169 C136 105 180 82 260 78 L334 79 C377 83 417 107 439 148" fill="none" strokeOpacity="0.45" strokeWidth="1.2" />
+            <path d="M86 216 C172 238 277 240 417 216" fill="none" strokeOpacity="0.4" strokeWidth="1.1" />
+            <path d="M154 111 L231 90 L324 92 L382 128 L344 179 L215 190 L146 155 Z" fill="none" strokeOpacity="0.55" strokeWidth="1.4" />
+            <path d="M202 116 L252 100 L315 103 L349 130 L322 162 L235 169 L182 148 Z" fill="#29c7df" fillOpacity="0.1" strokeOpacity="0.45" strokeWidth="1.1" />
+            <path d="M110 194 L203 204 L310 201 L427 181" fill="none" strokeOpacity="0.35" strokeWidth="1.1" />
+            <path d="M122 139 L194 158 L343 150 L437 121" fill="none" strokeOpacity="0.35" strokeWidth="1.1" />
 
-          <rect x="104" y="66" width="34" height="52" rx="12" fill="var(--bg)" stroke="var(--border-strong)" />
-          <rect x="262" y="66" width="34" height="52" rx="12" fill="var(--bg)" stroke="var(--border-strong)" />
-          <rect x="104" y="158" width="34" height="52" rx="12" fill="var(--bg)" stroke="var(--border-strong)" />
-          <rect x="262" y="158" width="34" height="52" rx="12" fill="var(--bg)" stroke="var(--border-strong)" />
+            <ellipse cx="106" cy="104" rx="30" ry="42" transform="rotate(-17 106 104)" fill="none" strokeOpacity="0.8" strokeWidth="2" />
+            <ellipse cx="378" cy="86" rx="30" ry="42" transform="rotate(-76 378 86)" fill="none" strokeOpacity="0.75" strokeWidth="2" />
+            <ellipse cx="132" cy="223" rx="33" ry="47" transform="rotate(-70 132 223)" fill="none" strokeOpacity="0.85" strokeWidth="2.2" />
+            <ellipse cx="405" cy="205" rx="32" ry="46" transform="rotate(-77 405 205)" fill="none" strokeOpacity="0.85" strokeWidth="2.2" />
+            <ellipse cx="106" cy="104" rx="17" ry="26" transform="rotate(-17 106 104)" fill="none" strokeOpacity="0.35" strokeWidth="1" />
+            <ellipse cx="378" cy="86" rx="16" ry="24" transform="rotate(-76 378 86)" fill="none" strokeOpacity="0.35" strokeWidth="1" />
+            <ellipse cx="132" cy="223" rx="18" ry="28" transform="rotate(-70 132 223)" fill="none" strokeOpacity="0.35" strokeWidth="1" />
+            <ellipse cx="405" cy="205" rx="18" ry="28" transform="rotate(-77 405 205)" fill="none" strokeOpacity="0.35" strokeWidth="1" />
 
-          <line x1="121" y1="92" x2="279" y2="92" stroke="var(--border)" strokeWidth="5" />
-          <line x1="121" y1="184" x2="279" y2="184" stroke="var(--border)" strokeWidth="5" />
-          <line x1="200" y1="58" x2="200" y2="208" stroke="var(--border-strong)" strokeWidth="2" strokeDasharray="5 5" />
-
-          <path d="M150 86 L250 86 L268 122 L250 160 L150 160 L132 122 Z" fill="url(#glass)" stroke="var(--accent-cian)" strokeOpacity="0.45" />
-          <path d="M160 94 L240 94 L250 122 L240 150 L160 150 L150 122 Z" fill="none" stroke="var(--border)" />
-          <line x1="150" y1="122" x2="250" y2="122" stroke="var(--border)" />
-
-          <rect x="158" y="38" width="84" height="42" rx="16" fill="none" stroke="var(--accent-cobre)" strokeOpacity="0.55" />
-          <circle cx="178" cy="58" r="10" fill="none" stroke="var(--border-strong)" />
-          <circle cx="222" cy="58" r="10" fill="none" stroke="var(--border-strong)" />
-          <path d="M168 196 Q200 210 232 196" fill="none" stroke="var(--accent-cobre)" strokeOpacity="0.55" strokeWidth="2" />
-          <circle cx="200" cy="205" r="11" fill="none" stroke="var(--border-strong)" />
-
-          <path d="M126 88 L148 72 M274 88 L252 72 M126 184 L148 198 M274 184 L252 198" stroke="var(--border-strong)" strokeWidth="1.5" />
-          <path d="M186 78 L214 78 M184 170 L216 170 M190 78 L190 170 M210 78 L210 170" stroke="var(--grid-line)" strokeWidth="1.3" />
+            <path d="M125 107 L192 125 M158 219 L242 186 M348 92 L321 127 M378 206 L324 179" fill="none" strokeOpacity="0.32" strokeWidth="1.4" />
+            <path d="M283 94 C288 118 287 143 279 168 M231 102 C236 126 236 153 229 181" fill="none" strokeOpacity="0.32" strokeWidth="1" />
+            <path d="M294 118 L332 137 M287 151 L324 165 M188 132 L221 145" fill="none" strokeOpacity="0.3" strokeWidth="1" />
+            <path d="M316 104 C352 112 385 130 425 157 M299 180 C340 182 382 175 432 157" fill="none" strokeOpacity="0.28" strokeWidth="1" />
+          </g>
 
           {withPosition.map((part) => {
             const pos = positionForPart(part);
