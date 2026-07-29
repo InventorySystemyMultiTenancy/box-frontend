@@ -10,86 +10,100 @@ function prefersReducedMotion() {
 export default function HeroScrollVideo({ children }: { children?: ReactNode }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const durationRef = useRef(0);
+  const targetTimeRef = useRef(0);
+  const visibleTimeRef = useRef(0);
   const tickingRef = useRef(false);
-  const lastScrollYRef = useRef(0);
-  const lastTimeRef = useRef(0);
-  const idleTimerRef = useRef<number | null>(null);
+  const scrubFrameRef = useRef(0);
+  const lastSeekAtRef = useRef(0);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
-    function onCanPlay() {
+    function onLoadedMetadata() {
       if (!video) return;
-      video.playbackRate = prefersReducedMotion() ? 0.65 : 0.85;
-      video.play().catch(() => {});
+      durationRef.current = video.duration;
+      video.pause();
+
+      const initialTime = prefersReducedMotion() ? video.duration * 0.5 : 0.001;
+      targetTimeRef.current = initialTime;
+      visibleTimeRef.current = initialTime;
+      video.currentTime = initialTime;
+
+      video.play().then(() => video.pause()).catch(() => {});
       setReady(true);
     }
 
-    video.addEventListener("canplay", onCanPlay);
-    return () => video.removeEventListener("canplay", onCanPlay);
+    video.addEventListener("loadedmetadata", onLoadedMetadata);
+    return () => video.removeEventListener("loadedmetadata", onLoadedMetadata);
   }, []);
 
   useEffect(() => {
     if (prefersReducedMotion()) return;
 
-    function clamp(min: number, value: number, max: number) {
-      return Math.min(max, Math.max(min, value));
+    function seekVideo(time: number) {
+      const video = videoRef.current;
+      if (!video || !durationRef.current || video.seeking) return false;
+
+      const nextTime = Math.min(durationRef.current - 0.04, Math.max(0.001, time));
+      const seekableTo = video.seekable.length ? video.seekable.end(video.seekable.length - 1) : durationRef.current;
+      if (nextTime > seekableTo) return false;
+
+      if (typeof video.fastSeek === "function") {
+        video.fastSeek(nextTime);
+      } else {
+        video.currentTime = nextTime;
+      }
+      return true;
     }
 
-    function updateScrollSync() {
+    function updateTargetTime() {
       tickingRef.current = false;
       const track = trackRef.current;
-      const video = videoRef.current;
-      if (!track || !video) return;
+      const duration = durationRef.current;
+      if (!track || !duration) return;
 
       const rect = track.getBoundingClientRect();
       const total = rect.height - window.innerHeight;
       const progress = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
       track.style.setProperty("--scroll-progress", progress.toFixed(4));
+      targetTimeRef.current = progress * duration;
+    }
 
+    function scrubTowardTarget() {
       const now = performance.now();
-      const scrollY = window.scrollY;
-      const elapsed = Math.max(16, now - (lastTimeRef.current || now));
-      const delta = scrollY - lastScrollYRef.current;
-      const speed = Math.min(1.25, Math.abs(delta) / elapsed);
-      const directionFactor = delta < 0 ? 0.72 : 1;
-      const targetRate = clamp(0.65, (0.82 + speed * 0.9) * directionFactor, 1.8);
+      const targetTime = targetTimeRef.current;
+      const visibleTime = visibleTimeRef.current;
+      const nextTime = visibleTime + (targetTime - visibleTime) * 0.34;
+      const seekDelta = Math.abs(nextTime - visibleTime);
+      const targetDelta = Math.abs(targetTime - nextTime);
+      const canSeek = now - lastSeekAtRef.current > 34;
 
-      video.playbackRate += (targetRate - video.playbackRate) * 0.32;
-      video.play().catch(() => {});
-
-      lastScrollYRef.current = scrollY;
-      lastTimeRef.current = now;
-
-      if (idleTimerRef.current) {
-        window.clearTimeout(idleTimerRef.current);
+      if (canSeek && (seekDelta > 0.018 || targetDelta > 0.035) && seekVideo(nextTime)) {
+        visibleTimeRef.current = nextTime;
+        lastSeekAtRef.current = now;
       }
 
-      idleTimerRef.current = window.setTimeout(() => {
-        const currentVideo = videoRef.current;
-        if (!currentVideo) return;
-        currentVideo.playbackRate += (0.85 - currentVideo.playbackRate) * 0.6;
-      }, 140);
+      scrubFrameRef.current = requestAnimationFrame(scrubTowardTarget);
     }
 
     function onScroll() {
       if (tickingRef.current) return;
       tickingRef.current = true;
-      requestAnimationFrame(updateScrollSync);
+      requestAnimationFrame(updateTargetTime);
     }
 
-    lastScrollYRef.current = window.scrollY;
-    lastTimeRef.current = performance.now();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
-    updateScrollSync();
+    updateTargetTime();
+    scrubFrameRef.current = requestAnimationFrame(scrubTowardTarget);
 
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
-      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
+      if (scrubFrameRef.current) cancelAnimationFrame(scrubFrameRef.current);
     };
   }, []);
 
@@ -100,8 +114,6 @@ export default function HeroScrollVideo({ children }: { children?: ReactNode }) 
           ref={videoRef}
           className={`${styles.video} ${ready ? styles.ready : ""}`}
           src="/hero-scroll-scrub.mp4"
-          autoPlay
-          loop
           muted
           playsInline
           preload="auto"
