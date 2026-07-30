@@ -1,176 +1,117 @@
 "use client";
 
 import { ReactNode, useEffect, useRef, useState } from "react";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { useIsMobile } from "@/lib/useIsMobile";
 import styles from "./HeroScrollVideo.module.css";
+
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
 
 function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-// Abaixo desta largura o hero abandona o scroll-scrubbing: em aparelhos reais o loop de
-// seek a cada frame (rAF infinito) sobrecarrega a GPU/CPU e trava a rolagem. No lugar,
-// o vídeo vira um fundo fixo (position: fixed) tocando em loop normal — sem nenhum
-// custo de JS por frame — enquanto o conteúdo rola por cima normalmente.
-function isMobileViewport() {
-  return typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
-}
-
 /**
- * No desktop: vídeo fixo (position: sticky) cujo frame é controlado pela posição de
- * rolagem (scroll-scrubbing). No mobile: vídeo é um fundo fixo tocando em loop normal —
- * continua visível atrás de todas as seções, mas sem nenhum seek atrelado ao scroll.
+ * Vídeo controlado pelo scroll (scroll-scrubbed) dentro de uma seção sticky em tela
+ * cheia — mesmo core (GSAP ScrollTrigger + scrub) no desktop e no mobile. O que muda
+ * no mobile: fonte de vídeo mais leve, remount seguro via key ao trocar de fonte, e o
+ * truque de "play + pause" para o iOS Safari não ficar com o primeiro frame preto.
  */
 export default function HeroScrollVideo({ overlay, children }: { overlay: ReactNode; children?: ReactNode }) {
-  const [mobile] = useState(isMobileViewport);
+  const isMobile = useIsMobile();
   const trackRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const durationRef = useRef(0);
-  const targetTimeRef = useRef(0);
-  const visibleTimeRef = useRef(0);
-  const tickingRef = useRef(false);
-  const scrubFrameRef = useRef(0);
-  const lastSeekAtRef = useRef(0);
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(prefersReducedMotion);
+
+  const videoSrc = isMobile ? "/hero-scroll-scrub-mobile.mp4" : "/hero-scroll-scrub.mp4";
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    const track = trackRef.current;
+    const sticky = stickyRef.current;
+    if (!video || !track || !sticky) return;
 
-    function onLoadedMetadata() {
-      if (!video) return;
-      durationRef.current = video.duration;
+    if (prefersReducedMotion()) {
+      video.currentTime = 0;
+      return;
+    }
 
-      if (mobile) {
-        // Não confiamos só no atributo autoplay — em vários navegadores mobile reais
-        // ele é ignorado silenciosamente dependendo de economia de dados/bateria.
-        video.muted = true;
-        video.loop = !prefersReducedMotion();
-        if (!prefersReducedMotion()) {
-          video.play().catch(() => {});
-        }
-        setReady(true);
-        return;
+    let durationReady = false;
+    let pendingProgress = 0;
+    let trigger: ScrollTrigger | undefined;
+    let cancelled = false;
+
+    function markReady() {
+      if (durationReady || !video || cancelled) return;
+      durationReady = Number.isFinite(video.duration) && video.duration > 0;
+      if (!durationReady) return;
+
+      video.currentTime = pendingProgress * video.duration;
+
+      // iOS Safari (e alguns Android) não desenham nenhum frame num vídeo pausado
+      // que nunca rodou — "ligar e desligar" rapidamente força a decodificação do
+      // primeiro frame antes de currentTime funcionar visualmente.
+      const playPromise = video.play();
+      if (playPromise) {
+        playPromise.then(() => video.pause()).catch(() => {});
       }
-
-      video.pause();
-      const initialTime = prefersReducedMotion() ? video.duration * 0.5 : 0.001;
-      targetTimeRef.current = initialTime;
-      visibleTimeRef.current = initialTime;
-      video.currentTime = initialTime;
-
-      video.play().then(() => video.pause()).catch(() => {});
       setReady(true);
+
+      trigger = ScrollTrigger.create({
+        trigger: track,
+        start: "top top",
+        end: "bottom bottom",
+        pin: sticky,
+        scrub: true,
+        onUpdate: (self) => {
+          pendingProgress = self.progress;
+          if (!track) return;
+          track.style.setProperty("--scroll-progress", self.progress.toFixed(4));
+          if (video && durationReady && !video.seeking) {
+            video.currentTime = self.progress * video.duration;
+          }
+        },
+      });
     }
 
-    video.addEventListener("loadedmetadata", onLoadedMetadata);
-    // Se o navegador já carregou os metadados (vídeo em cache) antes deste efeito
-    // rodar, o evento "loadedmetadata" já disparou e nunca chegaríamos a ouvi-lo.
-    if (video.readyState >= 1) onLoadedMetadata();
-
-    // Alguns navegadores mobile só liberam a reprodução após um primeiro gesto do
-    // usuário, mesmo com o vídeo mudo — reforça o play() no primeiro toque/scroll.
-    function retryPlay() {
-      if (mobile && video && video.paused && !prefersReducedMotion()) {
-        video.play().catch(() => {});
-      }
-    }
-    if (mobile) {
-      document.addEventListener("touchstart", retryPlay, { once: true, passive: true });
-      document.addEventListener("scroll", retryPlay, { once: true, passive: true });
-    }
+    video.addEventListener("loadedmetadata", markReady);
+    // Se o vídeo já veio do cache do navegador, "loadedmetadata" pode já ter disparado
+    // antes deste listener existir — checa o estado direto como fallback.
+    if (video.readyState >= 1) markReady();
 
     return () => {
-      video.removeEventListener("loadedmetadata", onLoadedMetadata);
-      document.removeEventListener("touchstart", retryPlay);
-      document.removeEventListener("scroll", retryPlay);
+      cancelled = true;
+      video.removeEventListener("loadedmetadata", markReady);
+      trigger?.kill();
     };
-  }, [mobile]);
-
-  useEffect(() => {
-    if (mobile || prefersReducedMotion()) return;
-
-    function seekVideo(time: number) {
-      const video = videoRef.current;
-      if (!video || !durationRef.current || video.seeking) return false;
-
-      const nextTime = Math.min(durationRef.current - 0.04, Math.max(0.001, time));
-      const seekableTo = video.seekable.length ? video.seekable.end(video.seekable.length - 1) : durationRef.current;
-      if (nextTime > seekableTo) return false;
-
-      if (typeof video.fastSeek === "function") {
-        video.fastSeek(nextTime);
-      } else {
-        video.currentTime = nextTime;
-      }
-      return true;
-    }
-
-    function updateTargetTime() {
-      tickingRef.current = false;
-      const track = trackRef.current;
-      const duration = durationRef.current;
-      if (!track || !duration) return;
-
-      const rect = track.getBoundingClientRect();
-      const total = rect.height - window.innerHeight;
-      const progress = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
-      track.style.setProperty("--scroll-progress", progress.toFixed(4));
-      targetTimeRef.current = progress * duration;
-    }
-
-    function scrubTowardTarget() {
-      const now = performance.now();
-      const targetTime = targetTimeRef.current;
-      const visibleTime = visibleTimeRef.current;
-      const nextTime = visibleTime + (targetTime - visibleTime) * 0.34;
-      const seekDelta = Math.abs(nextTime - visibleTime);
-      const targetDelta = Math.abs(targetTime - nextTime);
-      const canSeek = now - lastSeekAtRef.current > 34;
-
-      if (canSeek && (seekDelta > 0.018 || targetDelta > 0.035) && seekVideo(nextTime)) {
-        visibleTimeRef.current = nextTime;
-        lastSeekAtRef.current = now;
-      }
-
-      scrubFrameRef.current = requestAnimationFrame(scrubTowardTarget);
-    }
-
-    function onScroll() {
-      if (tickingRef.current) return;
-      tickingRef.current = true;
-      requestAnimationFrame(updateTargetTime);
-    }
-
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    updateTargetTime();
-    scrubFrameRef.current = requestAnimationFrame(scrubTowardTarget);
-
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      if (scrubFrameRef.current) cancelAnimationFrame(scrubFrameRef.current);
-    };
-  }, [mobile]);
+  }, [videoSrc]);
 
   return (
-    <div ref={trackRef} className={`${styles.scrollTrack} ${mobile ? styles.scrollTrackMobile : ""}`}>
-      <div className={styles.sticky}>
-        <video
-          ref={videoRef}
-          className={`${styles.video} ${!mobile ? styles.videoFading : ""} ${ready ? styles.ready : ""}`}
-          src={mobile ? "/hero-scroll-scrub-mobile.mp4" : "/hero-scroll-scrub.mp4"}
-          poster="/hero-poster.jpg"
-          muted
-          playsInline
-          preload="auto"
-        />
-        <div className={styles.scrim} />
+    <>
+      {/* Altura fixa (não min-height): delimita exatamente a distância de scroll do
+          scrub. O restante das seções da página fica FORA deste bloco — como
+          irmão, não filho — para não herdar essa altura travada em 220vh. */}
+      <div ref={trackRef} className={styles.scrollTrack}>
+        <div ref={stickyRef} className={styles.sticky}>
+          <video
+            key={videoSrc}
+            ref={videoRef}
+            className={`${styles.video} ${ready ? styles.ready : ""}`}
+            src={videoSrc}
+            poster="/hero-poster.jpg"
+            muted
+            playsInline
+            preload="auto"
+          />
+          <div className={styles.scrim} />
+          <div className={styles.overlaySlot}>{overlay}</div>
+        </div>
       </div>
-      <div className={mobile ? styles.mobileFlow : styles.content}>
-        {overlay}
-        {children}
-      </div>
-    </div>
+      <div className={styles.content}>{children}</div>
+    </>
   );
 }

@@ -1,20 +1,18 @@
 .scrollTrack {
   position: relative;
-  min-height: 100vh;
-  min-height: 100svh;
+  height: 220vh;
+  height: 220svh;
   background: #0b0d10;
-  isolation: isolate;
 }
 
+/* O GSAP ScrollTrigger cuida do pin (aplica position:fixed sozinho enquanto a trigger
+   track rola) — aqui só precisamos do tamanho e do fundo da seção "tela cheia". */
 .sticky {
-  position: sticky;
-  top: 0;
+  position: relative;
   height: 100vh;
   height: 100svh;
   overflow: hidden;
   background: #0b0d10;
-  z-index: 0;
-  contain: paint;
 }
 
 .video {
@@ -23,19 +21,13 @@
   width: 100%;
   height: 104%;
   object-fit: cover;
+  opacity: 0;
   transform: translate3d(0, calc(var(--scroll-progress, 0) * -2.5vh), 0) scale(1.035);
+  transition: opacity 0.5s ease;
   will-change: transform, opacity;
   backface-visibility: hidden;
 }
-/* No desktop o vídeo entra com um fade suave assim que o primeiro frame está pronto.
-   No mobile isso fica de fora de propósito: o poster (imagem estática leve) já cobre o
-   instante de carregamento, então esconder o vídeo atrás de opacity:0 só trocaria um
-   "fundo preto" por um "fundo preto com poster escondido" — pior, não melhor. */
-.videoFading {
-  opacity: 0;
-  transition: opacity 0.5s ease;
-}
-.videoFading.ready {
+.video.ready {
   opacity: 1;
 }
 
@@ -48,30 +40,12 @@
     radial-gradient(circle at 16% 38%, rgba(11, 13, 16, 0.18), transparent 34%);
 }
 
-.content {
+.overlaySlot {
   position: relative;
   z-index: 1;
-  margin-top: -100vh;
-  margin-top: -100svh;
-  min-height: 100vh;
-  min-height: 100svh;
+  height: 100%;
 }
 
-/* Mobile: sem seek por scroll (custo de JS por frame travava aparelhos reais) — o vídeo
-   vira um fundo fixo (position: fixed) tocando em loop normal, e todo o conteúdo (hero +
-   demais seções) rola por cima dele normalmente, sem margem negativa nem sticky. */
-.scrollTrackMobile {
-  min-height: 0;
-}
-.scrollTrackMobile .sticky {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: auto;
-}
-.mobileFlow {
+.content {
   position: relative;
-  z-index: 1;
 }
