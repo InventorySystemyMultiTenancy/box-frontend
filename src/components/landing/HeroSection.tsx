@@ -3,8 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ReactNode } from "react";
-import HeroScrollVideo from "./HeroScrollVideo";
+import dynamic from "next/dynamic";
 import styles from "./landing.module.css";
+
+// Componente decorativo e dependente do viewport real (mobile vs. desktop) — nunca
+// precisa ser renderizado no servidor, e evita qualquer divergência de hidratação.
+const HeroScrollVideo = dynamic(() => import("./HeroScrollVideo"), { ssr: false });
 
 const NAV_LINKS = [
   { href: "#diferenciais", label: "Diferenciais" },
@@ -56,25 +60,28 @@ export default function HeroSection({ children }: { children?: ReactNode }) {
         </div>
       )}
 
-      <HeroScrollVideo>
-        <section className={styles.heroOverlay}>
-          <span className={styles.heroLive}>
-            <i /> 3 VEÍCULOS EM MANUTENÇÃO AGORA
-          </span>
-          <h1 className={styles.heroTitle}>Seu carro, acompanhado em tempo real.</h1>
-          <p className={styles.heroLede}>
-            Da chegada à retirada, cada etapa da manutenção vira um evento que você vê acontecer —
-            fotos, laudos e aprovação, sem precisar perguntar o que está sendo feito.
-          </p>
-          <div className={styles.heroActions}>
-            <a href="#orcamento" className={`${styles.btn} ${styles.btnPrimary}`}>
-              Montar orçamento
-            </a>
-            <a href="#agendamento" className={`${styles.btn} ${styles.btnGhost}`}>
-              Agendar visita
-            </a>
-          </div>
-        </section>
+      <HeroScrollVideo
+        overlay={
+          <section className={styles.heroOverlay}>
+            <span className={styles.heroLive}>
+              <i /> 3 VEÍCULOS EM MANUTENÇÃO AGORA
+            </span>
+            <h1 className={styles.heroTitle}>Seu carro, acompanhado em tempo real.</h1>
+            <p className={styles.heroLede}>
+              Da chegada à retirada, cada etapa da manutenção vira um evento que você vê acontecer —
+              fotos, laudos e aprovação, sem precisar perguntar o que está sendo feito.
+            </p>
+            <div className={styles.heroActions}>
+              <a href="#orcamento" className={`${styles.btn} ${styles.btnPrimary}`}>
+                Montar orçamento
+              </a>
+              <a href="#agendamento" className={`${styles.btn} ${styles.btnGhost}`}>
+                Agendar visita
+              </a>
+            </div>
+          </section>
+        }
+      >
         <div className={styles.heroContent}>{children}</div>
       </HeroScrollVideo>
     </div>

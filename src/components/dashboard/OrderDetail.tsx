@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
-import { Approval, InventoryPart, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
+import { Approval, InventoryPart, ServiceOrder, ServiceOrderStatus, TimelineEvent, VehiclePart } from "@/lib/types";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
@@ -398,7 +398,6 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
       <StatusStrip current={order.status} />
 
       <div className={styles.progressCard}>
-        <div>{STATUS_LABELS[order.status]}</div>
         <div className={styles.progressBar}>
           <div className={styles.progressFill} style={{ width: `${order.progress}%` }} />
         </div>

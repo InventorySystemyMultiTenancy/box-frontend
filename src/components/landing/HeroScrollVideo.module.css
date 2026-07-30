@@ -50,3 +50,14 @@
   min-height: 100vh;
   min-height: 100svh;
 }
+
+/* Mobile: sem sticky, sem seek por scroll — o vídeo só toca em loop dentro de uma
+   seção normal, e o texto (overlaySlot) fica sobre ele sem depender de margem negativa. */
+.scrollTrackMobile .sticky {
+  position: relative;
+}
+.overlaySlot {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+}

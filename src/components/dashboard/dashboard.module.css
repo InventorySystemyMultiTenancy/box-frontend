@@ -156,6 +156,11 @@
   transition: opacity 0.15s ease;
 }
 .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
+.badgeCurrent {
+  font-size: 0.86rem;
+  padding: 0.5rem 0.9rem;
+}
+.badgeCurrent .dot { width: 7px; height: 7px; }
 .tone-muted { background: var(--bg-panel); color: var(--text-muted); }
 .tone-muted .dot { background: var(--text-muted); }
 .tone-info { background: var(--accent-cian-soft); color: var(--accent-cian); }
