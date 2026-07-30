@@ -14,6 +14,16 @@ function prefersReducedMotion() {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+// Duração real dos dois arquivos (conferida via ffprobe). Alguns navegadores (Safari,
+// principalmente com MP4 sem moov no início do arquivo) podem reportar `duration`
+// como Infinity/NaN por um tempo — esse valor serve de fallback para o scrub nunca
+// travar esperando um número que talvez nunca chegue.
+const FALLBACK_DURATION = 10;
+
+function getDuration(video: HTMLVideoElement) {
+  return Number.isFinite(video.duration) && video.duration > 0 ? video.duration : FALLBACK_DURATION;
+}
+
 /**
  * Vídeo controlado pelo scroll (scroll-scrubbed) dentro de uma seção sticky em tela
  * cheia — mesmo core (GSAP ScrollTrigger + scrub) no desktop e no mobile. O que muda
@@ -40,17 +50,16 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
       return;
     }
 
-    let durationReady = false;
+    let becameReady = false;
     let pendingProgress = 0;
     let trigger: ScrollTrigger | undefined;
     let cancelled = false;
 
     function markReady() {
-      if (durationReady || !video || cancelled) return;
-      durationReady = Number.isFinite(video.duration) && video.duration > 0;
-      if (!durationReady) return;
+      if (becameReady || !video || cancelled) return;
+      becameReady = true;
 
-      video.currentTime = pendingProgress * video.duration;
+      video.currentTime = pendingProgress * getDuration(video);
 
       // iOS Safari (e alguns Android) não desenham nenhum frame num vídeo pausado
       // que nunca rodou — "ligar e desligar" rapidamente força a decodificação do
@@ -69,18 +78,18 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
         scrub: true,
         onUpdate: (self) => {
           pendingProgress = self.progress;
-          if (!track) return;
+          if (!track || !video) return;
           track.style.setProperty("--scroll-progress", self.progress.toFixed(4));
-          if (video && durationReady && !video.seeking) {
-            video.currentTime = self.progress * video.duration;
+          if (!video.seeking) {
+            video.currentTime = self.progress * getDuration(video);
           }
         },
       });
     }
 
+    // `readyState >= 1` já garante metadados (inclusive em cache) mesmo que o navegador
+    // ainda não tenha resolvido `duration` corretamente — não travamos mais nisso.
     video.addEventListener("loadedmetadata", markReady);
-    // Se o vídeo já veio do cache do navegador, "loadedmetadata" pode já ter disparado
-    // antes deste listener existir — checa o estado direto como fallback.
     if (video.readyState >= 1) markReady();
 
     return () => {
