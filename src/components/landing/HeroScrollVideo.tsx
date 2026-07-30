@@ -158,8 +158,9 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
       <div className={styles.sticky}>
         <video
           ref={videoRef}
-          className={`${styles.video} ${ready ? styles.ready : ""}`}
-          src="/hero-scroll-scrub.mp4"
+          className={`${styles.video} ${!mobile ? styles.videoFading : ""} ${ready ? styles.ready : ""}`}
+          src={mobile ? "/hero-scroll-scrub-mobile.mp4" : "/hero-scroll-scrub.mp4"}
+          poster="/hero-poster.jpg"
           muted
           playsInline
           preload="auto"

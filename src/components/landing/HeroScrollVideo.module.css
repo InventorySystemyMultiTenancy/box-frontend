@@ -23,13 +23,19 @@
   width: 100%;
   height: 104%;
   object-fit: cover;
-  opacity: 0;
   transform: translate3d(0, calc(var(--scroll-progress, 0) * -2.5vh), 0) scale(1.035);
-  transition: opacity 0.5s ease;
   will-change: transform, opacity;
   backface-visibility: hidden;
 }
-.video.ready {
+/* No desktop o vídeo entra com um fade suave assim que o primeiro frame está pronto.
+   No mobile isso fica de fora de propósito: o poster (imagem estática leve) já cobre o
+   instante de carregamento, então esconder o vídeo atrás de opacity:0 só trocaria um
+   "fundo preto" por um "fundo preto com poster escondido" — pior, não melhor. */
+.videoFading {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.videoFading.ready {
   opacity: 1;
 }
 
