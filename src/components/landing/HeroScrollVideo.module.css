@@ -51,13 +51,21 @@
   min-height: 100svh;
 }
 
-/* Mobile: sem sticky, sem seek por scroll — o vídeo só toca em loop dentro de uma
-   seção normal, e o texto (overlaySlot) fica sobre ele sem depender de margem negativa. */
-.scrollTrackMobile .sticky {
-  position: relative;
+/* Mobile: sem seek por scroll (custo de JS por frame travava aparelhos reais) — o vídeo
+   vira um fundo fixo (position: fixed) tocando em loop normal, e todo o conteúdo (hero +
+   demais seções) rola por cima dele normalmente, sem margem negativa nem sticky. */
+.scrollTrackMobile {
+  min-height: 0;
 }
-.overlaySlot {
+.scrollTrackMobile .sticky {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: auto;
+}
+.mobileFlow {
   position: relative;
   z-index: 1;
-  height: 100%;
 }

@@ -8,18 +8,17 @@ function prefersReducedMotion() {
 }
 
 // Abaixo desta largura o hero abandona o scroll-scrubbing: em aparelhos reais o loop de
-// seek a cada frame (rAF infinito) sobrecarrega a GPU/CPU e trava a rolagem — o vídeo
-// também depende de 100vh, que oscila na barra de endereço do navegador mobile e fazia o
-// texto do hero (posicionado por margem negativa) sumir de tela por alguns segundos.
+// seek a cada frame (rAF infinito) sobrecarrega a GPU/CPU e trava a rolagem. No lugar,
+// o vídeo vira um fundo fixo (position: fixed) tocando em loop normal — sem nenhum
+// custo de JS por frame — enquanto o conteúdo rola por cima normalmente.
 function isMobileViewport() {
   return typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
 }
 
 /**
- * Componente do site institucional que ora escrutina o video na página de rolagem.
  * No desktop: vídeo fixo (position: sticky) cujo frame é controlado pela posição de
- * rolagem (scroll-scrubbing). No mobile: vídeo simplesmente toca em loop dentro de uma
- * seção normal de 100svh — sem sticky, sem seeks — para não travar em aparelhos reais.
+ * rolagem (scroll-scrubbing). No mobile: vídeo é um fundo fixo tocando em loop normal —
+ * continua visível atrás de todas as seções, mas sem nenhum seek atrelado ao scroll.
  */
 export default function HeroScrollVideo({ overlay, children }: { overlay: ReactNode; children?: ReactNode }) {
   const [mobile] = useState(isMobileViewport);
@@ -42,7 +41,13 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
       durationRef.current = video.duration;
 
       if (mobile) {
-        // No mobile o autoplay/loop do próprio <video> cuida da reprodução.
+        // Não confiamos só no atributo autoplay — em vários navegadores mobile reais
+        // ele é ignorado silenciosamente dependendo de economia de dados/bateria.
+        video.muted = true;
+        video.loop = !prefersReducedMotion();
+        if (!prefersReducedMotion()) {
+          video.play().catch(() => {});
+        }
         setReady(true);
         return;
       }
@@ -61,7 +66,24 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
     // Se o navegador já carregou os metadados (vídeo em cache) antes deste efeito
     // rodar, o evento "loadedmetadata" já disparou e nunca chegaríamos a ouvi-lo.
     if (video.readyState >= 1) onLoadedMetadata();
-    return () => video.removeEventListener("loadedmetadata", onLoadedMetadata);
+
+    // Alguns navegadores mobile só liberam a reprodução após um primeiro gesto do
+    // usuário, mesmo com o vídeo mudo — reforça o play() no primeiro toque/scroll.
+    function retryPlay() {
+      if (mobile && video && video.paused && !prefersReducedMotion()) {
+        video.play().catch(() => {});
+      }
+    }
+    if (mobile) {
+      document.addEventListener("touchstart", retryPlay, { once: true, passive: true });
+      document.addEventListener("scroll", retryPlay, { once: true, passive: true });
+    }
+
+    return () => {
+      video.removeEventListener("loadedmetadata", onLoadedMetadata);
+      document.removeEventListener("touchstart", retryPlay);
+      document.removeEventListener("scroll", retryPlay);
+    };
   }, [mobile]);
 
   useEffect(() => {
@@ -131,8 +153,6 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
     };
   }, [mobile]);
 
-  const canAutoplay = mobile && !prefersReducedMotion();
-
   return (
     <div ref={trackRef} className={`${styles.scrollTrack} ${mobile ? styles.scrollTrackMobile : ""}`}>
       <div className={styles.sticky}>
@@ -143,13 +163,13 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
           muted
           playsInline
           preload="auto"
-          autoPlay={canAutoplay}
-          loop={canAutoplay}
         />
         <div className={styles.scrim} />
-        {mobile && <div className={styles.overlaySlot}>{overlay}</div>}
       </div>
-      {mobile ? children : <div className={styles.content}>{overlay}{children}</div>}
+      <div className={mobile ? styles.mobileFlow : styles.content}>
+        {overlay}
+        {children}
+      </div>
     </div>
   );
 }
