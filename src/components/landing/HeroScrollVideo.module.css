@@ -1,16 +1,15 @@
 .scrollTrack {
   position: relative;
-  height: 220vh;
-  height: 220svh;
   background: #0b0d10;
 }
 
-/* O GSAP ScrollTrigger cuida do pin (aplica position:fixed sozinho enquanto a trigger
-   track rola) — aqui só precisamos do tamanho e do fundo da seção "tela cheia". */
-.sticky {
-  position: relative;
-  height: 100vh;
-  height: 100svh;
+/* Fixo por CSS puro (sem pin do GSAP) — fica atrás do conteúdo do início ao fim da
+   página; não participa da altura do documento, então .scrollTrack cresce
+   naturalmente até a altura real de .content. */
+.videoFixed {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
   overflow: hidden;
   background: #0b0d10;
 }
@@ -22,9 +21,9 @@
   height: 104%;
   object-fit: cover;
   opacity: 0;
-  transform: translate3d(0, calc(var(--scroll-progress, 0) * -2.5vh), 0) scale(1.035);
+  transform: scale(1.035);
   transition: opacity 0.5s ease;
-  will-change: transform, opacity;
+  will-change: opacity;
   backface-visibility: hidden;
 }
 .video.ready {
@@ -43,9 +42,11 @@
 .overlaySlot {
   position: relative;
   z-index: 1;
-  height: 100%;
+  min-height: 100vh;
+  min-height: 100svh;
 }
 
 .content {
   position: relative;
+  z-index: 1;
 }

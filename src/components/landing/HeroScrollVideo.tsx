@@ -31,15 +31,14 @@ function targetTime(progress: number, duration: number) {
 }
 
 /**
- * Vídeo controlado pelo scroll (scroll-scrubbed) dentro de uma seção sticky em tela
- * cheia — mesmo core (GSAP ScrollTrigger + scrub) no desktop e no mobile. O que muda
- * no mobile: fonte de vídeo mais leve, remount seguro via key ao trocar de fonte, e o
- * truque de "play + pause" para o iOS Safari não ficar com o primeiro frame preto.
+ * Vídeo fixo atrás de TODA a página inicial (não só do topo): o progresso do scroll
+ * ao longo de todo o conteúdo — do hero até o rodapé — controla o currentTime do
+ * vídeo. O vídeo fica em position:fixed o tempo todo (CSS puro); o GSAP ScrollTrigger
+ * só mede o progresso do scroll da página inteira para tocar o "scrub", sem pin.
  */
 export default function HeroScrollVideo({ overlay, children }: { overlay: ReactNode; children?: ReactNode }) {
   const isMobile = useIsMobile();
   const trackRef = useRef<HTMLDivElement>(null);
-  const stickyRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(prefersReducedMotion);
 
@@ -48,8 +47,7 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
   useEffect(() => {
     const video = videoRef.current;
     const track = trackRef.current;
-    const sticky = stickyRef.current;
-    if (!video || !track || !sticky) return;
+    if (!video || !track) return;
 
     if (prefersReducedMotion()) {
       video.currentTime = 0;
@@ -80,15 +78,11 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
         trigger: track,
         start: "top top",
         end: "bottom bottom",
-        pin: sticky,
         scrub: true,
         onUpdate: (self) => {
           pendingProgress = self.progress;
-          if (!track || !video) return;
-          track.style.setProperty("--scroll-progress", self.progress.toFixed(4));
-          if (!video.seeking) {
-            video.currentTime = targetTime(self.progress, getDuration(video));
-          }
+          if (!video || video.seeking) return;
+          video.currentTime = targetTime(self.progress, getDuration(video));
         },
       });
     }
@@ -106,27 +100,24 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
   }, [videoSrc]);
 
   return (
-    <>
-      {/* Altura fixa (não min-height): delimita exatamente a distância de scroll do
-          scrub. O restante das seções da página fica FORA deste bloco — como
-          irmão, não filho — para não herdar essa altura travada em 220vh. */}
-      <div ref={trackRef} className={styles.scrollTrack}>
-        <div ref={stickyRef} className={styles.sticky}>
-          <video
-            key={videoSrc}
-            ref={videoRef}
-            className={`${styles.video} ${ready ? styles.ready : ""}`}
-            src={videoSrc}
-            poster="/hero-poster.jpg"
-            muted
-            playsInline
-            preload="auto"
-          />
-          <div className={styles.scrim} />
-          <div className={styles.overlaySlot}>{overlay}</div>
-        </div>
+    <div ref={trackRef} className={styles.scrollTrack}>
+      <div className={styles.videoFixed}>
+        <video
+          key={videoSrc}
+          ref={videoRef}
+          className={`${styles.video} ${ready ? styles.ready : ""}`}
+          src={videoSrc}
+          poster="/hero-poster.jpg"
+          muted
+          playsInline
+          preload="auto"
+        />
+        <div className={styles.scrim} />
       </div>
-      <div className={styles.content}>{children}</div>
-    </>
+      <div className={styles.content}>
+        <div className={styles.overlaySlot}>{overlay}</div>
+        {children}
+      </div>
+    </div>
   );
 }
