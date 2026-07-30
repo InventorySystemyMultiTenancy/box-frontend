@@ -24,6 +24,12 @@ function getDuration(video: HTMLVideoElement) {
   return Number.isFinite(video.duration) && video.duration > 0 ? video.duration : FALLBACK_DURATION;
 }
 
+// Seekar exatamente no último frame trava/pisca em alguns navegadores (variações de
+// Safari incluídas) — mantém uma margem de segurança no fim do vídeo.
+function targetTime(progress: number, duration: number) {
+  return Math.min(progress * duration, duration - 0.05);
+}
+
 /**
  * Vídeo controlado pelo scroll (scroll-scrubbed) dentro de uma seção sticky em tela
  * cheia — mesmo core (GSAP ScrollTrigger + scrub) no desktop e no mobile. O que muda
@@ -59,7 +65,7 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
       if (becameReady || !video || cancelled) return;
       becameReady = true;
 
-      video.currentTime = pendingProgress * getDuration(video);
+      video.currentTime = targetTime(pendingProgress, getDuration(video));
 
       // iOS Safari (e alguns Android) não desenham nenhum frame num vídeo pausado
       // que nunca rodou — "ligar e desligar" rapidamente força a decodificação do
@@ -81,7 +87,7 @@ export default function HeroScrollVideo({ overlay, children }: { overlay: ReactN
           if (!track || !video) return;
           track.style.setProperty("--scroll-progress", self.progress.toFixed(4));
           if (!video.seeking) {
-            video.currentTime = self.progress * getDuration(video);
+            video.currentTime = targetTime(self.progress, getDuration(video));
           }
         },
       });
