@@ -1,25 +1,61 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ReactNode } from "react";
 import HeroScrollVideo from "./HeroScrollVideo";
 import styles from "./landing.module.css";
 
+const NAV_LINKS = [
+  { href: "#diferenciais", label: "Diferenciais" },
+  { href: "#servicos", label: "Serviços" },
+  { href: "#equipe", label: "Equipe" },
+  { href: "#agendamento", label: "Agendamento" },
+];
+
 export default function HeroSection({ children }: { children?: ReactNode }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <div className={styles.heroWrap}>
       <nav className={styles.nav}>
         <span className={styles.navBrand}>BOX.</span>
         <div className={styles.navLinks}>
-          <a href="#diferenciais">Diferenciais</a>
-          <a href="#servicos">Serviços</a>
-          <a href="#equipe">Equipe</a>
-          <a href="#agendamento">Agendamento</a>
+          {NAV_LINKS.map((link) => (
+            <a key={link.href} href={link.href}>
+              {link.label}
+            </a>
+          ))}
           <Link href="/login" className={styles.navCta}>
             Área do cliente
           </Link>
         </div>
+        <button
+          type="button"
+          className={styles.navToggle}
+          aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <span className={menuOpen ? styles.navToggleOpen : ""} />
+          <span className={menuOpen ? styles.navToggleOpen : ""} />
+          <span className={menuOpen ? styles.navToggleOpen : ""} />
+        </button>
       </nav>
+
+      {menuOpen && (
+        <div className={styles.navMobileMenu}>
+          {NAV_LINKS.map((link) => (
+            <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>
+              {link.label}
+            </a>
+          ))}
+          <Link href="/login" className={styles.navCta} onClick={() => setMenuOpen(false)}>
+            Área do cliente
+          </Link>
+        </div>
+      )}
+
       <HeroScrollVideo>
         <section className={styles.heroOverlay}>
           <span className={styles.heroLive}>

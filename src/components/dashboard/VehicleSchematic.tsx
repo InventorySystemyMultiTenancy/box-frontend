@@ -63,6 +63,7 @@ export default function VehicleSchematic({
   parts,
   approvals = [],
   canRespond = false,
+  canViewPrices = false,
   onRespondApproval,
   canManageMaintenance = false,
   onStartPart,
@@ -71,6 +72,7 @@ export default function VehicleSchematic({
   parts: VehiclePart[];
   approvals?: Approval[];
   canRespond?: boolean;
+  canViewPrices?: boolean;
   onRespondApproval?: (approvalId: string, status: "APPROVED" | "REJECTED", responseNote?: string) => Promise<void>;
   canManageMaintenance?: boolean;
   onStartPart?: (partId: string) => Promise<void>;
@@ -243,9 +245,9 @@ export default function VehicleSchematic({
                   ))}
                 </div>
               )}
-              {activeApproval.laborValue != null && <div className={styles.value}>Mão de obra: R$ {activeApproval.laborValue.toFixed(2)}</div>}
-              {activeApproval.partsValue != null && <div className={styles.value}>Peças: R$ {activeApproval.partsValue.toFixed(2)}</div>}
-              {activeApproval.estimatedValue != null && <div className={styles.value}>R$ {activeApproval.estimatedValue.toFixed(2)}</div>}
+              {canViewPrices && activeApproval.laborValue != null && <div className={styles.value}>Mão de obra: R$ {activeApproval.laborValue.toFixed(2)}</div>}
+              {canViewPrices && activeApproval.partsValue != null && <div className={styles.value}>Peças: R$ {activeApproval.partsValue.toFixed(2)}</div>}
+              {canViewPrices && activeApproval.estimatedValue != null && <div className={styles.value}>R$ {activeApproval.estimatedValue.toFixed(2)}</div>}
               {activeApproval.responseNote && <p className={styles.responseNote}>{activeApproval.responseNote}</p>}
               {canRespond && activeApproval.status === "PENDING" && activeApproval.estimatedValue != null && (
                 <>

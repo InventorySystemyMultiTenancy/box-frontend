@@ -5,7 +5,15 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
-export default function Timeline({ events, justArrivedId }: { events: TimelineEvent[]; justArrivedId?: string | null }) {
+export default function Timeline({
+  events,
+  justArrivedId,
+  canViewPrices = true,
+}: {
+  events: TimelineEvent[];
+  justArrivedId?: string | null;
+  canViewPrices?: boolean;
+}) {
   if (events.length === 0) {
     return <p className={styles.tlSub}>Nenhum evento registrado ainda.</p>;
   }
@@ -20,7 +28,7 @@ export default function Timeline({ events, justArrivedId }: { events: TimelineEv
         >
           <div className={styles.tlTime}>{formatTime(event.occurredAt)}</div>
           <div className={styles.tlText}>{event.title}</div>
-          {event.description && <div className={styles.tlSub}>{event.description}</div>}
+          {event.description && (canViewPrices || !/R\$|valor/i.test(event.description)) && <div className={styles.tlSub}>{event.description}</div>}
         </div>
       ))}
     </div>

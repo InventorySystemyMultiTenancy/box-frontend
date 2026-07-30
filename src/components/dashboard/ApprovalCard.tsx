@@ -12,9 +12,13 @@ function mediaUrl(url: string) {
 export default function ApprovalCard({
   approval,
   onRespond,
+  canRespond = true,
+  canViewPrices = true,
 }: {
   approval: Approval;
   onRespond: (status: "APPROVED" | "REJECTED", responseNote?: string) => Promise<void>;
+  canRespond?: boolean;
+  canViewPrices?: boolean;
 }) {
   const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
   const [responseNote, setResponseNote] = useState("");
@@ -50,10 +54,10 @@ export default function ApprovalCard({
           )}
         </div>
       )}
-      {approval.estimatedValue != null && (
+      {canViewPrices && approval.estimatedValue != null && (
         <div className={styles.value}>Valor estimado: R$ {approval.estimatedValue.toFixed(2)}</div>
       )}
-      {approval.status === "PENDING" ? (
+      {canRespond && approval.status === "PENDING" ? (
         <>
           <textarea
             className={styles.rejectReason}

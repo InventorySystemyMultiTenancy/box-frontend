@@ -41,6 +41,19 @@ const SIDE_LABEL: Record<string, string> = {
 
 /** Painel completo de uma ordem de serviço — status, timeline, aprovação e esquema do
  * veículo. Usado tanto na área do cliente quanto no projeto selecionado pelo mecânico. */
+function formatCurrency(value: number) {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export default function OrderDetail({ orderId }: { orderId: string }) {
   const { user, token } = useAuth();
   const [order, setOrder] = useState<ServiceOrder | null>(null);
@@ -65,6 +78,8 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
+  const isCustomer = user?.role === "CUSTOMER";
+  const canViewPrices = isCustomer || isAdmin;
 
   useEffect(() => {
     if (!token) return;
@@ -239,6 +254,87 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     setOrder((prev) => (prev ? { ...prev, status: "READY_FOR_PICKUP", progress: 100 } : prev));
   }
 
+  function generateServicePdf() {
+    if (!order || !isCustomer || order.status !== "READY_FOR_PICKUP") return;
+
+    const approvedApprovals = order.approvals.filter((approval) => approval.status === "APPROVED");
+    const total = approvedApprovals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
+    const completedParts = order.parts.filter((part) => part.status === "DONE");
+    const rows = approvedApprovals
+      .map((approval) => {
+        const parts = approval.partUsages?.length
+          ? approval.partUsages.map((usage) => `${usage.quantity}x ${usage.inventoryPart.name}`).join(", ")
+          : "Sem peça vinculada";
+        return `
+          <tr>
+            <td>${escapeHtml(approval.description)}</td>
+            <td>${escapeHtml(parts)}</td>
+            <td>${formatCurrency(approval.laborValue ?? 0)}</td>
+            <td>${formatCurrency(approval.partsValue ?? 0)}</td>
+            <td>${formatCurrency(approval.estimatedValue ?? 0)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+    const completedList = completedParts.map((part) => `<li>${escapeHtml(part.name)} - ${escapeHtml(part.note ?? "Serviço concluído")}</li>`).join("");
+    const printedAt = new Date().toLocaleString("pt-BR");
+    const vehicle = `${order.vehicle.brand} ${order.vehicle.model} ${order.vehicle.year}`;
+    const popup = window.open("", "_blank", "width=960,height=720");
+    if (!popup) return;
+
+    popup.document.write(`
+      <!doctype html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="utf-8" />
+          <title>Relatório ${escapeHtml(order.code)}</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #111; margin: 32px; }
+            h1 { margin: 0 0 6px; font-size: 24px; }
+            h2 { margin-top: 26px; font-size: 16px; }
+            .muted { color: #555; font-size: 13px; }
+            .summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 18px; margin-top: 18px; }
+            .box { border: 1px solid #ddd; padding: 10px; border-radius: 6px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; vertical-align: top; }
+            th { background: #f4f4f4; }
+            .total { margin-top: 18px; text-align: right; font-size: 18px; font-weight: 700; }
+            li { margin-bottom: 6px; }
+          </style>
+        </head>
+        <body>
+          <h1>Relatório final de manutenção</h1>
+          <div class="muted">Gerado em ${printedAt}</div>
+          <div class="summary">
+            <div class="box"><strong>Ordem</strong><br />${escapeHtml(order.code)}</div>
+            <div class="box"><strong>Veículo</strong><br />${escapeHtml(vehicle)}</div>
+            <div class="box"><strong>Placa</strong><br />${escapeHtml(order.vehicle.plate ?? "Não informada")}</div>
+            <div class="box"><strong>Quilometragem</strong><br />${order.vehicle.mileage.toLocaleString("pt-BR")} km</div>
+          </div>
+          <h2>Serviços realizados</h2>
+          <ul>${completedList || "<li>Nenhum problema concluído registrado.</li>"}</ul>
+          <h2>Valores aprovados</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Problema / serviço</th>
+                <th>Peças</th>
+                <th>Mão de obra</th>
+                <th>Peças</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>${rows || '<tr><td colspan="5">Nenhum valor aprovado registrado.</td></tr>'}</tbody>
+          </table>
+          <div class="total">Valor final: ${formatCurrency(total)}</div>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+    popup.focus();
+    popup.print();
+  }
+
   async function pricePendingProblem(e: React.FormEvent) {
     e.preventDefault();
     if (!token || !order || !pendingApproval) return;
@@ -327,7 +423,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         </div>
       )}
 
-      {isAdmin && canRegisterProblems && (
+      {isStaff && canRegisterProblems && (
         <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
           <h2>Finalização</h2>
           {blockedForPickup ? (
@@ -341,9 +437,15 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
             <>
               <p>Todos os problemas identificados foram resolvidos.</p>
               <div className={styles.approvalActions}>
-                <button className={styles.btnApprove} onClick={markReadyForPickup}>
-                  Veículo pronto para retirada
-                </button>
+                {isAdmin ? (
+                  <button className={styles.btnApprove} onClick={markReadyForPickup}>
+                    Veículo pronto para retirada
+                  </button>
+                ) : (
+                  <button className={styles.btnApprove} type="button" disabled>
+                    Aguardando admin liberar retirada
+                  </button>
+                )}
               </div>
             </>
           )}
@@ -353,13 +455,15 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
       <div className={styles.columns}>
         <div className={styles.panel}>
           <h2>Timeline da manutenção</h2>
-          <Timeline events={order.timelineEvents} justArrivedId={justArrivedId} />
+          <Timeline events={order.timelineEvents} justArrivedId={justArrivedId} canViewPrices={canViewPrices} />
         </div>
 
         <div>
-          {pendingApproval && pendingApproval.estimatedValue != null && (
+          {canViewPrices && pendingApproval && pendingApproval.estimatedValue != null && (
             <ApprovalCard
               approval={pendingApproval}
+              canRespond={isCustomer}
+              canViewPrices={canViewPrices}
               onRespond={(status, responseNote) => respondApproval(pendingApproval.id, status, responseNote)}
             />
           )}
@@ -524,15 +628,36 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
           <div className={`${styles.panel} ${isReady ? styles.panelReady : ""}`}>
             <h2>Modelo do veículo</h2>
             {isReady && <div className={styles.readyBanner}>Veículo pronto e em ótimo estado — pode retirar!</div>}
+            {isCustomer && isReady && (
+              <div className={styles.approvalActions}>
+                <button className={styles.btnApprove} onClick={generateServicePdf}>
+                  Gerar PDF do serviço
+                </button>
+              </div>
+            )}
             <VehicleSchematic
               parts={order.parts}
               approvals={order.approvals}
               canRespond={user?.role === "CUSTOMER"}
+              canViewPrices={canViewPrices}
               onRespondApproval={respondApproval}
               canManageMaintenance={isStaff}
               onStartPart={startPart}
               onResolvePart={resolvePart}
             />
+            {isStaff && canRegisterProblems && !blockedForPickup && (
+              <div className={styles.approvalActions}>
+                {isAdmin ? (
+                  <button className={styles.btnApprove} onClick={markReadyForPickup}>
+                    Veículo pronto para retirada
+                  </button>
+                ) : (
+                  <button className={styles.btnApprove} type="button" disabled>
+                    Aguardando admin liberar retirada
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 .scrollTrack {
   position: relative;
   min-height: 100vh;
+  min-height: 100svh;
   background: #0b0d10;
   isolation: isolate;
 }
@@ -9,6 +10,7 @@
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100svh;
   overflow: hidden;
   background: #0b0d10;
   z-index: 0;
@@ -44,5 +46,7 @@
   position: relative;
   z-index: 1;
   margin-top: -100vh;
+  margin-top: -100svh;
   min-height: 100vh;
+  min-height: 100svh;
 }

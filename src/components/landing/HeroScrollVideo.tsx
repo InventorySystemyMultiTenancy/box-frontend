@@ -37,6 +37,9 @@ export default function HeroScrollVideo({ children }: { children?: ReactNode }) 
     }
 
     video.addEventListener("loadedmetadata", onLoadedMetadata);
+    // Se o navegador já carregou os metadados (vídeo em cache) antes deste efeito
+    // rodar, o evento "loadedmetadata" já disparou e nunca chegaríamos a ouvi-lo.
+    if (video.readyState >= 1) onLoadedMetadata();
     return () => video.removeEventListener("loadedmetadata", onLoadedMetadata);
   }, []);
 
