@@ -35,8 +35,8 @@
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(11, 13, 16, 0.38) 0%, rgba(11, 13, 16, 0.2) 42%, rgba(11, 13, 16, 0.72) 100%),
-    radial-gradient(circle at 16% 38%, rgba(11, 13, 16, 0.18), transparent 34%);
+    linear-gradient(180deg, rgba(11, 13, 16, 0.55) 0%, rgba(11, 13, 16, 0.7) 100%),
+    radial-gradient(circle at 50% 40%, rgba(11, 13, 16, 0.25), transparent 55%);
 }
 
 .overlaySlot {
