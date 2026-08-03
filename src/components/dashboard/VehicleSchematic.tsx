@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { API_URL } from "@/lib/api";
-import { Approval, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/lib/types";
+import { Approval, InventoryPart, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/lib/types";
 import styles from "./dashboard.module.css";
 
 const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
@@ -68,6 +68,9 @@ export default function VehicleSchematic({
   canManageMaintenance = false,
   onStartPart,
   onResolvePart,
+  canEditPrice = false,
+  inventoryParts = [],
+  onPriceProblem,
 }: {
   parts: VehiclePart[];
   approvals?: Approval[];
@@ -77,6 +80,12 @@ export default function VehicleSchematic({
   canManageMaintenance?: boolean;
   onStartPart?: (partId: string) => Promise<void>;
   onResolvePart?: (partId: string) => Promise<void>;
+  canEditPrice?: boolean;
+  inventoryParts?: InventoryPart[];
+  onPriceProblem?: (
+    approvalId: string,
+    data: { laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
+  ) => Promise<void>;
 }) {
   const withPosition = useMemo(() => parts.filter((p) => HOTSPOT_POSITIONS[p.key]), [parts]);
 
@@ -94,6 +103,36 @@ export default function VehicleSchematic({
   const activeApproval = approvals.find((approval) =>
     active ? approval.partId === active.id || approval.media.some((media) => activeMediaIds.has(media.id)) : false
   );
+
+  const [editingPrice, setEditingPrice] = useState(false);
+  const [pricingBusy, setPricingBusy] = useState(false);
+  const [priceLaborValue, setPriceLaborValue] = useState("");
+  const [priceInventoryPartId, setPriceInventoryPartId] = useState("");
+  const [priceQuantity, setPriceQuantity] = useState("1");
+
+  useEffect(() => {
+    setEditingPrice(false);
+    setPriceLaborValue(activeApproval?.laborValue != null ? String(activeApproval.laborValue) : "");
+    const usage = activeApproval?.partUsages?.[0];
+    setPriceInventoryPartId(usage?.inventoryPart.id ?? "");
+    setPriceQuantity(usage ? String(usage.quantity) : "1");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeApproval?.id]);
+
+  async function savePrice(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeApproval || !onPriceProblem) return;
+    setPricingBusy(true);
+    try {
+      await onPriceProblem(activeApproval.id, {
+        laborValue: Number(priceLaborValue) || 0,
+        partUsages: priceInventoryPartId ? [{ inventoryPartId: priceInventoryPartId, quantity: Number(priceQuantity) || 1 }] : [],
+      });
+      setEditingPrice(false);
+    } finally {
+      setPricingBusy(false);
+    }
+  }
 
   async function respond(status: "APPROVED" | "REJECTED") {
     if (!activeApproval || !onRespondApproval) return;
