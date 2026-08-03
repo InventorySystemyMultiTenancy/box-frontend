@@ -50,6 +50,16 @@ export default function LoginPage() {
 
   return (
     <div className={styles.wrap}>
+      <video
+        className={styles.bgVideo}
+        src="/Car_engine_opened_showing_details_202607310943.mp4"
+        autoPlay
+        loop
+        muted
+        playsInline
+        preload="auto"
+      />
+      <div className={styles.scrim} />
       <form className={styles.card} onSubmit={handleSubmit}>
         <Link href="/" className={styles.backLink}>
           Voltar ao site
