@@ -4,7 +4,7 @@ import { QueryProvider } from "@/lib/query-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "BOX. — Oficina que você acompanha em tempo real",
+  title: "Reblind — Oficina que você acompanha em tempo real",
   description:
     "Acompanhe a manutenção do seu veículo em tempo real: diagnóstico, peças, aprovação digital e timeline completa.",
 };

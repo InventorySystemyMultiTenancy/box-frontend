@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -44,7 +45,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <div className={styles.page}>
       <header className={styles.topbar}>
         <div className={styles.topbarLeft}>
-          <span className={styles.brand}>BOX.</span>
+          <span className={styles.brand}>
+            <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} priority />
+          </span>
           {isStaff && (
             <nav className={styles.tabs}>
               {tabs.map((tab) => (

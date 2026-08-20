@@ -6,7 +6,7 @@
   justify-content: center;
   padding: 2rem;
   overflow: hidden;
-  background: #0b0d10;
+  background: var(--bg);
 }
 
 .bgVideo {
@@ -18,14 +18,15 @@
   object-fit: cover;
 }
 
-/* gradiente para o card continuar legível sobre qualquer frame do vídeo */
+/* véu claro — o vídeo aparece como textura sutil atrás do card, que continua
+   legível sobre qualquer frame */
 .scrim {
   position: fixed;
   inset: 0;
   z-index: 1;
   background:
-    linear-gradient(180deg, rgba(11, 13, 16, 0.55) 0%, rgba(11, 13, 16, 0.7) 100%),
-    radial-gradient(circle at 50% 40%, rgba(11, 13, 16, 0.25), transparent 55%);
+    linear-gradient(180deg, color-mix(in srgb, var(--bg) 78%, transparent) 0%, color-mix(in srgb, var(--bg) 88%, transparent) 100%),
+    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--bg) 55%, transparent), transparent 55%);
 }
 
 .card {
@@ -45,6 +46,10 @@
   font-weight: 750;
   font-size: 1.2rem;
 }
+.brandLogo {
+  height: 40px;
+  width: auto;
+}
 
 .backLink {
   display: inline-flex;
@@ -56,7 +61,7 @@
 }
 
 .backLink:hover {
-  color: var(--accent-cian);
+  color: var(--accent-blue);
 }
 
 .title {
@@ -128,7 +133,7 @@
   padding: 0.75rem;
   border-radius: 8px;
   border: none;
-  background: var(--accent-cobre);
+  background: var(--accent-blue);
   color: #fff;
   font-family: var(--font-display);
   font-weight: 700;

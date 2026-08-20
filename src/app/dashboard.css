@@ -1,7 +1,7 @@
 /* Tailwind + shadcn/ui — carregado apenas pelo layout do /dashboard, para não afetar
    a landing e o /login (que continuam em CSS Modules puro). Os tokens de cor abaixo
-   apontam para as mesmas variáveis de src/app/globals.css, então dark mode e a
-   identidade visual da BOX. (cian/cobre) já valem para os componentes shadcn. */
+   apontam para as mesmas variáveis de src/app/globals.css, então a identidade visual
+   da Reblind (cinza + azul-marinho) já vale para os componentes shadcn. */
 @import "tailwindcss";
 
 @theme inline {
@@ -11,7 +11,7 @@
   --color-card-foreground: var(--text);
   --color-popover: var(--bg-elevated);
   --color-popover-foreground: var(--text);
-  --color-primary: var(--accent-cian);
+  --color-primary: var(--accent-blue);
   --color-primary-foreground: #ffffff;
   --color-secondary: var(--bg-panel);
   --color-secondary-foreground: var(--text);
@@ -23,7 +23,7 @@
   --color-destructive-foreground: #ffffff;
   --color-border: var(--border);
   --color-input: var(--border);
-  --color-ring: var(--accent-cian);
+  --color-ring: var(--accent-blue);
 
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);

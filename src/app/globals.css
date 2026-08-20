@@ -1,51 +1,32 @@
-/* Tokens de identidade da BOX. — espelha especificacao-experiencia-digital.html */
+/* Tokens de identidade da Reblind — claro, cinza + azul-marinho, sem variante escura. */
 :root {
-  --bg: #f1f3f4;
+  --bg: #f5f6f8;
   --bg-elevated: #ffffff;
-  --bg-panel: #e7ebec;
-  --text: #12161a;
-  --text-muted: #5b6670;
-  --border: rgba(10, 20, 25, 0.12);
-  --border-strong: rgba(10, 20, 25, 0.22);
-  --accent-cian: #1c8794;
-  --accent-cian-soft: rgba(28, 135, 148, 0.12);
-  --accent-cobre: #a3521f;
-  --accent-cobre-soft: rgba(163, 82, 31, 0.12);
-  --success: #2e8b57;
-  --success-soft: rgba(46, 139, 87, 0.13);
-  --warning: #9c6a0a;
-  --warning-soft: rgba(156, 106, 10, 0.14);
-  --critical: #b23a3a;
-  --critical-soft: rgba(178, 58, 58, 0.13);
-  --grid-line: rgba(10, 20, 25, 0.07);
-  --shadow: 0 1px 2px rgba(10, 20, 25, 0.06), 0 8px 24px -12px rgba(10, 20, 25, 0.18);
+  --bg-panel: #edeff3;
+  --text: #1b222c;
+  --text-muted: #667085;
+  --border: rgba(27, 34, 44, 0.1);
+  --border-strong: rgba(27, 34, 44, 0.2);
 
-  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-  --font-body: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  --accent-blue: #0b3c82;
+  --accent-blue-strong: #082c61;
+  --accent-blue-soft: rgba(11, 60, 130, 0.1);
+  --accent-gray: #6b7280;
+  --accent-gray-soft: rgba(107, 114, 128, 0.12);
+
+  --success: #15803d;
+  --success-soft: rgba(21, 128, 61, 0.12);
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.12);
+  --critical: #dc2626;
+  --critical-soft: rgba(220, 38, 38, 0.12);
+
+  --grid-line: rgba(27, 34, 44, 0.06);
+  --shadow: 0 1px 2px rgba(16, 24, 32, 0.04), 0 8px 24px -12px rgba(16, 24, 32, 0.12);
+
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-body: var(--font-display);
   --font-mono: "SF Mono", "Cascadia Code", Consolas, "Roboto Mono", monospace;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b0d10;
-    --bg-elevated: #14181d;
-    --bg-panel: #1b2026;
-    --text: #edeff1;
-    --text-muted: #96a0a8;
-    --border: rgba(255, 255, 255, 0.09);
-    --border-strong: rgba(255, 255, 255, 0.16);
-    --accent-cian: #35c3d1;
-    --accent-cian-soft: rgba(53, 195, 209, 0.15);
-    --accent-cobre: #da8a45;
-    --accent-cobre-soft: rgba(218, 138, 69, 0.15);
-    --success: #4cbb7c;
-    --success-soft: rgba(76, 187, 124, 0.14);
-    --warning: #e0b04f;
-    --warning-soft: rgba(224, 176, 79, 0.14);
-    --critical: #e6635f;
-    --critical-soft: rgba(230, 99, 95, 0.14);
-    --grid-line: rgba(255, 255, 255, 0.055);
-  }
 }
 
 * {
@@ -104,7 +85,7 @@ textarea {
   font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: var(--accent-cobre);
+  color: var(--accent-blue);
 }
 
 .mono {

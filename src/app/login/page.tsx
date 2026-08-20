@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -64,7 +65,9 @@ export default function LoginPage() {
         <Link href="/" className={styles.backLink}>
           Voltar ao site
         </Link>
-        <div className={styles.brand}>BOX.</div>
+        <div className={styles.brand}>
+          <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} priority />
+        </div>
         <h1 className={styles.title}>{mode === "login" ? "Área do cliente" : "Criar conta de cliente"}</h1>
         <p className={styles.lede}>
           {mode === "login"

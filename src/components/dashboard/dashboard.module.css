@@ -14,6 +14,12 @@
 .brand {
   font-family: var(--font-display);
   font-weight: 750;
+  display: flex;
+  align-items: center;
+}
+.brandLogo {
+  height: 36px;
+  width: auto;
 }
 .topbarLeft {
   display: flex;
@@ -38,11 +44,11 @@
   background: var(--bg-panel);
 }
 .tabActive {
-  color: var(--accent-cian);
-  background: var(--accent-cian-soft);
+  color: var(--accent-blue);
+  background: var(--accent-blue-soft);
 }
 .tabActive:hover {
-  color: var(--accent-cian);
+  color: var(--accent-blue);
 }
 .topbarRight {
   display: flex;
@@ -119,13 +125,13 @@
   gap: 0.4rem;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--accent-cian);
+  color: var(--accent-blue);
 }
 .live i {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--accent-cian);
+  background: var(--accent-blue);
   display: block;
   animation: pulse 1.8s ease-in-out infinite;
 }
@@ -163,8 +169,8 @@
 .badgeCurrent .dot { width: 7px; height: 7px; }
 .tone-muted { background: var(--bg-panel); color: var(--text-muted); }
 .tone-muted .dot { background: var(--text-muted); }
-.tone-info { background: var(--accent-cian-soft); color: var(--accent-cian); }
-.tone-info .dot { background: var(--accent-cian); }
+.tone-info { background: var(--accent-blue-soft); color: var(--accent-blue); }
+.tone-info .dot { background: var(--accent-blue); }
 .tone-warn { background: var(--warning-soft); color: var(--warning); }
 .tone-warn .dot { background: var(--warning); }
 .tone-ok { background: var(--success-soft); color: var(--success); }
@@ -191,7 +197,7 @@
 .progressFill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--accent-cian), var(--accent-cobre));
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-gray));
   transition: width 0.5s ease;
 }
 .progressLabel {
@@ -301,7 +307,7 @@
   border: 0;
   border-radius: 8px;
   padding: 0.7rem 0.9rem;
-  background: var(--accent-cobre);
+  background: var(--accent-blue);
   color: #fff;
   cursor: pointer;
   font-family: var(--font-display);
@@ -344,9 +350,9 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--accent-cian);
+  background: var(--accent-blue);
   border: 2px solid var(--bg-elevated);
-  box-shadow: 0 0 0 1px var(--accent-cian);
+  box-shadow: 0 0 0 1px var(--accent-blue);
 }
 .tlItem.done::before {
   background: var(--success);
@@ -365,7 +371,7 @@
 .tlTime {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: var(--accent-cobre);
+  color: var(--accent-gray);
   font-weight: 700;
 }
 .tlText {
@@ -417,7 +423,7 @@
   border: 1px solid transparent;
   cursor: pointer;
 }
-.btnApprove { background: var(--accent-cobre); color: #fff; }
+.btnApprove { background: var(--accent-blue); color: #fff; }
 .btnReject { background: transparent; color: var(--text-muted); border-color: var(--border-strong); }
 .btnApprove:disabled, .btnReject:disabled { opacity: 0.5; cursor: default; }
 
@@ -470,7 +476,7 @@
   content: "";
   position: absolute;
   inset: -30%;
-  background: radial-gradient(circle, rgba(76, 187, 124, 0.5) 0%, transparent 70%);
+  background: radial-gradient(circle, var(--success-soft) 0%, transparent 70%);
   animation: ledPulse 2.2s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
@@ -487,27 +493,27 @@
   .panelReady .carWrap::before { animation: none; opacity: 0.55; }
 }
 
-/* esquema do veículo */
+/* esquema do veículo — visual "blueprint" claro (grade técnica sutil) */
 .carWrap {
   position: relative;
-  border: 1px dashed rgba(190, 255, 35, 0.28);
+  border: 1px dashed var(--border-strong);
   border-radius: 8px;
   padding: 0.8rem;
-  background-color: #050703;
+  background-color: var(--bg-panel);
   background-image:
-    radial-gradient(circle at 50% 50%, rgba(165, 255, 31, 0.12), transparent 42%),
-    repeating-linear-gradient(0deg, rgba(190, 255, 35, 0.07) 0 1px, transparent 1px 20px),
-    repeating-linear-gradient(90deg, rgba(190, 255, 35, 0.07) 0 1px, transparent 1px 20px);
-  box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.35);
+    radial-gradient(circle at 50% 50%, var(--accent-blue-soft), transparent 42%),
+    repeating-linear-gradient(0deg, var(--grid-line) 0 1px, transparent 1px 20px),
+    repeating-linear-gradient(90deg, var(--grid-line) 0 1px, transparent 1px 20px);
+  box-shadow: inset 0 0 24px rgba(16, 24, 32, 0.06);
 }
 .carWrap svg { width: 100%; height: auto; display: block; }
 .hotspot {
   cursor: pointer;
-  stroke: #050703;
+  stroke: var(--bg-elevated);
   stroke-width: 2.5;
-  filter: drop-shadow(0 0 5px rgba(182, 255, 36, 0.65));
+  filter: drop-shadow(0 0 4px rgba(11, 60, 130, 0.45));
 }
-.hotspot:focus-visible { outline: 2px solid var(--accent-cobre); }
+.hotspot:focus-visible { outline: 2px solid var(--accent-blue); }
 
 .partPanel { margin-top: 0.9rem; font-size: 0.85rem; }
 .partPanelHead {
@@ -738,7 +744,7 @@
 }
 .orderRow:last-child { border-bottom: none; }
 .orderRow:hover { background: var(--bg-panel); }
-.orderRowActive { background: var(--accent-cian-soft); }
+.orderRowActive { background: var(--accent-blue-soft); }
 .orderRowInfo strong {
   font-family: var(--font-display);
   font-size: 0.9rem;
