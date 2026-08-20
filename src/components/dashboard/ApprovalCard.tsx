@@ -57,6 +57,11 @@ export default function ApprovalCard({
       {canViewPrices && approval.estimatedValue != null && (
         <div className={styles.value}>Valor estimado: R$ {approval.estimatedValue.toFixed(2)}</div>
       )}
+      {approval.note && (
+        <div className={styles.partNote}>
+          <strong>Observação do mecânico:</strong> {approval.note}
+        </div>
+      )}
       {canRespond && approval.status === "PENDING" ? (
         <>
           <textarea

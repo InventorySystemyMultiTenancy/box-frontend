@@ -75,6 +75,9 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   const [inventoryParts, setInventoryParts] = useState<InventoryPart[]>([]);
   const [problemMessage, setProblemMessage] = useState<string | null>(null);
   const [problemBusy, setProblemBusy] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
+  const [finalizeBusy, setFinalizeBusy] = useState(false);
+  const [finalizeForm, setFinalizeForm] = useState({ description: "", extraValue: "", photo: null as File | null });
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
@@ -90,9 +93,9 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   }, [token, orderId]);
 
   useEffect(() => {
-    if (!token || !isAdmin) return;
+    if (!token || !isStaff) return;
     api.inventoryParts(token).then(({ parts }) => setInventoryParts(parts as InventoryPart[]));
-  }, [token, isAdmin]);
+  }, [token, isStaff]);
 
   useEffect(() => {
     if (!token || !orderId) return;
@@ -248,11 +251,53 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     setJustArrivedId(event.id);
   }
 
-  async function markReadyForPickup() {
+  async function finalizeOrder(e: React.FormEvent) {
+    e.preventDefault();
     if (!token || !order) return;
-    await api.updateOrderStatus(order.id, "READY_FOR_PICKUP", token);
-    setOrder((prev) => (prev ? { ...prev, status: "READY_FOR_PICKUP", progress: 100 } : prev));
+    setFinalizeBusy(true);
+    try {
+      const result = await api.finalizeOrder(
+        order.id,
+        { description: finalizeForm.description || undefined, extraValue: finalizeForm.extraValue || undefined, photo: finalizeForm.photo },
+        token
+      );
+      setOrder(result.order as ServiceOrder);
+      setFinalizing(false);
+      setFinalizeForm({ description: "", extraValue: "", photo: null });
+    } finally {
+      setFinalizeBusy(false);
+    }
   }
+
+  const updateProblemDetails = useCallback(
+    async (approvalId: string, data: { note?: string; partUsages: { inventoryPartId: string; quantity: number }[]; files: File[] }) => {
+      if (!token || !order) return;
+      const result = await api.updateProblemDetails(order.id, approvalId, data, token);
+      const approval = result.approval as Approval;
+      setOrder((prev) => (prev ? { ...prev, approvals: prev.approvals.map((a) => (a.id === approval.id ? approval : a)) } : prev));
+    },
+    [token, order]
+  );
+
+  const priceProblem = useCallback(
+    async (approvalId: string, data: { laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }) => {
+      if (!token || !order) return;
+      const result = await api.priceProblem(order.id, approvalId, data, token);
+      const approval = result.approval as Approval;
+      const part = result.part as VehiclePart | null;
+      setOrder((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: "AWAITING_APPROVAL",
+          progress: 35,
+          approvals: prev.approvals.map((a) => (a.id === approval.id ? approval : a)),
+          parts: part ? prev.parts.map((p) => (p.id === part.id ? part : p)) : prev.parts,
+        };
+      });
+    },
+    [token, order]
+  );
 
   function generateServicePdf() {
     if (!order || !isCustomer || order.status !== "READY_FOR_PICKUP") return;
@@ -435,17 +480,19 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
           ) : (
             <>
               <p>Todos os problemas identificados foram resolvidos.</p>
-              <div className={styles.approvalActions}>
-                {isAdmin ? (
-                  <button className={styles.btnApprove} onClick={markReadyForPickup}>
-                    Veículo pronto para retirada
+              {isAdmin ? (
+                <div className={styles.approvalActions}>
+                  <button className={styles.btnApprove} disabled={finalizing} onClick={() => setFinalizing(true)}>
+                    {finalizing ? "Preencha a entrega abaixo, junto ao modelo do veículo" : "Veículo pronto para retirada"}
                   </button>
-                ) : (
+                </div>
+              ) : (
+                <div className={styles.approvalActions}>
                   <button className={styles.btnApprove} type="button" disabled>
                     Aguardando admin liberar retirada
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -643,18 +690,59 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
               canManageMaintenance={isStaff}
               onStartPart={startPart}
               onResolvePart={resolvePart}
+              canEditPrice={isAdmin}
+              inventoryParts={inventoryParts}
+              onPriceProblem={priceProblem}
+              onUpdateProblem={updateProblemDetails}
             />
             {isStaff && canRegisterProblems && !blockedForPickup && (
               <div className={styles.approvalActions}>
                 {isAdmin ? (
-                  <button className={styles.btnApprove} onClick={markReadyForPickup}>
-                    Veículo pronto para retirada
-                  </button>
+                  !finalizing && (
+                    <button className={styles.btnApprove} onClick={() => setFinalizing(true)}>
+                      Veículo pronto para retirada
+                    </button>
+                  )
                 ) : (
                   <button className={styles.btnApprove} type="button" disabled>
                     Aguardando admin liberar retirada
                   </button>
                 )}
+              </div>
+            )}
+            {isAdmin && isStaff && canRegisterProblems && !blockedForPickup && finalizing && (
+              <div className={styles.panel}>
+                <h2>Confirmar entrega</h2>
+                <form className={styles.formGrid} onSubmit={finalizeOrder}>
+                  <label className={styles.fullField}>
+                    Descrição da entrega
+                    <textarea
+                      value={finalizeForm.description}
+                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, description: e.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Valor extra
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={finalizeForm.extraValue}
+                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, extraValue: e.target.value }))}
+                    />
+                  </label>
+                  <label className={styles.fullField}>
+                    Foto do veículo finalizado
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, photo: e.target.files?.[0] ?? null }))}
+                    />
+                  </label>
+                  <button className={styles.actionButton} type="submit" disabled={finalizeBusy}>
+                    {finalizeBusy ? "Finalizando..." : "Confirmar entrega"}
+                  </button>
+                </form>
               </div>
             )}
           </div>

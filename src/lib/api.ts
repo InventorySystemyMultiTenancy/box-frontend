@@ -112,6 +112,41 @@ export const api = {
     );
   },
 
+  updateProblemDetails: (
+    orderId: string,
+    approvalId: string,
+    payload: { note?: string; partUsages?: { inventoryPartId: string; quantity: number }[]; files?: File[] },
+    token: string
+  ) => {
+    const form = new FormData();
+    if (payload.note !== undefined) form.append("note", payload.note);
+    if (payload.partUsages && payload.partUsages.length > 0) form.append("partUsages", JSON.stringify(payload.partUsages));
+    (payload.files ?? []).forEach((file) => form.append("files", file));
+
+    return request<{ approval: unknown; event: unknown }>(
+      `/api/service-orders/${orderId}/parts/problems/${approvalId}/updates`,
+      { method: "POST", body: form },
+      token
+    );
+  },
+
+  finalizeOrder: (
+    orderId: string,
+    payload: { description?: string; extraValue?: string; photo?: File | null },
+    token: string
+  ) => {
+    const form = new FormData();
+    if (payload.description) form.append("description", payload.description);
+    if (payload.extraValue) form.append("extraValue", payload.extraValue);
+    if (payload.photo) form.append("photo", payload.photo);
+
+    return request<{ order: unknown }>(
+      `/api/service-orders/${orderId}/finalize`,
+      { method: "PATCH", body: form },
+      token
+    );
+  },
+
   resolvePart: (orderId: string, partId: string, token: string) =>
     request<{ part: unknown; event: unknown }>(
       `/api/service-orders/${orderId}/parts/${partId}/resolve`,

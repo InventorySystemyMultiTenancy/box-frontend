@@ -89,6 +89,7 @@ export interface Media {
   url: string;
   type: "PHOTO" | "VIDEO" | "AUDIO" | "DOCUMENT";
   label?: string | null;
+  isDeliveryPhoto?: boolean;
   createdAt: string;
 }
 
@@ -120,6 +121,7 @@ export interface Approval {
   partId?: string | null;
   title: string;
   description: string;
+  note?: string | null;
   laborValue?: number | null;
   partsValue?: number | null;
   estimatedValue?: number | null;
@@ -142,6 +144,8 @@ export interface ServiceOrder {
   scheduledAt?: string | null;
   receivedAt: string;
   completedAt?: string | null;
+  deliveryDescription?: string | null;
+  deliveryExtraValue?: number | null;
   vehicle: Vehicle;
   timelineEvents: TimelineEvent[];
   parts: VehiclePart[];

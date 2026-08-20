@@ -71,6 +71,7 @@ export default function VehicleSchematic({
   canEditPrice = false,
   inventoryParts = [],
   onPriceProblem,
+  onUpdateProblem,
 }: {
   parts: VehiclePart[];
   approvals?: Approval[];
@@ -85,6 +86,10 @@ export default function VehicleSchematic({
   onPriceProblem?: (
     approvalId: string,
     data: { laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
+  ) => Promise<void>;
+  onUpdateProblem?: (
+    approvalId: string,
+    data: { note?: string; partUsages: { inventoryPartId: string; quantity: number }[]; files: File[] }
   ) => Promise<void>;
 }) {
   const withPosition = useMemo(() => parts.filter((p) => HOTSPOT_POSITIONS[p.key]), [parts]);
@@ -104,20 +109,51 @@ export default function VehicleSchematic({
     active ? approval.partId === active.id || approval.media.some((media) => activeMediaIds.has(media.id)) : false
   );
 
+  type UsageRow = { inventoryPartId: string; quantity: string };
+
   const [editingPrice, setEditingPrice] = useState(false);
   const [pricingBusy, setPricingBusy] = useState(false);
   const [priceLaborValue, setPriceLaborValue] = useState("");
-  const [priceInventoryPartId, setPriceInventoryPartId] = useState("");
-  const [priceQuantity, setPriceQuantity] = useState("1");
+  const [priceUsages, setPriceUsages] = useState<UsageRow[]>([]);
+
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsBusy, setDetailsBusy] = useState(false);
+  const [detailNote, setDetailNote] = useState("");
+  const [detailUsages, setDetailUsages] = useState<UsageRow[]>([]);
+  const [detailFiles, setDetailFiles] = useState<File[]>([]);
 
   useEffect(() => {
     setEditingPrice(false);
     setPriceLaborValue(activeApproval?.laborValue != null ? String(activeApproval.laborValue) : "");
-    const usage = activeApproval?.partUsages?.[0];
-    setPriceInventoryPartId(usage?.inventoryPart.id ?? "");
-    setPriceQuantity(usage ? String(usage.quantity) : "1");
+    setPriceUsages(
+      activeApproval?.partUsages?.map((usage) => ({ inventoryPartId: usage.inventoryPart.id, quantity: String(usage.quantity) })) ?? []
+    );
+    setDetailsOpen(false);
+    setDetailNote(activeApproval?.note ?? "");
+    setDetailUsages([]);
+    setDetailFiles([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeApproval?.id]);
+
+  function addUsageRow(setter: React.Dispatch<React.SetStateAction<UsageRow[]>>) {
+    setter((prev) => [...prev, { inventoryPartId: "", quantity: "1" }]);
+  }
+  function updateUsageRow(
+    setter: React.Dispatch<React.SetStateAction<UsageRow[]>>,
+    index: number,
+    field: keyof UsageRow,
+    value: string
+  ) {
+    setter((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  }
+  function removeUsageRow(setter: React.Dispatch<React.SetStateAction<UsageRow[]>>, index: number) {
+    setter((prev) => prev.filter((_, i) => i !== index));
+  }
+  function usagesToPayload(rows: UsageRow[]) {
+    return rows
+      .filter((row) => row.inventoryPartId)
+      .map((row) => ({ inventoryPartId: row.inventoryPartId, quantity: Number(row.quantity) || 1 }));
+  }
 
   async function savePrice(e: React.FormEvent) {
     e.preventDefault();
@@ -126,11 +162,29 @@ export default function VehicleSchematic({
     try {
       await onPriceProblem(activeApproval.id, {
         laborValue: Number(priceLaborValue) || 0,
-        partUsages: priceInventoryPartId ? [{ inventoryPartId: priceInventoryPartId, quantity: Number(priceQuantity) || 1 }] : [],
+        partUsages: usagesToPayload(priceUsages),
       });
       setEditingPrice(false);
     } finally {
       setPricingBusy(false);
+    }
+  }
+
+  async function saveDetails(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeApproval || !onUpdateProblem) return;
+    setDetailsBusy(true);
+    try {
+      await onUpdateProblem(activeApproval.id, {
+        note: detailNote,
+        partUsages: usagesToPayload(detailUsages),
+        files: detailFiles,
+      });
+      setDetailUsages([]);
+      setDetailFiles([]);
+      setDetailsOpen(false);
+    } finally {
+      setDetailsBusy(false);
     }
   }
 
@@ -287,6 +341,11 @@ export default function VehicleSchematic({
               {canViewPrices && activeApproval.laborValue != null && <div className={styles.value}>Mão de obra: R$ {activeApproval.laborValue.toFixed(2)}</div>}
               {canViewPrices && activeApproval.partsValue != null && <div className={styles.value}>Peças: R$ {activeApproval.partsValue.toFixed(2)}</div>}
               {canViewPrices && activeApproval.estimatedValue != null && <div className={styles.value}>R$ {activeApproval.estimatedValue.toFixed(2)}</div>}
+              {activeApproval.note && (
+                <div className={styles.partNote}>
+                  <strong>Observação do mecânico:</strong> {activeApproval.note}
+                </div>
+              )}
               {activeApproval.responseNote && <p className={styles.responseNote}>{activeApproval.responseNote}</p>}
               {canRespond && activeApproval.status === "PENDING" && activeApproval.estimatedValue != null && (
                 <>
@@ -305,6 +364,130 @@ export default function VehicleSchematic({
                     </button>
                   </div>
                 </>
+              )}
+
+              {canEditPrice && onPriceProblem && (
+                <div className={styles.approvalActions}>
+                  {!editingPrice ? (
+                    <button className={styles.actionButton} type="button" onClick={() => setEditingPrice(true)}>
+                      {activeApproval.estimatedValue != null ? "Editar preço" : "Precificar problema"}
+                    </button>
+                  ) : (
+                    <form className={styles.formGrid} onSubmit={savePrice}>
+                      <label>
+                        Mão de obra
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={priceLaborValue}
+                          onChange={(e) => setPriceLaborValue(e.target.value)}
+                          required
+                        />
+                      </label>
+                      {priceUsages.map((row, index) => (
+                        <div key={index} className={styles.fullField}>
+                          <label>
+                            Peça utilizada
+                            <select
+                              value={row.inventoryPartId}
+                              onChange={(e) => updateUsageRow(setPriceUsages, index, "inventoryPartId", e.target.value)}
+                            >
+                              <option value="">Nenhuma peça</option>
+                              {inventoryParts.map((part) => (
+                                <option key={part.id} value={part.id}>
+                                  {part.name} · estoque {part.stockQty}
+                                  {part.unitCost != null ? ` · R$ ${part.unitCost.toFixed(2)}` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            Quantidade
+                            <input
+                              type="number"
+                              min="1"
+                              value={row.quantity}
+                              onChange={(e) => updateUsageRow(setPriceUsages, index, "quantity", e.target.value)}
+                            />
+                          </label>
+                          <button type="button" className={styles.btnReject} onClick={() => removeUsageRow(setPriceUsages, index)}>
+                            Remover peça
+                          </button>
+                        </div>
+                      ))}
+                      <button type="button" className={styles.actionButton} onClick={() => addUsageRow(setPriceUsages)}>
+                        Adicionar peça
+                      </button>
+                      <button className={styles.actionButton} type="submit" disabled={pricingBusy}>
+                        {pricingBusy ? "Salvando..." : "Salvar preço"}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {canManageMaintenance && onUpdateProblem && (
+                <div className={styles.approvalActions}>
+                  {!detailsOpen ? (
+                    <button className={styles.actionButton} type="button" onClick={() => setDetailsOpen(true)}>
+                      Adicionar fotos, peças ou observação
+                    </button>
+                  ) : (
+                    <form className={styles.formGrid} onSubmit={saveDetails}>
+                      <label className={styles.fullField}>
+                        Observação
+                        <textarea value={detailNote} onChange={(e) => setDetailNote(e.target.value)} />
+                      </label>
+                      {detailUsages.map((row, index) => (
+                        <div key={index} className={styles.fullField}>
+                          <label>
+                            Peça necessária
+                            <select
+                              value={row.inventoryPartId}
+                              onChange={(e) => updateUsageRow(setDetailUsages, index, "inventoryPartId", e.target.value)}
+                            >
+                              <option value="">Selecione</option>
+                              {inventoryParts.map((part) => (
+                                <option key={part.id} value={part.id}>
+                                  {part.name} · estoque {part.stockQty}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            Quantidade
+                            <input
+                              type="number"
+                              min="1"
+                              value={row.quantity}
+                              onChange={(e) => updateUsageRow(setDetailUsages, index, "quantity", e.target.value)}
+                            />
+                          </label>
+                          <button type="button" className={styles.btnReject} onClick={() => removeUsageRow(setDetailUsages, index)}>
+                            Remover peça
+                          </button>
+                        </div>
+                      ))}
+                      <button type="button" className={styles.actionButton} onClick={() => addUsageRow(setDetailUsages)}>
+                        Adicionar peça
+                      </button>
+                      <label className={styles.fullField}>
+                        Fotos
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => setDetailFiles(Array.from(e.target.files ?? []))}
+                        />
+                        {detailFiles.length > 0 && <span>{detailFiles.length} imagem(ns) selecionada(s)</span>}
+                      </label>
+                      <button className={styles.actionButton} type="submit" disabled={detailsBusy}>
+                        {detailsBusy ? "Salvando..." : "Salvar detalhes"}
+                      </button>
+                    </form>
+                  )}
+                </div>
               )}
             </div>
           )}
