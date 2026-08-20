@@ -1,6 +1,6 @@
 .scrollTrack {
   position: relative;
-  background: var(--bg);
+  background: #0b0d10;
 }
 
 /* Fixo por CSS puro (sem pin do GSAP) — fica atrás do conteúdo do início ao fim da
@@ -11,7 +11,7 @@
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  background: var(--bg);
+  background: #0b0d10;
 }
 
 .video {
@@ -30,14 +30,13 @@
   opacity: 1;
 }
 
-/* véu claro — o vídeo aparece só como uma textura sutil atrás do conteúdo claro,
-   texto e cards continuam legíveis sobre qualquer frame */
+/* leve gradiente para o texto do overlay continuar legível sobre qualquer frame do vídeo */
 .scrim {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--bg) 82%, transparent) 0%, color-mix(in srgb, var(--bg) 90%, transparent) 100%),
-    radial-gradient(circle at 50% 40%, color-mix(in srgb, var(--bg) 60%, transparent), transparent 55%);
+    linear-gradient(180deg, rgba(11, 13, 16, 0.55) 0%, rgba(11, 13, 16, 0.7) 100%),
+    radial-gradient(circle at 50% 40%, rgba(11, 13, 16, 0.25), transparent 55%);
 }
 
 .overlaySlot {

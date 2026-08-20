@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ReactNode } from "react";
 import dynamic from "next/dynamic";
@@ -23,7 +24,11 @@ export default function HeroSection({ children }: { children?: ReactNode }) {
   return (
     <div className={styles.heroWrap}>
       <nav className={styles.nav}>
-        <span className={styles.navBrand}>BOX.</span>
+        <span className={styles.navBrand}>
+          <span className={styles.brandBadge}>
+            <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} priority />
+          </span>
+        </span>
         <div className={styles.navLinks}>
           {NAV_LINKS.map((link) => (
             <a key={link.href} href={link.href}>

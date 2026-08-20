@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Reveal from "./Reveal";
 import styles from "./landing.module.css";
 
@@ -236,5 +237,14 @@ export function FinalCta() {
 }
 
 export function SiteFooter() {
-  return <footer className={styles.footer}>BOX. — acompanhamento de manutenção em tempo real.</footer>;
+  return (
+    <footer className={styles.footer}>
+      <div className={styles.footerBrand}>
+        <span className={styles.brandBadge}>
+          <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} />
+        </span>
+      </div>
+      Reblind — acompanhamento de manutenção em tempo real.
+    </footer>
+  );
 }
