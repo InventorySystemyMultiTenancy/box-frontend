@@ -1,0 +1,35 @@
+/* Tailwind + shadcn/ui — carregado apenas pelo layout do /dashboard, para não afetar
+   a landing e o /login (que continuam em CSS Modules puro). Os tokens de cor abaixo
+   apontam para as mesmas variáveis de src/app/globals.css, então dark mode e a
+   identidade visual da BOX. (cian/cobre) já valem para os componentes shadcn. */
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--bg-elevated);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--bg-elevated);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--accent-cian);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--bg-panel);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--bg-panel);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--bg-panel);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--critical);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--accent-cian);
+
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-display);
+}

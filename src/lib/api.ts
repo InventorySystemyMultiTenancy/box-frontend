@@ -40,10 +40,10 @@ export const api = {
   users: (token: string) => request<{ users: unknown[] }>("/api/auth/users", {}, token),
 
   createUser: (
-    payload: { name: string; email: string; password: string; phone?: string; role: "CUSTOMER" | "MECHANIC" | "ADMIN" },
+    payload: { name: string; email: string; password: string; phone?: string; role: "CUSTOMER" | "MECHANIC" | "ADMIN"; roleId?: string },
     token: string
   ) =>
-    request<{ user: { id: string; name: string; email: string; role: string; phone?: string | null } }>(
+    request<{ user: { id: string; name: string; email: string; role: string; roleId?: string | null; phone?: string | null } }>(
       "/api/auth/users",
       {
         method: "POST",
@@ -54,7 +54,14 @@ export const api = {
 
   updateUser: (
     id: string,
-    payload: { name?: string; email?: string; password?: string; phone?: string | null; role?: "CUSTOMER" | "MECHANIC" | "ADMIN" },
+    payload: {
+      name?: string;
+      email?: string;
+      password?: string;
+      phone?: string | null;
+      role?: "CUSTOMER" | "MECHANIC" | "ADMIN";
+      roleId?: string | null;
+    },
     token: string
   ) =>
     request<{ user: unknown }>(
@@ -226,6 +233,51 @@ export const api = {
       { method: "PATCH", body: JSON.stringify(payload) },
       token
     ),
+
+  mePermissions: (token: string) => request<{ permissions: string[] }>("/api/auth/me/permissions", {}, token),
+
+  clients: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) => {
+    const search = new URLSearchParams();
+    if (params.q) search.set("q", params.q);
+    if (params.page) search.set("page", String(params.page));
+    if (params.pageSize) search.set("pageSize", String(params.pageSize));
+    const qs = search.toString();
+    return request<{ items: unknown[]; pagination: { page: number; pageSize: number; total: number; totalPages: number } }>(
+      `/api/clients${qs ? `?${qs}` : ""}`,
+      {},
+      token
+    );
+  },
+
+  client: (id: string, token: string) => request<{ client: unknown }>(`/api/clients/${id}`, {}, token),
+
+  createClient: (payload: Record<string, unknown>, token: string) =>
+    request<{ client: unknown }>("/api/clients", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateClient: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ client: unknown }>(`/api/clients/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  archiveClient: (id: string, token: string) =>
+    request<void>(`/api/clients/${id}`, { method: "DELETE" }, token),
+
+  roles: (token: string) => request<{ roles: unknown[] }>("/api/roles", {}, token),
+
+  createRole: (payload: { name: string; description?: string }, token: string) =>
+    request<{ role: unknown }>("/api/roles", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  deleteRole: (id: string, token: string) => request<void>(`/api/roles/${id}`, { method: "DELETE" }, token),
+
+  rolePermissions: (id: string, token: string) =>
+    request<{ permissions: unknown[] }>(`/api/roles/${id}/permissions`, {}, token),
+
+  setRolePermissions: (id: string, permissionIds: string[], token: string) =>
+    request<{ permissions: unknown[] }>(
+      `/api/roles/${id}/permissions`,
+      { method: "PUT", body: JSON.stringify({ permissionIds }) },
+      token
+    ),
+
+  permissionCatalog: (token: string) => request<{ permissions: unknown[] }>("/api/permissions", {}, token),
 };
 
 export { API_URL };

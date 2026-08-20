@@ -71,6 +71,7 @@ export interface User {
   name: string;
   email: string;
   role: "CUSTOMER" | "MECHANIC" | "ADMIN";
+  roleId?: string | null;
   phone?: string | null;
 }
 
@@ -182,6 +183,76 @@ export interface FinancialEntry {
   amount: number;
   occurredAt: string;
   createdAt: string;
+}
+
+export interface Permission {
+  id: string;
+  resource: string;
+  action: string;
+  description?: string | null;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  isSystem: boolean;
+  createdAt: string;
+  _count?: { users: number };
+}
+
+export interface Client {
+  id: string;
+  userId?: string | null;
+  name: string;
+  cpfCnpj?: string | null;
+  rg?: string | null;
+  birthDate?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  addressLine?: string | null;
+  zipCode?: string | null;
+  city?: string | null;
+  state?: string | null;
+  company?: string | null;
+  clientType: "INDIVIDUAL" | "COMPANY";
+  notes?: string | null;
+  internalNotes?: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Versões resumidas — o endpoint de detalhe do cliente não inclui os relacionamentos
+// aninhados completos (timeline, peças, aprovações) que o ServiceOrder/QuoteRequest
+// completos têm, só os campos próprios da OS/solicitação.
+export interface ClientServiceOrderSummary {
+  id: string;
+  code: string;
+  status: ServiceOrderStatus;
+  progress: number;
+  receivedAt: string;
+  completedAt?: string | null;
+  vehicleId: string;
+}
+
+export interface ClientQuoteRequestSummary {
+  id: string;
+  problemDescription: string;
+  status: QuoteRequestStatus;
+  scheduledAt?: string | null;
+  createdAt: string;
+  vehicleId: string;
+}
+
+export interface ClientDetail extends Client {
+  vehicles: Vehicle[];
+  serviceOrders: ClientServiceOrderSummary[];
+  quoteRequests: ClientQuoteRequestSummary[];
+  totalSpent: number;
+  lastVisit?: string | null;
 }
 
 export type QuoteRequestStatus = "PENDING" | "ACCEPTED" | "DECLINED";

@@ -4,7 +4,9 @@ import { useEffect, ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import { Toaster } from "@/components/ui/sonner";
 import styles from "@/components/dashboard/dashboard.module.css";
+import "../dashboard.css";
 
 const STAFF_TABS = [
   { href: "/dashboard", label: "Projetos" },
@@ -19,7 +21,7 @@ const ADMIN_TABS = [
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const { user, token, loading, logout } = useAuth();
+  const { user, token, loading, hasPermission, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -32,7 +34,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   const isStaff = user.role === "MECHANIC" || user.role === "ADMIN";
-  const tabs = user.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS;
+  const tabs = [
+    ...(user.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
+    ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes" }] : []),
+    ...(hasPermission("roles", "manage") ? [{ href: "/dashboard/cargos", label: "Cargos" }] : []),
+  ];
 
   return (
     <div className={styles.page}>
@@ -58,6 +64,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       </header>
 
       {children}
+      <Toaster />
     </div>
   );
 }

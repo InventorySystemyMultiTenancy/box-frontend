@@ -9,12 +9,15 @@ interface AuthUser {
   name: string;
   email: string;
   role: string;
+  roleId?: string | null;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   token: string | null;
   loading: boolean;
+  permissions: Set<string>;
+  hasPermission: (resource: string, action: string) => boolean;
   login: (email: string, password: string) => Promise<void>;
   registerCustomer: (payload: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => void;
@@ -30,20 +33,28 @@ function readStoredToken() {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(readStoredToken);
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(() => readStoredToken() !== null);
   const router = useRouter();
 
   useEffect(() => {
     if (!token) return;
-    api
-      .me(token)
-      .then(({ user }) => setUser(user as AuthUser))
+    Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [] }))])
+      .then(([{ user }, { permissions }]) => {
+        setUser(user as AuthUser);
+        setPermissions(new Set(permissions));
+      })
       .catch(() => {
         window.localStorage.removeItem(STORAGE_KEY);
         setToken(null);
       })
       .finally(() => setLoading(false));
   }, [token]);
+
+  const hasPermission = useCallback(
+    (resource: string, action: string) => permissions.has(`${resource}.${action}`),
+    [permissions]
+  );
 
   const login = useCallback(async (email: string, password: string) => {
     const { token, user } = await api.login(email, password);
@@ -63,10 +74,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.localStorage.removeItem(STORAGE_KEY);
     setToken(null);
     setUser(null);
+    setPermissions(new Set());
     router.push("/");
   }, [router]);
 
-  return <AuthContext.Provider value={{ user, token, loading, login, registerCustomer, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, token, loading, permissions, hasPermission, login, registerCustomer, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

@@ -3,18 +3,20 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import { User } from "@/lib/types";
+import { User, Role } from "@/lib/types";
 import styles from "./dashboard.module.css";
 
 export default function MechanicUsersPanel() {
   const { token } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [userForm, setUserForm] = useState({
     name: "",
     email: "",
     password: "",
     phone: "",
     role: "CUSTOMER" as "CUSTOMER" | "MECHANIC" | "ADMIN",
+    roleId: "",
   });
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -22,6 +24,7 @@ export default function MechanicUsersPanel() {
   function loadUsers() {
     if (!token) return;
     api.users(token).then(({ users }) => setUsers(users as User[]));
+    api.roles(token).then(({ roles }) => setRoles(roles as Role[])).catch(() => {});
   }
 
   useEffect(loadUsers, [token]);
@@ -32,9 +35,12 @@ export default function MechanicUsersPanel() {
     setBusy(true);
     setMessage(null);
     try {
-      const { user: created } = await api.createUser({ ...userForm, phone: userForm.phone || undefined }, token);
+      const { user: created } = await api.createUser(
+        { ...userForm, phone: userForm.phone || undefined, roleId: userForm.roleId || undefined },
+        token
+      );
       setUsers((prev) => [created as User, ...prev]);
-      setUserForm({ name: "", email: "", password: "", phone: "", role: "CUSTOMER" });
+      setUserForm({ name: "", email: "", password: "", phone: "", role: "CUSTOMER", roleId: "" });
       setMessage("Usuário criado.");
     } catch {
       setMessage("Não foi possível criar o usuário.");
@@ -46,6 +52,12 @@ export default function MechanicUsersPanel() {
   async function updateUser(user: User, role: User["role"]) {
     if (!token) return;
     const { user: updated } = await api.updateUser(user.id, { role }, token);
+    setUsers((prev) => prev.map((item) => (item.id === user.id ? (updated as User) : item)));
+  }
+
+  async function updateUserCargo(user: User, roleId: string) {
+    if (!token) return;
+    const { user: updated } = await api.updateUser(user.id, { roleId: roleId || null }, token);
     setUsers((prev) => prev.map((item) => (item.id === user.id ? (updated as User) : item)));
   }
 
@@ -78,6 +90,17 @@ export default function MechanicUsersPanel() {
               <option value="ADMIN">Admin</option>
             </select>
           </label>
+          <label className={styles.fullField}>
+            Cargo
+            <select value={userForm.roleId} onChange={(e) => setUserForm((prev) => ({ ...prev, roleId: e.target.value }))}>
+              <option value="">Sem cargo</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+          </label>
           {message && <div className={styles.formMessage}>{message}</div>}
           <button className={styles.actionButton} type="submit" disabled={busy}>
             {busy ? "Criando..." : "Criar usuário"}
@@ -97,6 +120,14 @@ export default function MechanicUsersPanel() {
               <option value="CUSTOMER">Cliente</option>
               <option value="MECHANIC">Mecânico</option>
               <option value="ADMIN">Admin</option>
+            </select>
+            <select value={user.roleId ?? ""} onChange={(e) => updateUserCargo(user, e.target.value)}>
+              <option value="">Sem cargo</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
             </select>
           </div>
         ))}
