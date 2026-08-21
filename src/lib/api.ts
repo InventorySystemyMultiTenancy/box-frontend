@@ -407,6 +407,43 @@ export const api = {
 
   bayOccupancy: (token: string, params: { from?: string; to?: string } = {}) =>
     request<{ occupancy: unknown[] }>(`/api/agenda/appointments/bay-occupancy${toQuery(params)}`, {}, token),
+
+  // PDV / Balcão
+  counterSales: (token: string, params: { status?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/counter-sales${toQuery(params)}`, {}, token),
+
+  createCounterSale: (payload: Record<string, unknown>, token: string) =>
+    request<{ sale: unknown }>("/api/counter-sales", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  cancelCounterSale: (id: string, token: string) =>
+    request<{ sale: unknown }>(`/api/counter-sales/${id}/cancel`, { method: "POST" }, token),
+
+  // Relatórios
+  dashboardReport: (token: string, params: { from?: string; to?: string } = {}) =>
+    request<{ report: unknown }>(`/api/reports/dashboard${toQuery(params)}`, {}, token),
+
+  // Garantias
+  expiringWarranties: (token: string, withinDays = 30) =>
+    request<{ parts: unknown[] }>(`/api/warranties/expiring${toQuery({ withinDays })}`, {}, token),
+
+  setPartWarranty: (orderId: string, partId: string, payload: { months: number; startAt?: string }, token: string) =>
+    request<{ part: unknown }>(
+      `/api/service-orders/${orderId}/parts/${partId}/warranty`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+      token
+    ),
+
+  // Histórico de veículo
+  vehicleHistory: (id: string, token: string) => request<{ history: unknown }>(`/api/vehicles/${id}/history`, {}, token),
+
+  revisionAlerts: (token: string) => request<{ alerts: unknown[] }>("/api/vehicles/revision-alerts", {}, token),
+
+  // Notificações
+  notifications: (token: string, params: { serviceOrderId?: string } = {}) =>
+    request<{ notifications: unknown[] }>(`/api/notifications${toQuery(params)}`, {}, token),
+
+  notifyServiceOrder: (orderId: string, token: string) =>
+    request<{ ok: boolean }>(`/api/service-orders/${orderId}/notify`, { method: "POST" }, token),
 };
 
 interface Pagination {

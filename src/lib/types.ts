@@ -112,9 +112,20 @@ export interface VehiclePart {
   note?: string | null;
   wearLevel?: number | null;
   warranty?: string | null;
+  warrantyMonths?: number | null;
+  warrantyStartAt?: string | null;
+  warrantyExpiresAt?: string | null;
   updatedAt: string;
   responsible?: { name: string } | null;
   media: Media[];
+}
+
+export interface ExpiringWarrantyPart extends VehiclePart {
+  serviceOrder: {
+    id: string;
+    code: string;
+    vehicle: { id: string; brand: string; model: string; plate?: string | null; owner: { id: string; name: string; phone?: string | null } };
+  };
 }
 
 export interface Approval {
@@ -442,6 +453,76 @@ export interface MechanicWorkload {
 export interface BayOccupancy {
   bay: Bay;
   appointments: Appointment[];
+}
+
+// PDV / Balcão
+export type CounterSaleStatus = "COMPLETED" | "CANCELLED";
+
+export interface CounterSaleItem {
+  id: string;
+  inventoryPartId: string;
+  inventoryPart: InventoryPart;
+  quantity: number;
+  unitPrice: number;
+}
+
+export interface CounterSale {
+  id: string;
+  code: string;
+  clientId?: string | null;
+  client?: { id: string; name: string } | null;
+  customerName?: string | null;
+  status: CounterSaleStatus;
+  paymentMethod?: string | null;
+  bankAccountId?: string | null;
+  bankAccount?: BankAccount | null;
+  totalAmount: number;
+  createdAt: string;
+  cancelledAt?: string | null;
+  items: CounterSaleItem[];
+}
+
+// Relatórios / Dashboard
+export interface DashboardReport {
+  revenue: { total: number; count: number; ticketMedio: number };
+  approvalStats: { approved: number; rejected: number; total: number; rate: number };
+  quoteStats: { accepted: number; declined: number; total: number; rate: number };
+  mechanicProductivity: { mechanicId: string; mechanicName: string; completedParts: number }[];
+  turnover: { cogs: number; inventoryValue: number; turnoverRatio: number };
+  lowStock: number;
+}
+
+// Histórico de veículo
+export interface VehicleHistory {
+  vehicle: { id: string; brand: string; model: string; year: number; plate?: string | null; mileage: number; owner: { id: string; name: string; phone?: string | null } };
+  serviceOrders: ClientServiceOrderSummary[];
+  totalSpent: number;
+  lastServiceAt?: string | null;
+  monthsSinceLastService: number | null;
+  revisionDue: boolean;
+}
+
+export interface RevisionAlert {
+  vehicle: { id: string; brand: string; model: string; year: number; plate?: string | null };
+  owner: { id: string; name: string; phone?: string | null };
+  lastServiceAt: string;
+  monthsSinceLastService: number;
+}
+
+// Notificações
+export type NotificationChannel = "SMS" | "WHATSAPP";
+export type NotificationStatus = "SENT" | "FAILED";
+
+export interface NotificationLog {
+  id: string;
+  channel: NotificationChannel;
+  to: string;
+  message: string;
+  status: NotificationStatus;
+  errorMessage?: string | null;
+  serviceOrderId?: string | null;
+  provider: string;
+  createdAt: string;
 }
 
 export type QuoteRequestStatus = "PENDING" | "ACCEPTED" | "DECLINED";
