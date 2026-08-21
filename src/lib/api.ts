@@ -278,6 +278,151 @@ export const api = {
     ),
 
   permissionCatalog: (token: string) => request<{ permissions: unknown[] }>("/api/permissions", {}, token),
+
+  // Financeiro — contas bancárias
+  bankAccounts: (token: string) => request<{ accounts: unknown[] }>("/api/finance/bank-accounts", {}, token),
+
+  createBankAccount: (payload: Record<string, unknown>, token: string) =>
+    request<{ account: unknown }>("/api/finance/bank-accounts", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateBankAccount: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ account: unknown }>(`/api/finance/bank-accounts/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  archiveBankAccount: (id: string, token: string) =>
+    request<void>(`/api/finance/bank-accounts/${id}`, { method: "DELETE" }, token),
+
+  // Financeiro — contas a pagar
+  payables: (token: string, params: { status?: string; category?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/payables${toQuery(params)}`, {}, token),
+
+  createPayables: (payload: Record<string, unknown>, token: string) =>
+    request<{ installments: unknown[] }>("/api/finance/payables", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  payPayable: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ payable: unknown }>(`/api/finance/payables/${id}/pay`, { method: "POST", body: JSON.stringify(payload) }, token),
+
+  cancelPayable: (id: string, token: string) =>
+    request<{ payable: unknown }>(`/api/finance/payables/${id}/cancel`, { method: "POST" }, token),
+
+  // Financeiro — contas a receber
+  receivables: (token: string, params: { status?: string; category?: string; clientId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/receivables${toQuery(params)}`, {}, token),
+
+  createReceivables: (payload: Record<string, unknown>, token: string) =>
+    request<{ installments: unknown[] }>("/api/finance/receivables", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  createReceivableFromServiceOrder: (payload: { serviceOrderId: string; dueDate: string }, token: string) =>
+    request<{ receivable: unknown }>("/api/finance/receivables/from-service-order", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  receiveReceivable: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ receivable: unknown }>(`/api/finance/receivables/${id}/receive`, { method: "POST", body: JSON.stringify(payload) }, token),
+
+  cancelReceivable: (id: string, token: string) =>
+    request<{ receivable: unknown }>(`/api/finance/receivables/${id}/cancel`, { method: "POST" }, token),
+
+  // Financeiro — fluxo de caixa e DRE
+  cashFlow: (token: string, params: { from?: string; to?: string } = {}) =>
+    request<{ cashFlow: unknown }>(`/api/finance/cash-flow${toQuery(params)}`, {}, token),
+
+  dre: (token: string, params: { from?: string; to?: string } = {}) =>
+    request<{ dre: unknown }>(`/api/finance/dre${toQuery(params)}`, {}, token),
+
+  // Fiscal — notas fiscais
+  invoices: (token: string, params: { status?: string; type?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/invoices${toQuery(params)}`, {}, token),
+
+  createInvoice: (payload: Record<string, unknown>, token: string) =>
+    request<{ invoice: unknown }>("/api/invoices", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  issueInvoice: (id: string, token: string) =>
+    request<{ invoice: unknown }>(`/api/invoices/${id}/issue`, { method: "POST" }, token),
+
+  cancelInvoice: (id: string, token: string) =>
+    request<{ invoice: unknown }>(`/api/invoices/${id}/cancel`, { method: "POST" }, token),
+
+  // Fornecedores
+  suppliers: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/suppliers${toQuery(params)}`, {}, token),
+
+  supplier: (id: string, token: string) => request<{ supplier: unknown }>(`/api/suppliers/${id}`, {}, token),
+
+  createSupplier: (payload: Record<string, unknown>, token: string) =>
+    request<{ supplier: unknown }>("/api/suppliers", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateSupplier: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ supplier: unknown }>(`/api/suppliers/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  archiveSupplier: (id: string, token: string) =>
+    request<void>(`/api/suppliers/${id}`, { method: "DELETE" }, token),
+
+  // Compras
+  purchaseOrders: (token: string, params: { status?: string; supplierId?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/purchase-orders${toQuery(params)}`, {}, token),
+
+  purchaseOrder: (id: string, token: string) => request<{ order: unknown }>(`/api/purchase-orders/${id}`, {}, token),
+
+  createPurchaseOrder: (payload: Record<string, unknown>, token: string) =>
+    request<{ order: unknown }>("/api/purchase-orders", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  sendPurchaseOrder: (id: string, token: string) =>
+    request<{ order: unknown }>(`/api/purchase-orders/${id}/send`, { method: "POST" }, token),
+
+  receivePurchaseOrder: (id: string, payload: { items: { itemId: string; receivedQty: number }[] }, token: string) =>
+    request<{ order: unknown }>(`/api/purchase-orders/${id}/receive`, { method: "POST", body: JSON.stringify(payload) }, token),
+
+  cancelPurchaseOrder: (id: string, token: string) =>
+    request<{ order: unknown }>(`/api/purchase-orders/${id}/cancel`, { method: "POST" }, token),
+
+  replenishmentSuggestions: (token: string) =>
+    request<{ suggestions: unknown[] }>("/api/purchase-orders/replenishment-suggestions", {}, token),
+
+  createPurchaseOrdersFromSuggestions: (token: string) =>
+    request<{ created: unknown[]; skippedWithoutSupplier: unknown[] }>("/api/purchase-orders/from-suggestions", { method: "POST" }, token),
+
+  // Agenda
+  bays: (token: string) => request<{ bays: unknown[] }>("/api/agenda/bays", {}, token),
+
+  createBay: (payload: Record<string, unknown>, token: string) =>
+    request<{ bay: unknown }>("/api/agenda/bays", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateBay: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ bay: unknown }>(`/api/agenda/bays/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  archiveBay: (id: string, token: string) => request<void>(`/api/agenda/bays/${id}`, { method: "DELETE" }, token),
+
+  appointments: (token: string, params: { from?: string; to?: string; mechanicId?: string; bayId?: string; status?: string } = {}) =>
+    request<{ appointments: unknown[] }>(`/api/agenda/appointments${toQuery(params)}`, {}, token),
+
+  createAppointment: (payload: Record<string, unknown>, token: string) =>
+    request<{ appointment: unknown }>("/api/agenda/appointments", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateAppointment: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ appointment: unknown }>(`/api/agenda/appointments/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  setAppointmentStatus: (id: string, status: string, token: string) =>
+    request<{ appointment: unknown }>(`/api/agenda/appointments/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }, token),
+
+  mechanicWorkload: (token: string, params: { from?: string; to?: string } = {}) =>
+    request<{ workload: unknown[] }>(`/api/agenda/appointments/workload${toQuery(params)}`, {}, token),
+
+  bayOccupancy: (token: string, params: { from?: string; to?: string } = {}) =>
+    request<{ occupancy: unknown[] }>(`/api/agenda/appointments/bay-occupancy${toQuery(params)}`, {}, token),
 };
+
+interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+function toQuery(params: Record<string, string | number | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : "";
+}
 
 export { API_URL };

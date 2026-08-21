@@ -161,6 +161,9 @@ export interface InventoryPart {
   description?: string | null;
   unitCost: number;
   stockQty: number;
+  minStockQty: number;
+  reorderQty: number;
+  preferredSupplierId?: string | null;
   photoUrl?: string | null;
   active: boolean;
   createdAt: string;
@@ -253,6 +256,192 @@ export interface ClientDetail extends Client {
   quoteRequests: ClientQuoteRequestSummary[];
   totalSpent: number;
   lastVisit?: string | null;
+}
+
+// Financeiro
+export interface BankAccount {
+  id: string;
+  name: string;
+  bank?: string | null;
+  agency?: string | null;
+  accountNumber?: string | null;
+  initialBalance: number;
+  currentBalance: number;
+  active: boolean;
+}
+
+export type PayableStatus = "PENDING" | "PAID" | "OVERDUE" | "CANCELLED";
+export type ReceivableStatus = "PENDING" | "RECEIVED" | "OVERDUE" | "CANCELLED";
+
+export interface AccountPayable {
+  id: string;
+  description: string;
+  category: string;
+  payeeName: string;
+  amount: number;
+  dueDate: string;
+  paidAt?: string | null;
+  paidAmount?: number | null;
+  status: PayableStatus;
+  paymentMethod?: string | null;
+  bankAccountId?: string | null;
+  bankAccount?: BankAccount | null;
+  installmentNumber?: number | null;
+  installmentTotal?: number | null;
+  notes?: string | null;
+}
+
+export interface AccountReceivable {
+  id: string;
+  description: string;
+  category: string;
+  clientId?: string | null;
+  client?: { id: string; name: string } | null;
+  serviceOrderId?: string | null;
+  serviceOrder?: { id: string; code: string } | null;
+  amount: number;
+  dueDate: string;
+  receivedAt?: string | null;
+  receivedAmount?: number | null;
+  status: ReceivableStatus;
+  paymentMethod?: string | null;
+  bankAccountId?: string | null;
+  bankAccount?: BankAccount | null;
+  installmentNumber?: number | null;
+  installmentTotal?: number | null;
+  notes?: string | null;
+}
+
+export interface CashFlowTimelinePoint {
+  date: string;
+  in: number;
+  out: number;
+  balance: number;
+}
+
+export interface CashFlow {
+  initialBalance: number;
+  totalIn: number;
+  totalOut: number;
+  finalBalance: number;
+  timeline: CashFlowTimelinePoint[];
+}
+
+export interface DRE {
+  grossRevenue: number;
+  totalExpenses: number;
+  netResult: number;
+  revenueByCategory: { category: string; amount: number }[];
+  expensesByCategory: { category: string; amount: number }[];
+}
+
+// Fiscal
+export type InvoiceType = "NFE" | "NFSE" | "NFCE";
+export type InvoiceStatus = "DRAFT" | "PENDING" | "ISSUED" | "CANCELLED" | "ERROR";
+
+export interface Invoice {
+  id: string;
+  type: InvoiceType;
+  status: InvoiceStatus;
+  number?: string | null;
+  series?: string | null;
+  provider: string;
+  totalAmount: number;
+  issueDate?: string | null;
+  cancelledAt?: string | null;
+  errorMessage?: string | null;
+  client?: { id: string; name: string } | null;
+  serviceOrder?: { id: string; code: string } | null;
+  createdAt: string;
+}
+
+// Compras e fornecedores
+export interface Supplier {
+  id: string;
+  name: string;
+  cpfCnpj?: string | null;
+  contactName?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+  addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
+  notes?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+export type PurchaseOrderStatus = "DRAFT" | "SENT" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
+
+export interface PurchaseOrderItem {
+  id: string;
+  inventoryPartId: string;
+  inventoryPart: InventoryPart;
+  quantity: number;
+  unitCost: number;
+  receivedQty: number;
+}
+
+export interface PurchaseOrder {
+  id: string;
+  code: string;
+  supplierId: string;
+  supplier: Supplier;
+  status: PurchaseOrderStatus;
+  notes?: string | null;
+  expectedDate?: string | null;
+  sentAt?: string | null;
+  createdAt: string;
+  items: PurchaseOrderItem[];
+}
+
+export interface ReplenishmentSuggestion extends InventoryPart {
+  suggestedQty: number;
+  preferredSupplier?: Supplier | null;
+}
+
+// Agenda
+export type BayType = "BAY" | "LIFT";
+
+export interface Bay {
+  id: string;
+  name: string;
+  type: BayType;
+  active: boolean;
+}
+
+export type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "IN_PROGRESS" | "DONE" | "CANCELLED" | "NO_SHOW";
+
+export interface Appointment {
+  id: string;
+  title: string;
+  vehicleId?: string | null;
+  vehicle?: Vehicle | null;
+  clientId?: string | null;
+  client?: { id: string; name: string } | null;
+  serviceOrderId?: string | null;
+  serviceOrder?: { id: string; code: string; status: string } | null;
+  mechanicId?: string | null;
+  mechanic?: { id: string; name: string } | null;
+  bayId?: string | null;
+  bay?: Bay | null;
+  startAt: string;
+  estimatedDurationMin: number;
+  status: AppointmentStatus;
+  notes?: string | null;
+}
+
+export interface MechanicWorkload {
+  mechanicId: string;
+  mechanicName: string;
+  appointments: number;
+  totalMinutes: number;
+}
+
+export interface BayOccupancy {
+  bay: Bay;
+  appointments: Appointment[];
 }
 
 export type QuoteRequestStatus = "PENDING" | "ACCEPTED" | "DECLINED";
