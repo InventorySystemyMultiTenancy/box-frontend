@@ -507,6 +507,28 @@
   box-shadow: inset 0 0 24px rgba(16, 24, 32, 0.06);
 }
 .carWrap svg { width: 100%; height: auto; display: block; }
+
+/* Computador: holograma deitado (paisagem) para reduzir o quanto precisa descer a
+   tela até o painel de detalhes — no celular mantém o enquadramento vertical original
+   (a imagem em si é de um veículo visto de cima, naturalmente mais alta que larga). */
+@media (min-width: 761px) {
+  .carWrap {
+    container-type: size;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    aspect-ratio: 26 / 15;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .carWrap svg {
+    width: 100cqh;
+    height: 100cqw;
+    max-width: none;
+    transform: rotate(90deg);
+  }
+}
 .hotspot {
   cursor: pointer;
   stroke: var(--bg-elevated);

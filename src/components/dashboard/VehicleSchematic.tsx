@@ -482,7 +482,7 @@ export default function VehicleSchematic({
               ) : (
                 <button
                   className={styles.btnApprove}
-                  disabled={starting || activeApproval?.status === "PENDING" || activeApproval?.status === "REJECTED"}
+                  disabled={starting}
                   onClick={start}
                 >
                   {starting ? "Iniciando..." : "Iniciar manutenção"}
