@@ -357,14 +357,42 @@ export interface Invoice {
   status: InvoiceStatus;
   number?: string | null;
   series?: string | null;
+  accessKey?: string | null;
+  operationNature?: string | null;
   provider: string;
+  issuerName?: string | null;
+  issuerDocument?: string | null;
+  recipientName?: string | null;
+  recipientDocument?: string | null;
+  paymentMethod?: string | null;
+  description?: string | null;
   totalAmount: number;
+  discountAmount?: number | null;
+  taxAmount?: number | null;
   issueDate?: string | null;
   cancelledAt?: string | null;
   errorMessage?: string | null;
   client?: { id: string; name: string } | null;
   serviceOrder?: { id: string; code: string } | null;
   createdAt: string;
+}
+
+export interface ExtractedInvoiceData {
+  type: InvoiceType;
+  number: string | null;
+  series: string | null;
+  accessKey: string | null;
+  operationNature: string | null;
+  issuerName: string | null;
+  issuerDocument: string | null;
+  recipientName: string | null;
+  recipientDocument: string | null;
+  paymentMethod: string | null;
+  description: string;
+  totalAmount: number | null;
+  discountAmount: number | null;
+  taxAmount: number | null;
+  issueDate: string | null;
 }
 
 // Compras e fornecedores

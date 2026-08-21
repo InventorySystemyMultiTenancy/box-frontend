@@ -347,7 +347,26 @@ export const api = {
     const form = new FormData();
     form.append("photo", photo);
     return request<{
-      extracted: { type: "NFE" | "NFSE" | "NFCE"; totalAmount: number | null; description: string; issueDate: string | null; clientNameGuess: string | null };
+      extracted: {
+        type: "NFE" | "NFSE" | "NFCE";
+        number: string | null;
+        series: string | null;
+        accessKey: string | null;
+        operationNature: string | null;
+        issuerName: string | null;
+        issuerDocument: string | null;
+        recipientName: string | null;
+        recipientDocument: string | null;
+        paymentMethod: string | null;
+        description: string;
+        totalAmount: number | null;
+        discountAmount: number | null;
+        taxAmount: number | null;
+        issueDate: string | null;
+      };
+      clientId: string | null;
+      clientName: string | null;
+      clientCreated: boolean;
     }>("/api/invoices/extract", { method: "POST", body: form }, token);
   },
 

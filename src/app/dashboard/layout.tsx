@@ -67,7 +67,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           )}
         </div>
         <div className={styles.topbarRight}>
-          <span>{user.name}</span>
           <button className={styles.logout} onClick={logout}>
             Sair
           </button>
