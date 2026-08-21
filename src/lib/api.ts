@@ -40,10 +40,18 @@ export const api = {
   users: (token: string) => request<{ users: unknown[] }>("/api/auth/users", {}, token),
 
   createUser: (
-    payload: { name: string; email: string; password: string; phone?: string; role: "CUSTOMER" | "MECHANIC" | "ADMIN"; roleId?: string },
+    payload: {
+      name: string;
+      email: string;
+      password: string;
+      phone?: string;
+      role: "CUSTOMER" | "MECHANIC" | "ADMIN";
+      roleId?: string;
+      commissionRate?: number;
+    },
     token: string
   ) =>
-    request<{ user: { id: string; name: string; email: string; role: string; roleId?: string | null; phone?: string | null } }>(
+    request<{ user: { id: string; name: string; email: string; role: string; roleId?: string | null; phone?: string | null; commissionRate?: number | null } }>(
       "/api/auth/users",
       {
         method: "POST",
@@ -61,6 +69,7 @@ export const api = {
       phone?: string | null;
       role?: "CUSTOMER" | "MECHANIC" | "ADMIN";
       roleId?: string | null;
+      commissionRate?: number | null;
     },
     token: string
   ) =>
@@ -334,6 +343,14 @@ export const api = {
   createInvoice: (payload: Record<string, unknown>, token: string) =>
     request<{ invoice: unknown }>("/api/invoices", { method: "POST", body: JSON.stringify(payload) }, token),
 
+  extractInvoice: (photo: File, token: string) => {
+    const form = new FormData();
+    form.append("photo", photo);
+    return request<{
+      extracted: { type: "NFE" | "NFSE" | "NFCE"; totalAmount: number | null; description: string; issueDate: string | null; clientNameGuess: string | null };
+    }>("/api/invoices/extract", { method: "POST", body: form }, token);
+  },
+
   issueInvoice: (id: string, token: string) =>
     request<{ invoice: unknown }>(`/api/invoices/${id}/issue`, { method: "POST" }, token),
 
@@ -438,12 +455,29 @@ export const api = {
 
   revisionAlerts: (token: string) => request<{ alerts: unknown[] }>("/api/vehicles/revision-alerts", {}, token),
 
-  // Notificações
-  notifications: (token: string, params: { serviceOrderId?: string } = {}) =>
-    request<{ notifications: unknown[] }>(`/api/notifications${toQuery(params)}`, {}, token),
+  // Comissões
+  commissions: (token: string, params: { mechanicId?: string; status?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/commissions${toQuery(params)}`, {}, token),
 
-  notifyServiceOrder: (orderId: string, token: string) =>
-    request<{ ok: boolean }>(`/api/service-orders/${orderId}/notify`, { method: "POST" }, token),
+  generateCommissions: (payload: { from: string; to: string }, token: string) =>
+    request<{ created: unknown[] }>("/api/commissions/generate", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  payCommission: (id: string, payload: { bankAccountId?: string }, token: string) =>
+    request<{ commission: unknown }>(`/api/commissions/${id}/pay`, { method: "POST", body: JSON.stringify(payload) }, token),
+
+  cancelCommission: (id: string, token: string) =>
+    request<{ commission: unknown }>(`/api/commissions/${id}/cancel`, { method: "POST" }, token),
+
+  // Lojas
+  stores: (token: string) => request<{ stores: unknown[] }>("/api/stores", {}, token),
+
+  createStore: (payload: Record<string, unknown>, token: string) =>
+    request<{ store: unknown }>("/api/stores", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateStore: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ store: unknown }>(`/api/stores/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  archiveStore: (id: string, token: string) => request<void>(`/api/stores/${id}`, { method: "DELETE" }, token),
 };
 
 interface Pagination {

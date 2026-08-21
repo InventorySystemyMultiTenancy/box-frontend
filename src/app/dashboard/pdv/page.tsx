@@ -14,7 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Client, CounterSale, InventoryPart } from "@/lib/types";
+import type { Client, CounterSale, InventoryPart, Store } from "@/lib/types";
 
 interface ItemRow {
   inventoryPartId: string;
@@ -38,8 +38,15 @@ export default function PdvPage() {
   const [clientId, setClientId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [storeId, setStoreId] = useState("");
   const [items, setItems] = useState<ItemRow[]>([EMPTY_ROW]);
   const [saving, setSaving] = useState(false);
+
+  const { data: stores } = useQuery({
+    queryKey: ["stores"],
+    queryFn: async () => (await api.stores(token!)).stores as Store[],
+    enabled: !!token,
+  });
 
   const { data: clients } = useQuery({
     queryKey: ["clients-all"],
@@ -82,6 +89,7 @@ export default function PdvPage() {
     setClientId("");
     setCustomerName("");
     setPaymentMethod("");
+    setStoreId("");
     setItems([EMPTY_ROW]);
   }
 
@@ -105,7 +113,13 @@ export default function PdvPage() {
     setSaving(true);
     try {
       await api.createCounterSale(
-        { clientId: clientId || undefined, customerName: customerName || undefined, paymentMethod: paymentMethod || undefined, items: validItems },
+        {
+          clientId: clientId || undefined,
+          customerName: customerName || undefined,
+          paymentMethod: paymentMethod || undefined,
+          storeId: storeId || undefined,
+          items: validItems,
+        },
         token
       );
       toast.success("Venda registrada.");
@@ -193,9 +207,25 @@ export default function PdvPage() {
                 </Button>
               </div>
 
-              <div className="grid gap-1.5 max-w-xs">
-                <Label htmlFor="pdv-payment">Forma de pagamento</Label>
-                <Input id="pdv-payment" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="PIX" />
+              <div className="grid grid-cols-2 gap-3 max-w-md">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="pdv-payment">Forma de pagamento</Label>
+                  <Input id="pdv-payment" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="PIX" />
+                </div>
+                {stores && stores.length > 0 && (
+                  <div className="grid gap-1.5">
+                    <Label>Loja</Label>
+                    <Select value={storeId || "NONE"} onValueChange={(v) => setStoreId(v === "NONE" ? "" : v)}>
+                      <SelectTrigger><SelectValue placeholder="Sem loja" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">—</SelectItem>
+                        {stores.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between border-t pt-4">

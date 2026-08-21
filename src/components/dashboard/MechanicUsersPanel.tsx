@@ -17,6 +17,7 @@ export default function MechanicUsersPanel() {
     phone: "",
     role: "CUSTOMER" as "CUSTOMER" | "MECHANIC" | "ADMIN",
     roleId: "",
+    commissionRate: "",
   });
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -36,11 +37,16 @@ export default function MechanicUsersPanel() {
     setMessage(null);
     try {
       const { user: created } = await api.createUser(
-        { ...userForm, phone: userForm.phone || undefined, roleId: userForm.roleId || undefined },
+        {
+          ...userForm,
+          phone: userForm.phone || undefined,
+          roleId: userForm.roleId || undefined,
+          commissionRate: userForm.commissionRate ? Number(userForm.commissionRate) / 100 : undefined,
+        },
         token
       );
       setUsers((prev) => [created as User, ...prev]);
-      setUserForm({ name: "", email: "", password: "", phone: "", role: "CUSTOMER", roleId: "" });
+      setUserForm({ name: "", email: "", password: "", phone: "", role: "CUSTOMER", roleId: "", commissionRate: "" });
       setMessage("Usuário criado.");
     } catch {
       setMessage("Não foi possível criar o usuário.");
@@ -58,6 +64,13 @@ export default function MechanicUsersPanel() {
   async function updateUserCargo(user: User, roleId: string) {
     if (!token) return;
     const { user: updated } = await api.updateUser(user.id, { roleId: roleId || null }, token);
+    setUsers((prev) => prev.map((item) => (item.id === user.id ? (updated as User) : item)));
+  }
+
+  async function updateUserCommission(user: User, commissionPercent: string) {
+    if (!token) return;
+    const commissionRate = commissionPercent ? Number(commissionPercent) / 100 : null;
+    const { user: updated } = await api.updateUser(user.id, { commissionRate }, token);
     setUsers((prev) => prev.map((item) => (item.id === user.id ? (updated as User) : item)));
   }
 
@@ -101,6 +114,20 @@ export default function MechanicUsersPanel() {
               ))}
             </select>
           </label>
+          {userForm.role === "MECHANIC" && (
+            <label>
+              Comissão (%)
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={userForm.commissionRate}
+                onChange={(e) => setUserForm((prev) => ({ ...prev, commissionRate: e.target.value }))}
+                placeholder="ex: 10"
+              />
+            </label>
+          )}
           {message && <div className={styles.formMessage}>{message}</div>}
           <button className={styles.actionButton} type="submit" disabled={busy}>
             {busy ? "Criando..." : "Criar usuário"}
@@ -129,6 +156,19 @@ export default function MechanicUsersPanel() {
                 </option>
               ))}
             </select>
+            {user.role === "MECHANIC" && (
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                style={{ width: 90 }}
+                defaultValue={user.commissionRate != null ? user.commissionRate * 100 : ""}
+                onBlur={(e) => updateUserCommission(user, e.target.value)}
+                placeholder="Comissão %"
+                title="Percentual de comissão"
+              />
+            )}
           </div>
         ))}
       </div>

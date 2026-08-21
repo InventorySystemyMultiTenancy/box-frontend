@@ -73,6 +73,7 @@ export interface User {
   role: "CUSTOMER" | "MECHANIC" | "ADMIN";
   roleId?: string | null;
   phone?: string | null;
+  commissionRate?: number | null;
 }
 
 export interface Vehicle {
@@ -509,20 +510,34 @@ export interface RevisionAlert {
   monthsSinceLastService: number;
 }
 
-// Notificações
-export type NotificationChannel = "SMS" | "WHATSAPP";
-export type NotificationStatus = "SENT" | "FAILED";
+// Comissão de mecânico
+export type CommissionStatus = "PENDING" | "PAID" | "CANCELLED";
 
-export interface NotificationLog {
+export interface Commission {
   id: string;
-  channel: NotificationChannel;
-  to: string;
-  message: string;
-  status: NotificationStatus;
-  errorMessage?: string | null;
-  serviceOrderId?: string | null;
-  provider: string;
+  mechanicId: string;
+  mechanic: { id: string; name: string; commissionRate?: number | null };
+  approvalId: string;
+  approval: { id: string; title: string; estimatedValue?: number | null };
+  serviceOrderId: string;
+  serviceOrder: { id: string; code: string };
+  baseAmount: number;
+  rate: number;
+  amount: number;
+  status: CommissionStatus;
+  paidAt?: string | null;
   createdAt: string;
+}
+
+// Lojas (multi-loja)
+export interface Store {
+  id: string;
+  name: string;
+  addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
+  phone?: string | null;
+  active: boolean;
 }
 
 export type QuoteRequestStatus = "PENDING" | "ACCEPTED" | "DECLINED";

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Bay, BayType } from "@/lib/types";
+import type { Bay, BayType, Store } from "@/lib/types";
 
 export default function BaysPanel() {
   const { token, hasPermission } = useAuth();
@@ -70,17 +70,25 @@ function BayFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onSaved
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<BayType>("BAY");
+  const [storeId, setStoreId] = useState("");
+
+  const { data: stores } = useQuery({
+    queryKey: ["stores"],
+    queryFn: async () => (await api.stores(token!)).stores as Store[],
+    enabled: !!token && open,
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token || !name.trim()) return;
     setSaving(true);
     try {
-      await api.createBay({ name, type }, token);
+      await api.createBay({ name, type, storeId: storeId || undefined }, token);
       toast.success("Box/elevador criado.");
       setOpen(false);
       setName("");
       setType("BAY");
+      setStoreId("");
       onSaved();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Não foi possível criar.");
@@ -111,6 +119,20 @@ function BayFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onSaved
               </SelectContent>
             </Select>
           </div>
+          {stores && stores.length > 0 && (
+            <div className="grid gap-1.5">
+              <Label>Loja</Label>
+              <Select value={storeId || "NONE"} onValueChange={(v) => setStoreId(v === "NONE" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Sem loja" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">—</SelectItem>
+                  {stores.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <DialogFooter>
             <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Criar"}</Button>
           </DialogFooter>

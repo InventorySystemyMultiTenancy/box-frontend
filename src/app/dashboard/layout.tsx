@@ -44,7 +44,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     ...(hasPermission("pdv", "view") ? [{ href: "/dashboard/pdv", label: "PDV" }] : []),
     ...(hasPermission("warranties", "view") ? [{ href: "/dashboard/garantias", label: "Garantias" }] : []),
     ...(hasPermission("reports", "view") ? [{ href: "/dashboard/relatorios", label: "Relatórios" }] : []),
-    ...(isStaff ? [{ href: "/dashboard/notificacoes", label: "Notificações" }] : []),
+    ...(hasPermission("commissions", "view") ? [{ href: "/dashboard/comissoes", label: "Comissões" }] : []),
+    ...(hasPermission("stores", "view") ? [{ href: "/dashboard/lojas", label: "Lojas" }] : []),
     ...(hasPermission("roles", "manage") ? [{ href: "/dashboard/cargos", label: "Cargos" }] : []),
   ];
 

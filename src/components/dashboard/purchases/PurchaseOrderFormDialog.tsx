@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Supplier, InventoryPart } from "@/lib/types";
+import type { Supplier, InventoryPart, Store } from "@/lib/types";
 
 interface ItemRow {
   inventoryPartId: string;
@@ -33,6 +33,7 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [supplierId, setSupplierId] = useState(defaultSupplierId ?? "");
+  const [storeId, setStoreId] = useState("");
   const [expectedDate, setExpectedDate] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<ItemRow[]>(
@@ -47,6 +48,12 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
     enabled: !!token && open,
   });
 
+  const { data: stores } = useQuery({
+    queryKey: ["stores"],
+    queryFn: async () => (await api.stores(token!)).stores as Store[],
+    enabled: !!token && open,
+  });
+
   const { data: parts } = useQuery({
     queryKey: ["inventory-parts"],
     queryFn: async () => (await api.inventoryParts(token!)).parts as InventoryPart[],
@@ -56,6 +63,7 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
   function handleOpenChange(next: boolean) {
     if (next) {
       setSupplierId(defaultSupplierId ?? "");
+      setStoreId("");
       setExpectedDate("");
       setNotes("");
       setItems(
@@ -99,7 +107,7 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
     setSaving(true);
     try {
       await api.createPurchaseOrder(
-        { supplierId, expectedDate: expectedDate || undefined, notes: notes || undefined, items: validItems },
+        { supplierId, storeId: storeId || undefined, expectedDate: expectedDate || undefined, notes: notes || undefined, items: validItems },
         token
       );
       toast.success("Pedido de compra criado.");
@@ -140,6 +148,20 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
               <Label htmlFor="expectedDate">Previsão de entrega</Label>
               <Input id="expectedDate" type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
             </div>
+            {stores && stores.length > 0 && (
+              <div className="grid gap-1.5">
+                <Label>Loja</Label>
+                <Select value={storeId || "NONE"} onValueChange={(v) => setStoreId(v === "NONE" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Sem loja" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">—</SelectItem>
+                    {stores.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-2">

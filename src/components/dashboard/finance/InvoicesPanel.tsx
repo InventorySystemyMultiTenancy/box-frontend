@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -124,16 +124,39 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
   const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [extracting, setExtracting] = useState(false);
   const [type, setType] = useState<InvoiceType>("NFSE");
   const [clientId, setClientId] = useState("");
   const [totalAmount, setTotalAmount] = useState("");
   const [description, setDescription] = useState("");
+  const [clientNameGuess, setClientNameGuess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: clients } = useQuery({
     queryKey: ["clients-all"],
     queryFn: async () => (await api.clients(token!, { pageSize: 100 })).items as Client[],
     enabled: !!token && open,
   });
+
+  async function handleExtract(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !token) return;
+    setExtracting(true);
+    setClientNameGuess(null);
+    try {
+      const { extracted } = await api.extractInvoice(file, token);
+      setType(extracted.type);
+      if (extracted.totalAmount) setTotalAmount(String(extracted.totalAmount));
+      setDescription(extracted.description);
+      setClientNameGuess(extracted.clientNameGuess);
+      toast.success("Dados extraídos — confira antes de salvar.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível ler a imagem.");
+    } finally {
+      setExtracting(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -147,6 +170,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
       setClientId("");
       setTotalAmount("");
       setDescription("");
+      setClientNameGuess(null);
       onSaved();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Não foi possível criar a nota.");
@@ -163,6 +187,18 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           <DialogTitle>Nova nota fiscal</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
+          <div className="grid gap-1.5">
+            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleExtract} />
+            <Button type="button" variant="outline" size="sm" className="w-fit" disabled={extracting} onClick={() => fileInputRef.current?.click()}>
+              <Sparkles className="size-4" />
+              {extracting ? "Lendo nota fiscal..." : "Ler nota fiscal por foto (IA)"}
+            </Button>
+            {clientNameGuess && (
+              <p className="text-xs text-muted-foreground">
+                Destinatário identificado na imagem: <strong>{clientNameGuess}</strong> — selecione o cliente correspondente abaixo.
+              </p>
+            )}
+          </div>
           <div className="grid gap-1.5">
             <Label>Tipo</Label>
             <Select value={type} onValueChange={(v) => setType(v as InvoiceType)}>
