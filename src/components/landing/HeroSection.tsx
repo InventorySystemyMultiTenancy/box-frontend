@@ -25,9 +25,7 @@ export default function HeroSection({ children }: { children?: ReactNode }) {
     <div className={styles.heroWrap}>
       <nav className={styles.nav}>
         <span className={styles.navBrand}>
-          <span className={styles.brandBadge}>
-            <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} priority />
-          </span>
+          <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
         </span>
         <div className={styles.navLinks}>
           {NAV_LINKS.map((link) => (

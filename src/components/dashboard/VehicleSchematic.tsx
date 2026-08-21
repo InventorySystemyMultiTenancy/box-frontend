@@ -228,24 +228,6 @@ export default function VehicleSchematic({
     <div>
       <div className={styles.carWrap}>
         <svg viewBox="0 0 300 520" role="group" aria-label="Modelo raio-x do veiculo visto de cima com pontos de manutencao">
-          <defs>
-            <linearGradient id="xrayGreen" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#c8ff2f" stopOpacity="0.3" />
-              <stop offset="48%" stopColor="#86f300" stopOpacity="0.12" />
-              <stop offset="100%" stopColor="#c8ff2f" stopOpacity="0.2" />
-            </linearGradient>
-            <filter id="greenGlow" x="-35%" y="-35%" width="170%" height="170%">
-              <feGaussianBlur stdDeviation="2.2" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-            <pattern id="wireGrid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#b6ff24" strokeOpacity="0.18" strokeWidth="0.7" />
-            </pattern>
-          </defs>
-
           <rect x="0" y="0" width="300" height="520" fill="transparent" />
           <image href="/vehicle-xray-top.jpg" x="0" y="0" width="300" height="520" preserveAspectRatio="xMidYMid slice" />
 
@@ -253,10 +235,10 @@ export default function VehicleSchematic({
             const pos = positionForPart(part);
             const isActive = part.id === active?.id;
             const tone = PART_STATUS_TONE[part.status];
-            const fill = isActive ? "#b6ff24" : tone === "crit" ? "var(--critical)" : tone === "warn" ? "var(--warning)" : "var(--accent-cobre)";
+            const fill = isActive ? "var(--accent-blue)" : tone === "crit" ? "var(--critical)" : tone === "warn" ? "var(--warning)" : "var(--accent-gray)";
             return (
               <g key={part.id}>
-                {isActive && <circle cx={pos.x} cy={pos.y} r={14} fill="none" stroke="#b6ff24" strokeWidth={1.6} opacity={0.55} />}
+                {isActive && <circle cx={pos.x} cy={pos.y} r={14} fill="none" stroke="var(--accent-blue)" strokeWidth={1.6} opacity={0.55} />}
                 <circle
                   className={styles.hotspot}
                   cx={pos.x}

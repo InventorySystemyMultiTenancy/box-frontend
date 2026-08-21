@@ -240,9 +240,7 @@ export function SiteFooter() {
   return (
     <footer className={styles.footer}>
       <div className={styles.footerBrand}>
-        <span className={styles.brandBadge}>
-          <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} />
-        </span>
+        <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} />
       </div>
       Reblind — acompanhamento de manutenção em tempo real.
     </footer>
