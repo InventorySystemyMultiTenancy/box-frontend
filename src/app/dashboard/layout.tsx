@@ -37,7 +37,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isStaff = user.role === "MECHANIC" || user.role === "ADMIN";
   const tabs = [
     ...(user.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
+    ...(isStaff ? [{ href: "/dashboard/busca", label: "Busca" }] : []),
     ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes" }] : []),
+    ...(isStaff ? [{ href: "/dashboard/complementos", label: "Complementos" }] : []),
+    ...(isStaff ? [{ href: "/dashboard/alertas", label: "Alertas" }] : []),
+    ...(hasPermission("insurance", "view") ? [{ href: "/dashboard/seguradoras", label: "Seguradoras" }] : []),
     ...(hasPermission("suppliers", "view") ? [{ href: "/dashboard/fornecedores", label: "Fornecedores" }] : []),
     ...(hasPermission("purchases", "view") ? [{ href: "/dashboard/compras", label: "Compras" }] : []),
     ...(hasPermission("agenda", "view") ? [{ href: "/dashboard/agenda", label: "Agenda" }] : []),

@@ -1,18 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { getSocket, joinStaffRoom } from "@/lib/socket";
 import { STATUS_LABELS, STATUS_TONE, ServiceOrder, ServiceOrderStatus } from "@/lib/types";
 import OrderDetail from "@/components/dashboard/OrderDetail";
+import KanbanBoard from "@/components/dashboard/KanbanBoard";
 import styles from "./dashboard.module.css";
 
 /** Lista de todos os projetos (carros) em andamento — o mecânico escolhe um para gerenciar. */
 export default function MechanicProjectsPanel() {
   const { token } = useAuth();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(searchParams.get("order"));
+  const [view, setView] = useState<"kanban" | "list">("kanban");
 
   useEffect(() => {
     if (!token) return;
@@ -39,11 +43,43 @@ export default function MechanicProjectsPanel() {
     };
   }, [token]);
 
+  function handleStatusChanged(orderId: string, status: ServiceOrderStatus) {
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+  }
+
   return (
     <div className={styles.content}>
-      <div className={styles.sectionTitle}>Projetos em andamento</div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className={styles.sectionTitle} style={{ marginBottom: 0 }}>
+          Projetos em andamento
+        </div>
+        <div className="inline-flex rounded-md border p-0.5 text-sm">
+          <button
+            type="button"
+            className={`rounded px-3 py-1 ${view === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            onClick={() => setView("kanban")}
+          >
+            Kanban
+          </button>
+          <button
+            type="button"
+            className={`rounded px-3 py-1 ${view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            onClick={() => setView("list")}
+          >
+            Lista
+          </button>
+        </div>
+      </div>
+
       {orders.length === 0 ? (
         <p className={styles.tlSub}>Nenhuma ordem de serviço cadastrada ainda.</p>
+      ) : view === "kanban" ? (
+        <KanbanBoard
+          orders={orders}
+          selectedOrderId={selectedOrderId}
+          onSelect={setSelectedOrderId}
+          onStatusChanged={handleStatusChanged}
+        />
       ) : (
         <div className={styles.ordersList}>
           {orders.map((order) => (

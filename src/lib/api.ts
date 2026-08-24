@@ -497,6 +497,129 @@ export const api = {
     request<{ store: unknown }>(`/api/stores/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
 
   archiveStore: (id: string, token: string) => request<void>(`/api/stores/${id}`, { method: "DELETE" }, token),
+
+  // Processo da OS (Fase 1) — consultor/orçamentista/técnico, prioridade, previsão,
+  // setor, seguro/sinistro.
+  updateServiceOrderProcess: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ order: unknown }>(`/api/service-orders/${id}/process`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  updateVehicle: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ vehicle: unknown }>(`/api/vehicles/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  // Seguradoras
+  insuranceCompanies: (token: string, params: { q?: string; accredited?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/insurance-companies${toQuery(params)}`, {}, token),
+
+  insuranceCompany: (id: string, token: string) => request<{ company: unknown }>(`/api/insurance-companies/${id}`, {}, token),
+
+  createInsuranceCompany: (payload: Record<string, unknown>, token: string) =>
+    request<{ company: unknown }>("/api/insurance-companies", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateInsuranceCompany: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ company: unknown }>(`/api/insurance-companies/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  archiveInsuranceCompany: (id: string, token: string) =>
+    request<void>(`/api/insurance-companies/${id}`, { method: "DELETE" }, token),
+
+  // Setores
+  sectors: (token: string) => request<{ sectors: unknown[] }>("/api/sectors", {}, token),
+
+  createSector: (payload: Record<string, unknown>, token: string) =>
+    request<{ sector: unknown }>("/api/sectors", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  archiveSector: (id: string, token: string) => request<void>(`/api/sectors/${id}`, { method: "DELETE" }, token),
+
+  // Catálogo de serviços
+  serviceCatalog: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ items: unknown[]; pagination: Pagination }>(`/api/service-catalog${toQuery(params)}`, {}, token),
+
+  createServiceCatalogItem: (payload: Record<string, unknown>, token: string) =>
+    request<{ item: unknown }>("/api/service-catalog", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateServiceCatalogItem: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ item: unknown }>(`/api/service-catalog/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  archiveServiceCatalogItem: (id: string, token: string) =>
+    request<void>(`/api/service-catalog/${id}`, { method: "DELETE" }, token),
+
+  // Orçamento formal (Estimate)
+  estimates: (token: string, params: { serviceOrderId?: string; status?: string; insuranceCompanyId?: string } = {}) =>
+    request<{ estimates: unknown[] }>(`/api/estimates${toQuery(params)}`, {}, token),
+
+  estimate: (id: string, token: string) => request<{ estimate: unknown }>(`/api/estimates/${id}`, {}, token),
+
+  createEstimate: (payload: Record<string, unknown>, token: string) =>
+    request<{ estimate: unknown }>("/api/estimates", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateEstimate: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ estimate: unknown }>(`/api/estimates/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  setEstimateStatus: (id: string, status: string, token: string) =>
+    request<{ estimate: unknown }>(`/api/estimates/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }, token),
+
+  addEstimateItem: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ estimate: unknown }>(`/api/estimates/${id}/items`, { method: "POST", body: JSON.stringify(payload) }, token),
+
+  removeEstimateItem: (id: string, itemId: string, token: string) =>
+    request<{ estimate: unknown }>(`/api/estimates/${id}/items/${itemId}`, { method: "DELETE" }, token),
+
+  // Complementos de mão de obra pendentes
+  pendingSupplements: (token: string) => request<{ items: unknown[] }>("/api/supplements/pending", {}, token),
+
+  // Vistorias
+  inspections: (token: string, params: { status?: string; insuranceCompanyId?: string; inspectorId?: string; from?: string; to?: string } = {}) =>
+    request<{ inspections: unknown[] }>(`/api/inspections${toQuery(params)}`, {}, token),
+
+  inspectionsToSchedule: (token: string) => request<{ orders: unknown[] }>("/api/inspections/to-schedule", {}, token),
+
+  regularizationList: (token: string) => request<{ items: unknown[] }>("/api/inspections/regularization", {}, token),
+
+  inspection: (id: string, token: string) => request<{ inspection: unknown }>(`/api/inspections/${id}`, {}, token),
+
+  createInspection: (payload: Record<string, unknown>, token: string) =>
+    request<{ inspection: unknown }>("/api/inspections", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateInspection: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ inspection: unknown }>(`/api/inspections/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  createInspectionIssue: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ inspection: unknown }>(`/api/inspections/${id}/issues`, { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateInspectionIssue: (id: string, issueId: string, payload: Record<string, unknown>, token: string) =>
+    request<{ issue: unknown }>(`/api/inspections/${id}/issues/${issueId}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  // Apontamento de horas
+  timeEntries: (token: string, params: { employeeId?: string; serviceOrderId?: string; status?: string } = {}) =>
+    request<{ entries: unknown[] }>(`/api/time-entries${toQuery(params)}`, {}, token),
+
+  startTimeEntry: (payload: Record<string, unknown>, token: string) =>
+    request<{ entry: unknown }>("/api/time-entries", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  pauseTimeEntry: (id: string, token: string) => request<{ entry: unknown }>(`/api/time-entries/${id}/pause`, { method: "PATCH" }, token),
+
+  resumeTimeEntry: (id: string, token: string) => request<{ entry: unknown }>(`/api/time-entries/${id}/resume`, { method: "PATCH" }, token),
+
+  finishTimeEntry: (id: string, token: string) => request<{ entry: unknown }>(`/api/time-entries/${id}/finish`, { method: "PATCH" }, token),
+
+  capacityPanel: (token: string) => request<unknown>("/api/time-entries/capacity", {}, token),
+
+  // Auditoria
+  auditLogs: (token: string, params: { entity?: string; entityId?: string; userId?: string } = {}) =>
+    request<{ logs: unknown[] }>(`/api/audit-logs${toQuery(params)}`, {}, token),
+
+  // Central de alertas
+  alerts: (token: string) => request<{ notifications: unknown[] }>("/api/alerts", {}, token),
+
+  markAlertRead: (id: string, token: string) => request<{ notification: unknown }>(`/api/alerts/${id}/read`, { method: "PATCH" }, token),
+
+  // Documentos padronizados
+  documentTemplates: (token: string) => request<{ templates: unknown[] }>("/api/document-templates", {}, token),
+
+  renderDocument: (key: string, serviceOrderId: string, token: string) =>
+    request<{ document: { name: string; html: string } }>(`/api/document-templates/${key}/render/${serviceOrderId}`, {}, token),
+
+  // Busca global
+  globalSearch: (q: string, token: string) => request<{ orders: unknown[]; estimates: unknown[] }>(`/api/search${toQuery({ q })}`, {}, token),
 };
 
 interface Pagination {
