@@ -807,3 +807,64 @@ export interface QuoteRequest {
   vehicle: Vehicle;
   serviceOrder?: { id: string; code: string; status: ServiceOrderStatus } | null;
 }
+
+// --- Caminhões (controle de pilotagem) --------------------------------------
+
+export interface Truck {
+  id: string;
+  plate: string;
+  brand?: string | null;
+  model?: string | null;
+  year?: number | null;
+  assignedEmployeeId?: string | null;
+  assignedEmployee?: { id: string; name: string; phone?: string | null } | null;
+  active: boolean;
+  notes?: string | null;
+  // Pilotagem em andamento (0 ou 1 item) — vem junto na listagem para saber se o
+  // caminhão está disponível sem uma chamada extra por caminhão.
+  trips?: TruckTrip[];
+}
+
+export type TruckTripStatus = "IN_PROGRESS" | "COMPLETED";
+
+export interface TruckTrip {
+  id: string;
+  truckId: string;
+  truck?: Truck;
+  driverId: string;
+  driver?: { id: string; name: string };
+  status: TruckTripStatus;
+  startedAt: string;
+  startKm: number;
+  startFuelLevel: string;
+  startCondition?: string | null;
+  startPhotoUrl?: string | null;
+  endedAt?: string | null;
+  endKm?: number | null;
+  endFuelLevel?: string | null;
+  endCondition?: string | null;
+  endPhotoUrl?: string | null;
+  notes?: string | null;
+}
+
+export interface TruckWithTrips extends Truck {
+  trips: TruckTrip[];
+}
+
+// --- Reconhecimento de veículo por IA ---------------------------------------
+
+export interface DetectedVehicleProblem {
+  description: string;
+  location?: string | null;
+  severity?: "LOW" | "MEDIUM" | "HIGH" | null;
+}
+
+export interface RecognizedVehicleData {
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  color: string | null;
+  plate: string | null;
+  visibleProblems: DetectedVehicleProblem[];
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+}

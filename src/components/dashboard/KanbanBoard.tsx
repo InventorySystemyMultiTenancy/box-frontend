@@ -20,6 +20,24 @@ const TONE_CLASSES: Record<string, string> = {
   ok: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
 };
 
+// Cor de fundo clara e transparente por etapa — cada coluna com um tom distinto
+// para diferenciar etapas mesmo dentro do mesmo grupo (ex.: as várias etapas "em
+// andamento" não ficam todas idênticas).
+const COLUMN_BG_CLASSES: Record<ServiceOrderStatus, string> = {
+  SCHEDULED: "bg-slate-100/70 dark:bg-slate-400/10",
+  RECEIVED: "bg-sky-100/70 dark:bg-sky-400/10",
+  AWAITING_DIAGNOSIS: "bg-cyan-100/70 dark:bg-cyan-400/10",
+  DIAGNOSIS_DONE: "bg-teal-100/70 dark:bg-teal-400/10",
+  AWAITING_APPROVAL: "bg-amber-100/70 dark:bg-amber-400/10",
+  PARTS_REQUESTED: "bg-orange-100/70 dark:bg-orange-400/10",
+  PARTS_RECEIVED: "bg-yellow-100/70 dark:bg-yellow-400/10",
+  IN_PROGRESS: "bg-blue-100/70 dark:bg-blue-400/10",
+  TESTING: "bg-indigo-100/70 dark:bg-indigo-400/10",
+  WASHING: "bg-purple-100/70 dark:bg-purple-400/10",
+  FINISHED: "bg-emerald-100/70 dark:bg-emerald-400/10",
+  READY_FOR_PICKUP: "bg-green-100/70 dark:bg-green-400/10",
+};
+
 const PRIORITY_CLASSES: Record<string, string> = {
   LOW: "bg-muted text-muted-foreground",
   NORMAL: "bg-muted text-muted-foreground",
@@ -160,7 +178,7 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
               columnRefs.current.set(status, el);
             }}
             data-status={status}
-            className={`flex min-w-0 flex-col rounded-lg border bg-muted/30 ${dragOverStatus === status ? "ring-2 ring-primary" : ""}`}
+            className={`flex min-w-0 flex-col rounded-lg border ${COLUMN_BG_CLASSES[status]} ${dragOverStatus === status ? "ring-2 ring-primary" : ""}`}
           >
             <div className="flex items-center justify-between border-b px-3 py-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{STATUS_LABELS[status]}</span>
@@ -201,6 +219,7 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
                         </span>
                       )}
                     </div>
+                    {order.vehicle.owner && <div className="text-xs text-muted-foreground">{order.vehicle.owner.name}</div>}
                     <div className="mt-0.5 font-mono text-xs text-muted-foreground">
                       {order.code} {order.vehicle.plate ? `· ${order.vehicle.plate}` : ""}
                     </div>

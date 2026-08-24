@@ -50,6 +50,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes" }] : []),
     ...(isStaff ? [{ href: "/dashboard/complementos", label: "Complementos" }] : []),
     ...(isStaff ? [{ href: "/dashboard/alertas", label: "Alertas" }] : []),
+    ...(isStaff ? [{ href: "/dashboard/caminhoes", label: "Caminhões" }] : []),
     ...(hasPermission("insurance", "view") ? [{ href: "/dashboard/seguradoras", label: "Seguradoras" }] : []),
     ...(hasPermission("suppliers", "view") ? [{ href: "/dashboard/fornecedores", label: "Fornecedores" }] : []),
     ...(hasPermission("purchases", "view") ? [{ href: "/dashboard/compras", label: "Compras" }] : []),

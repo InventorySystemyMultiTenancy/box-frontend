@@ -8,11 +8,14 @@ import { getSocket, joinStaffRoom } from "@/lib/socket";
 import { STATUS_LABELS, STATUS_TONE, ServiceOrder, ServiceOrderStatus } from "@/lib/types";
 import OrderDetail from "@/components/dashboard/OrderDetail";
 import KanbanBoard from "@/components/dashboard/KanbanBoard";
+import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import styles from "./dashboard.module.css";
 
 /** Lista de todos os projetos (carros) em andamento — o mecânico escolhe um para gerenciar. */
 export default function MechanicProjectsPanel() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(searchParams.get("order"));
@@ -47,27 +50,45 @@ export default function MechanicProjectsPanel() {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
   }
 
+  function handleProjectCreated(orderId: string) {
+    if (token) api.serviceOrders(token).then(({ orders }) => setOrders(orders as ServiceOrder[]));
+    setSelectedOrderId(orderId);
+  }
+
   return (
     <div className={styles.content}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className={styles.sectionTitle} style={{ marginBottom: 0 }}>
           Projetos em andamento
         </div>
-        <div className="inline-flex rounded-md border p-0.5 text-sm">
-          <button
-            type="button"
-            className={`rounded px-3 py-1 ${view === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            onClick={() => setView("kanban")}
-          >
-            Kanban
-          </button>
-          <button
-            type="button"
-            className={`rounded px-3 py-1 ${view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            onClick={() => setView("list")}
-          >
-            Lista
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {user?.role === "ADMIN" && (
+            <NewProjectDialog
+              onCreated={handleProjectCreated}
+              trigger={
+                <Button size="sm">
+                  <Plus className="size-4" />
+                  Novo projeto
+                </Button>
+              }
+            />
+          )}
+          <div className="inline-flex rounded-md border p-0.5 text-sm">
+            <button
+              type="button"
+              className={`rounded px-3 py-1 ${view === "kanban" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              onClick={() => setView("kanban")}
+            >
+              Kanban
+            </button>
+            <button
+              type="button"
+              className={`rounded px-3 py-1 ${view === "list" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              onClick={() => setView("list")}
+            >
+              Lista
+            </button>
+          </div>
         </div>
       </div>
 

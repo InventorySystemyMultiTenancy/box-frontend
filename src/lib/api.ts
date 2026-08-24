@@ -629,6 +629,74 @@ export const api = {
 
   // Busca global
   globalSearch: (q: string, token: string) => request<{ orders: unknown[]; estimates: unknown[] }>(`/api/search${toQuery({ q })}`, {}, token),
+
+  // Caminhões
+  trucks: (token: string) => request<{ trucks: unknown[] }>("/api/trucks", {}, token),
+
+  trucksAssignedToMe: (token: string) => request<{ trucks: unknown[] }>("/api/trucks/assigned-to-me", {}, token),
+
+  truck: (id: string, token: string) => request<{ truck: unknown }>(`/api/trucks/${id}`, {}, token),
+
+  createTruck: (payload: Record<string, unknown>, token: string) =>
+    request<{ truck: unknown }>("/api/trucks", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateTruck: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ truck: unknown }>(`/api/trucks/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  archiveTruck: (id: string, token: string) => request<void>(`/api/trucks/${id}`, { method: "DELETE" }, token),
+
+  truckTrips: (truckId: string, token: string) => request<{ trips: unknown[] }>(`/api/trucks/${truckId}/trips`, {}, token),
+
+  startTruckTrip: (
+    truckId: string,
+    payload: { startKm: number; startFuelLevel: string; startCondition?: string; photo?: File | null },
+    token: string
+  ) => {
+    const form = new FormData();
+    form.append("startKm", String(payload.startKm));
+    form.append("startFuelLevel", payload.startFuelLevel);
+    if (payload.startCondition) form.append("startCondition", payload.startCondition);
+    if (payload.photo) form.append("photo", payload.photo);
+    return request<{ trip: unknown }>(`/api/trucks/${truckId}/trips/start`, { method: "POST", body: form }, token);
+  },
+
+  finishTruckTrip: (
+    truckId: string,
+    tripId: string,
+    payload: { endKm: number; endFuelLevel: string; endCondition?: string; notes?: string; photo: File },
+    token: string
+  ) => {
+    const form = new FormData();
+    form.append("endKm", String(payload.endKm));
+    form.append("endFuelLevel", payload.endFuelLevel);
+    if (payload.endCondition) form.append("endCondition", payload.endCondition);
+    if (payload.notes) form.append("notes", payload.notes);
+    form.append("photo", payload.photo);
+    return request<{ trip: unknown }>(`/api/trucks/${truckId}/trips/${tripId}/finish`, { method: "PATCH", body: form }, token);
+  },
+
+  // Novo projeto sem solicitação
+  recognizeVehiclePhoto: (photo: File, token: string) => {
+    const form = new FormData();
+    form.append("photo", photo);
+    return request<{ recognized: unknown }>("/api/vehicles/recognize", { method: "POST", body: form }, token);
+  },
+
+  quickCreateClient: (payload: Record<string, unknown>, token: string) =>
+    request<{ client: unknown; userId: string; generatedPassword: string }>(
+      "/api/clients/quick-create",
+      { method: "POST", body: JSON.stringify(payload) },
+      token
+    ),
+
+  vehicles: (token: string, params: { ownerId?: string } = {}) =>
+    request<{ vehicles: unknown[] }>(`/api/vehicles${toQuery(params)}`, {}, token),
+
+  createVehicle: (payload: Record<string, unknown>, token: string) =>
+    request<{ vehicle: unknown }>("/api/vehicles", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  createServiceOrder: (payload: Record<string, unknown>, token: string) =>
+    request<{ order: unknown }>("/api/service-orders", { method: "POST", body: JSON.stringify(payload) }, token),
 };
 
 interface Pagination {
