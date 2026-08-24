@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
-import { Approval, InventoryPart, ServiceOrder, ServiceOrderStatus, TimelineEvent, VehiclePart } from "@/lib/types";
+import { Approval, InventoryPart, SERVICE_ORDER_STATUSES, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
@@ -78,6 +79,9 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [finalizeForm, setFinalizeForm] = useState({ description: "", extraValue: "", photo: null as File | null });
+  const [advancePhoto, setAdvancePhoto] = useState<File | null>(null);
+  const [advanceBusy, setAdvanceBusy] = useState(false);
+  const [advanceMessage, setAdvanceMessage] = useState<string | null>(null);
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
@@ -214,6 +218,35 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     if (!token || !order) return;
     await api.updateOrderStatus(order.id, "RECEIVED", token);
     setOrder((prev) => (prev ? { ...prev, status: "RECEIVED" } : prev));
+  }
+
+  // Avança para a próxima etapa da sequência (mesmo botão usado no Kanban, só que
+  // aqui dentro do projeto e com a opção de anexar uma foto documentando a etapa.
+  async function advanceStage(nextStatus: ServiceOrderStatus) {
+    if (!token || !order) return;
+    setAdvanceBusy(true);
+    setAdvanceMessage(null);
+    try {
+      const result = await api.updateOrderStatus(order.id, nextStatus, token, advancePhoto);
+      const updatedOrder = result.order as Partial<ServiceOrder>;
+      const event = result.event as TimelineEvent | null;
+      setOrder((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: (updatedOrder.status as ServiceOrderStatus) ?? nextStatus,
+          progress: updatedOrder.progress ?? prev.progress,
+          timelineEvents:
+            event && !prev.timelineEvents.some((t) => t.id === event.id) ? [...prev.timelineEvents, event] : prev.timelineEvents,
+        };
+      });
+      if (event) setJustArrivedId(event.id);
+      setAdvancePhoto(null);
+    } catch {
+      setAdvanceMessage("Não foi possível avançar a etapa.");
+    } finally {
+      setAdvanceBusy(false);
+    }
   }
 
   async function resolvePart(partId: string) {
@@ -426,6 +459,20 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
   const pendingNeedsPrice = pendingApproval && pendingApproval.estimatedValue == null;
 
+  // Próxima etapa da sequência — para no FINISHED, já que ir para "pronto para
+  // retirada" exige o fluxo de finalização (peças concluídas), não um simples avanço.
+  const statusIndex = SERVICE_ORDER_STATUSES.indexOf(order.status);
+  const nextStatus: ServiceOrderStatus | null =
+    statusIndex >= 0 && statusIndex < SERVICE_ORDER_STATUSES.length - 2 ? SERVICE_ORDER_STATUSES[statusIndex + 1] : null;
+
+  const whatsAppLink =
+    isStaff && order.vehicle.owner
+      ? buildWhatsAppLink(
+          order.vehicle.owner.phone,
+          `Olá, ${order.vehicle.owner.name}! Seu ${order.vehicle.brand} ${order.vehicle.model} (OS ${order.code}) está na etapa: "${STATUS_LABELS[order.status]}". Acompanhe pelo sistema: ${typeof window !== "undefined" ? window.location.origin : ""}/dashboard`
+        )
+      : null;
+
   return (
     <div>
       <div className={styles.orderHeader}>
@@ -500,6 +547,39 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {isStaff && (nextStatus || whatsAppLink) && (
+        <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
+          <h2>Avançar etapa</h2>
+          {nextStatus && (
+            <>
+              <p>
+                Etapa atual: <strong>{STATUS_LABELS[order.status]}</strong>. Próxima etapa: <strong>{STATUS_LABELS[nextStatus]}</strong>.
+              </p>
+              <label className={styles.fullField} style={{ display: "block", marginBottom: "0.8rem" }}>
+                Foto desta etapa (opcional)
+                <input type="file" accept="image/*" onChange={(e) => setAdvancePhoto(e.target.files?.[0] ?? null)} />
+                {advancePhoto && <span>{advancePhoto.name}</span>}
+              </label>
+            </>
+          )}
+          {advanceMessage && <div className={styles.formMessage}>{advanceMessage}</div>}
+          <div className={styles.approvalActions}>
+            {nextStatus && (
+              <button className={styles.btnApprove} disabled={advanceBusy} onClick={() => advanceStage(nextStatus)}>
+                {advanceBusy ? "Avançando..." : `Avançar para "${STATUS_LABELS[nextStatus]}"`}
+              </button>
+            )}
+            {whatsAppLink ? (
+              <a className={styles.btnApprove} href={whatsAppLink} target="_blank" rel="noreferrer">
+                Avisar cliente (WhatsApp)
+              </a>
+            ) : (
+              isStaff && <span className={styles.tlSub}>Cliente sem telefone cadastrado.</span>
+            )}
+          </div>
         </div>
       )}
 

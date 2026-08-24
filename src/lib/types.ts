@@ -84,6 +84,7 @@ export interface Vehicle {
   engine?: string | null;
   plate?: string | null;
   mileage: number;
+  owner?: { id: string; name: string; email?: string; phone?: string | null };
 }
 
 export interface Media {

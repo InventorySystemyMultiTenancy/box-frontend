@@ -91,11 +91,20 @@ export const api = {
       body: JSON.stringify({ status, responseNote }),
     }, token),
 
-  updateOrderStatus: (orderId: string, status: string, token: string) =>
-    request<{ order: unknown }>(`/api/service-orders/${orderId}/status`, {
+  // Avança a etapa da OS — usado pelo drag do Kanban (sem foto) e pelo botão
+  // "Avançar etapa" dentro do projeto (com foto opcional documentando a etapa).
+  updateOrderStatus: (orderId: string, status: string, token: string, photo?: File | null) => {
+    if (photo) {
+      const form = new FormData();
+      form.append("status", status);
+      form.append("photo", photo);
+      return request<{ order: unknown; event: unknown }>(`/api/service-orders/${orderId}/status`, { method: "PATCH", body: form }, token);
+    }
+    return request<{ order: unknown; event: unknown }>(`/api/service-orders/${orderId}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
-    }, token),
+    }, token);
+  },
 
   createProblem: (
     orderId: string,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   SERVICE_ORDER_STATUSES,
@@ -27,6 +27,10 @@ const PRIORITY_CLASSES: Record<string, string> = {
   URGENT: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
 };
 
+// Distância mínima (px) antes de um toque/clique virar arraste — evita competir
+// com o tap que abre a ficha do veículo.
+const DRAG_THRESHOLD = 8;
+
 function daysSince(iso?: string) {
   if (!iso) return null;
   const ms = Date.now() - new Date(iso).getTime();
@@ -40,10 +44,20 @@ interface KanbanBoardProps {
   onStatusChanged: (orderId: string, status: ServiceOrderStatus) => void;
 }
 
+interface DragState {
+  pointerId: number;
+  orderId: string;
+  startX: number;
+  startY: number;
+  dragging: boolean;
+}
+
 export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatusChanged }: KanbanBoardProps) {
   const { token } = useAuth();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<ServiceOrderStatus | null>(null);
+  const columnRefs = useRef(new Map<ServiceOrderStatus, HTMLDivElement | null>());
+  const dragState = useRef<DragState | null>(null);
 
   const columns = useMemo(() => {
     const byStatus = new Map<ServiceOrderStatus, ServiceOrder[]>();
@@ -55,14 +69,18 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
     return SERVICE_ORDER_STATUSES.map((status) => ({ status, orders: byStatus.get(status) ?? [] }));
   }, [orders]);
 
-  async function handleDrop(status: ServiceOrderStatus) {
-    setDragOverStatus(null);
-    const orderId = draggingId;
-    setDraggingId(null);
-    if (!orderId || !token) return;
+  function statusAtPoint(x: number, y: number): ServiceOrderStatus | null {
+    for (const [status, el] of columnRefs.current) {
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return status;
+    }
+    return null;
+  }
 
+  async function commitDrop(orderId: string, status: ServiceOrderStatus) {
     const order = orders.find((o) => o.id === orderId);
-    if (!order || order.status === status) return;
+    if (!order || order.status === status || !token) return;
 
     if (status === "READY_FOR_PICKUP") {
       toast.error("Para marcar como pronto para retirada, finalize a OS na ficha do veículo.");
@@ -78,6 +96,58 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
     }
   }
 
+  // Pointer Events unificam mouse, toque e caneta — o mesmo código arrasta com o
+  // dedo no celular e com o mouse no computador, sem depender do HTML5 Drag and
+  // Drop nativo (que não funciona em telas de toque).
+  function handlePointerDown(e: React.PointerEvent, orderId: string) {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    dragState.current = { pointerId: e.pointerId, orderId, startX: e.clientX, startY: e.clientY, dragging: false };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Alguns navegadores/eventos sintéticos recusam a captura — o arraste ainda
+      // funciona via os listeners normais, só perde a garantia de eventos fora do card.
+    }
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
+    const state = dragState.current;
+    if (!state || state.pointerId !== e.pointerId) return;
+
+    if (!state.dragging) {
+      const dx = e.clientX - state.startX;
+      const dy = e.clientY - state.startY;
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      state.dragging = true;
+      setDraggingId(state.orderId);
+    }
+
+    e.preventDefault();
+    setDragOverStatus(statusAtPoint(e.clientX, e.clientY));
+  }
+
+  function handlePointerUp(e: React.PointerEvent) {
+    const state = dragState.current;
+    dragState.current = null;
+    if (!state || state.pointerId !== e.pointerId) return;
+
+    if (!state.dragging) {
+      onSelect(state.orderId);
+    } else {
+      const target = statusAtPoint(e.clientX, e.clientY);
+      if (target) commitDrop(state.orderId, target);
+    }
+    setDraggingId(null);
+    setDragOverStatus(null);
+  }
+
+  function handlePointerCancel(e: React.PointerEvent) {
+    if (dragState.current?.pointerId !== e.pointerId) return;
+    dragState.current = null;
+    setDraggingId(null);
+    setDragOverStatus(null);
+  }
+
   return (
     <div className="min-w-0">
       {/* Grid responsivo: quantas colunas couberem (mín. 240px cada) por linha; o que
@@ -86,16 +156,11 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
         {columns.map(({ status, orders: colOrders }) => (
           <div
             key={status}
+            ref={(el) => {
+              columnRefs.current.set(status, el);
+            }}
+            data-status={status}
             className={`flex min-w-0 flex-col rounded-lg border bg-muted/30 ${dragOverStatus === status ? "ring-2 ring-primary" : ""}`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOverStatus(status);
-            }}
-            onDragLeave={() => setDragOverStatus((s) => (s === status ? null : s))}
-            onDrop={(e) => {
-              e.preventDefault();
-              handleDrop(status);
-            }}
           >
             <div className="flex items-center justify-between border-b px-3 py-2">
               <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{STATUS_LABELS[status]}</span>
@@ -106,14 +171,23 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
               {colOrders.map((order) => {
                 const days = daysSince(order.updatedAt);
                 return (
-                  <button
+                  <div
                     key={order.id}
-                    type="button"
-                    draggable
-                    onDragStart={() => setDraggingId(order.id)}
-                    onDragEnd={() => setDraggingId(null)}
-                    onClick={() => onSelect(order.id)}
-                    className={`rounded-md border bg-card p-2.5 text-left text-sm shadow-sm transition-opacity hover:border-primary/50 ${
+                    role="button"
+                    tabIndex={0}
+                    data-order-id={order.id}
+                    onPointerDown={(e) => handlePointerDown(e, order.id)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerCancel}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onSelect(order.id);
+                      }
+                    }}
+                    style={{ touchAction: "none" }}
+                    className={`cursor-grab select-none rounded-md border bg-card p-2.5 text-left text-sm shadow-sm transition-opacity hover:border-primary/50 active:cursor-grabbing ${
                       order.id === selectedOrderId ? "border-primary ring-1 ring-primary" : ""
                     } ${draggingId === order.id ? "opacity-40" : ""}`}
                   >
@@ -137,7 +211,7 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
                       <span className={`rounded-full px-1.5 py-0.5 ${TONE_CLASSES[STATUS_TONE[status]]}`}>{days != null ? `${days}d nesta etapa` : "—"}</span>
                       {order.technician && <span>{order.technician.name}</span>}
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
