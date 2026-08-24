@@ -79,12 +79,14 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
   }
 
   return (
-    <div className="min-w-0 sm:overflow-x-auto sm:pb-2">
-      <div className="flex flex-col gap-3 sm:min-w-max sm:flex-row">
+    <div className="min-w-0">
+      {/* Grid responsivo: quantas colunas couberem (mín. 240px cada) por linha; o que
+          não couber quebra para a linha de baixo — nunca precisa rolar para o lado. */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
         {columns.map(({ status, orders: colOrders }) => (
           <div
             key={status}
-            className={`flex w-full flex-col rounded-lg border bg-muted/30 sm:w-72 sm:shrink-0 ${dragOverStatus === status ? "ring-2 ring-primary" : ""}`}
+            className={`flex min-w-0 flex-col rounded-lg border bg-muted/30 ${dragOverStatus === status ? "ring-2 ring-primary" : ""}`}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOverStatus(status);

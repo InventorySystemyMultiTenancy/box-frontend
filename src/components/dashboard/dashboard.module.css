@@ -104,6 +104,25 @@
   flex-shrink: 0;
 }
 
+/* Menu hambúrguer — só no celular, complementa a roleta de abas com a lista
+   completa de navegação (mesmo conteúdo da sidebar do computador). */
+.hamburgerBtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  cursor: pointer;
+}
+.hamburgerBtn:hover {
+  background: var(--bg-panel);
+}
+
 @media (max-width: 760px) {
   .topbar {
     flex-wrap: wrap;
@@ -123,6 +142,49 @@
     -webkit-overflow-scrolling: touch;
   }
   .topbarRight span { display: none; }
+  .hamburgerBtn { display: flex; }
+}
+
+.mobileNavOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 32, 0.45);
+  z-index: 60;
+  animation: fadeIn 0.15s ease;
+}
+.mobileNavDrawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 80vw;
+  max-width: 300px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+  animation: slideIn 0.2s ease;
+}
+.mobileNavDrawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobileNavOverlay, .mobileNavDrawer { animation: none; }
+}
+@media (min-width: 761px) {
+  .mobileNavOverlay { display: none; }
 }
 
 /* Corpo do painel: sidebar de navegação (só computador) + área de conteúdo. */

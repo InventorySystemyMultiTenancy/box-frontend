@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
 import styles from "@/components/dashboard/dashboard.module.css";
@@ -29,10 +29,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const navRef = useRef<HTMLElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [lastPathname, setLastPathname] = useState(pathname);
 
   useEffect(() => {
     if (!loading && !token) router.replace("/login");
   }, [loading, token, router]);
+
+  // Fecha o menu hambúrguer automaticamente ao trocar de página (padrão React de
+  // "ajustar estado durante a renderização", sem precisar de useEffect).
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
+    setMobileNavOpen(false);
+  }
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const tabs = [
@@ -124,6 +133,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         )}
 
         <div className={styles.topbarRight}>
+          {isStaff && (
+            <button
+              type="button"
+              className={styles.hamburgerBtn}
+              aria-label="Abrir menu de navegação"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu size={18} />
+            </button>
+          )}
           <button className={styles.logout} onClick={logout}>
             Sair
           </button>
@@ -138,6 +157,23 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         )}
         <div className={styles.mainArea}>{children}</div>
       </div>
+
+      {isStaff && mobileNavOpen && (
+        <div className={styles.mobileNavOverlay} onClick={() => setMobileNavOpen(false)}>
+          <div className={styles.mobileNavDrawer} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.mobileNavDrawerHeader}>
+              <span className={styles.brand}>
+                <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} />
+              </span>
+              <button type="button" className={styles.hamburgerBtn} aria-label="Fechar menu" onClick={() => setMobileNavOpen(false)}>
+                <X size={18} />
+              </button>
+            </div>
+            <nav className={styles.sidebarNav}>{navList}</nav>
+          </div>
+        </div>
+      )}
+
       <Toaster />
     </div>
   );
