@@ -79,12 +79,12 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
   }
 
   return (
-    <div className="min-w-0 overflow-x-auto pb-2">
-      <div className="flex min-w-max gap-3">
+    <div className="min-w-0 sm:overflow-x-auto sm:pb-2">
+      <div className="flex flex-col gap-3 sm:min-w-max sm:flex-row">
         {columns.map(({ status, orders: colOrders }) => (
           <div
             key={status}
-            className={`flex w-72 shrink-0 flex-col rounded-lg border bg-muted/30 ${dragOverStatus === status ? "ring-2 ring-primary" : ""}`}
+            className={`flex w-full flex-col rounded-lg border bg-muted/30 sm:w-72 sm:shrink-0 ${dragOverStatus === status ? "ring-2 ring-primary" : ""}`}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOverStatus(status);

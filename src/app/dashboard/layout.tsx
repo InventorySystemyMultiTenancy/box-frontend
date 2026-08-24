@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, ReactNode } from "react";
+import { useEffect, useRef, useState, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Toaster } from "@/components/ui/sonner";
 import styles from "@/components/dashboard/dashboard.module.css";
@@ -25,18 +26,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, token, loading, hasPermission, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const navRef = useRef<HTMLElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   useEffect(() => {
     if (!loading && !token) router.replace("/login");
   }, [loading, token, router]);
 
-  if (loading || !user) {
-    return <div className={styles.empty}>Carregando painel...</div>;
-  }
-
-  const isStaff = user.role === "MECHANIC" || user.role === "ADMIN";
+  const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const tabs = [
-    ...(user.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
+    ...(user?.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
     ...(isStaff ? [{ href: "/dashboard/busca", label: "Busca" }] : []),
     ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes" }] : []),
     ...(isStaff ? [{ href: "/dashboard/complementos", label: "Complementos" }] : []),
@@ -53,23 +53,76 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     ...(hasPermission("roles", "manage") ? [{ href: "/dashboard/cargos", label: "Cargos" }] : []),
   ];
 
+  function updateScrollState() {
+    const el = navRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 4);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  }
+
+  useEffect(() => {
+    updateScrollState();
+    const el = navRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", updateScrollState);
+    window.addEventListener("resize", updateScrollState);
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      window.removeEventListener("resize", updateScrollState);
+    };
+  }, [tabs.length]);
+
+  function scrollNav(direction: 1 | -1) {
+    navRef.current?.scrollBy({ left: direction * 220, behavior: "smooth" });
+  }
+
+  if (loading || !user) {
+    return <div className={styles.empty}>Carregando painel...</div>;
+  }
+
+  const navList = (
+    <>
+      {tabs.map((tab) => (
+        <Link key={tab.href} href={tab.href} className={`${styles.tab} ${pathname === tab.href ? styles.tabActive : ""}`}>
+          {tab.label}
+        </Link>
+      ))}
+    </>
+  );
+
   return (
     <div className={styles.page}>
       <header className={styles.topbar}>
-        <div className={styles.topbarLeft}>
-          <span className={styles.brand}>
-            <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} priority />
-          </span>
-          {isStaff && (
-            <nav className={styles.tabs}>
-              {tabs.map((tab) => (
-                <Link key={tab.href} href={tab.href} className={`${styles.tab} ${pathname === tab.href ? styles.tabActive : ""}`}>
-                  {tab.label}
-                </Link>
-              ))}
+        <span className={styles.brand}>
+          <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} priority />
+        </span>
+
+        {isStaff && (
+          <div className={styles.navScrollerWrap}>
+            <button
+              type="button"
+              className={styles.navArrow}
+              aria-label="Rolar navegação para a esquerda"
+              onClick={() => scrollNav(-1)}
+              disabled={!canScrollLeft}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <nav className={styles.tabs} ref={navRef}>
+              {navList}
             </nav>
-          )}
-        </div>
+            <button
+              type="button"
+              className={styles.navArrow}
+              aria-label="Rolar navegação para a direita"
+              onClick={() => scrollNav(1)}
+              disabled={!canScrollRight}
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+
         <div className={styles.topbarRight}>
           <button className={styles.logout} onClick={logout}>
             Sair
@@ -77,7 +130,14 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {children}
+      <div className={styles.body}>
+        {isStaff && (
+          <aside className={styles.sidebar}>
+            <nav className={styles.sidebarNav}>{navList}</nav>
+          </aside>
+        )}
+        <div className={styles.mainArea}>{children}</div>
+      </div>
       <Toaster />
     </div>
   );
