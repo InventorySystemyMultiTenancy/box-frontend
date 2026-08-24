@@ -68,7 +68,7 @@ export default function PayablesPanel() {
         {canManage && <PayableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a pagar</Button>} />}
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -172,7 +172,7 @@ function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             <Label htmlFor="p-description">Descrição *</Label>
             <Input id="p-description" required value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="p-category">Categoria *</Label>
               <Input id="p-category" required value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="ALUGUEL" />
@@ -182,7 +182,7 @@ function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
               <Input id="p-payee" required value={form.payeeName} onChange={(e) => set("payeeName", e.target.value)} />
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label htmlFor="p-amount">Valor *</Label>
               <Input id="p-amount" type="number" min="0" step="0.01" required value={form.amount} onChange={(e) => set("amount", e.target.value)} />

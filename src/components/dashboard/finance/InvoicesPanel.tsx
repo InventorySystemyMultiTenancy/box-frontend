@@ -68,7 +68,7 @@ export default function InvoicesPanel() {
         {canManage && <InvoiceFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova nota fiscal</Button>} />}
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -262,7 +262,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             {autoClientMessage && <p className="text-xs text-muted-foreground">{autoClientMessage}</p>}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label>Tipo</Label>
               <Select value={form.type} onValueChange={(v) => set("type", v as InvoiceType)}>
@@ -289,7 +289,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             <Input id="inv-access-key" value={form.accessKey} onChange={(e) => set("accessKey", e.target.value)} placeholder="44 dígitos (NF-e/NFC-e)" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="inv-issuer-name">Emitente</Label>
               <Input id="inv-issuer-name" value={form.issuerName} onChange={(e) => set("issuerName", e.target.value)} />
@@ -312,7 +312,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="inv-recipient-name">Destinatário (nome na nota)</Label>
               <Input id="inv-recipient-name" value={form.recipientName} onChange={(e) => set("recipientName", e.target.value)} />
@@ -323,7 +323,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="inv-operation">Natureza da operação</Label>
               <Input id="inv-operation" value={form.operationNature} onChange={(e) => set("operationNature", e.target.value)} placeholder="Venda de mercadoria" />
@@ -339,7 +339,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             <Input id="inv-description" required value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label htmlFor="inv-amount">Valor total *</Label>
               <Input id="inv-amount" type="number" min="0" step="0.01" required value={form.totalAmount} onChange={(e) => set("totalAmount", e.target.value)} />

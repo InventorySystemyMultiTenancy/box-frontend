@@ -44,7 +44,7 @@ export default function BankAccountsPanel() {
       <div className="flex justify-end">
         {canManage && <BankAccountFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta</Button>} />}
       </div>
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -137,7 +137,7 @@ function BankAccountFormDialog({ trigger, onSaved }: { trigger: React.ReactNode;
             <Label htmlFor="bank-bank">Banco</Label>
             <Input id="bank-bank" value={form.bank} onChange={(e) => set("bank", e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="bank-agency">Agência</Label>
               <Input id="bank-agency" value={form.agency} onChange={(e) => set("agency", e.target.value)} />

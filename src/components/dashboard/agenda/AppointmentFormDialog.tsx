@@ -117,7 +117,7 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
             <Label htmlFor="ap-title">Título *</Label>
             <Input id="ap-title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Revisão preventiva" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label>Cliente</Label>
               <Select
@@ -149,7 +149,7 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label>Mecânico</Label>
               <Select value={mechanicId || "NONE"} onValueChange={(v) => setMechanicId(v === "NONE" ? "" : v)}>
@@ -175,7 +175,7 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="ap-start">Início *</Label>
               <Input id="ap-start" type="datetime-local" required value={startAt} onChange={(e) => setStartAt(e.target.value)} />

@@ -89,7 +89,7 @@ export function SupplierFormDialog({ supplier, trigger, onSaved }: SupplierFormD
           <DialogTitle>{supplier ? "Editar fornecedor" : "Novo fornecedor"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="col-span-2 grid gap-1.5">
               <Label htmlFor="name">Nome/Razão social *</Label>
               <Input id="name" required value={form.name} onChange={(e) => set("name", e.target.value)} />

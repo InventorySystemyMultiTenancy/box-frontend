@@ -157,7 +157,7 @@ export default function PdvPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="grid gap-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5">
                   <Label>Cliente cadastrado</Label>
                   <Select value={clientId || "NONE"} onValueChange={(v) => setClientId(v === "NONE" ? "" : v)}>
@@ -179,8 +179,8 @@ export default function PdvPage() {
               <div className="grid gap-2">
                 <Label>Itens</Label>
                 {items.map((row, index) => (
-                  <div key={index} className="flex items-end gap-2">
-                    <div className="grid flex-1 gap-1.5">
+                  <div key={index} className="flex flex-wrap items-end gap-2">
+                    <div className="grid min-w-40 flex-1 gap-1.5">
                       <Select value={row.inventoryPartId} onValueChange={(v) => onSelectPart(index, v)}>
                         <SelectTrigger><SelectValue placeholder="Peça..." /></SelectTrigger>
                         <SelectContent>
@@ -193,10 +193,10 @@ export default function PdvPage() {
                     <div className="grid w-20 gap-1.5">
                       <Input type="number" min="1" placeholder="Qtd" value={row.quantity} onChange={(e) => updateItem(index, { quantity: e.target.value })} />
                     </div>
-                    <div className="grid w-28 gap-1.5">
+                    <div className="grid w-24 gap-1.5 sm:w-28">
                       <Input type="number" min="0" step="0.01" placeholder="Preço un." value={row.unitPrice} onChange={(e) => updateItem(index, { unitPrice: e.target.value })} />
                     </div>
-                    <Button type="button" variant="outline" size="icon" onClick={() => removeRow(index)} disabled={items.length === 1}>
+                    <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => removeRow(index)} disabled={items.length === 1}>
                       <Trash2 className="size-4" />
                     </Button>
                   </div>
@@ -207,7 +207,7 @@ export default function PdvPage() {
                 </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 max-w-md">
+              <div className="grid grid-cols-1 gap-3 sm:max-w-md sm:grid-cols-2">
                 <div className="grid gap-1.5">
                   <Label htmlFor="pdv-payment">Forma de pagamento</Label>
                   <Input id="pdv-payment" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="PIX" />
@@ -241,7 +241,7 @@ export default function PdvPage() {
         </Card>
       )}
 
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>

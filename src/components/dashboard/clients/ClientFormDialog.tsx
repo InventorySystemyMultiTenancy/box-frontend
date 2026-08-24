@@ -100,7 +100,7 @@ export function ClientFormDialog({ client, trigger, onSaved }: ClientFormDialogP
           <DialogTitle>{client ? "Editar cliente" : "Novo cliente"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="col-span-2 grid gap-1.5">
               <Label htmlFor="name">Nome *</Label>
               <Input id="name" required value={form.name} onChange={(e) => set("name", e.target.value)} />

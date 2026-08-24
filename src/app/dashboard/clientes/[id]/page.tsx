@@ -156,7 +156,7 @@ export default function ClienteDetailPage() {
           </CardHeader>
           <CardContent className="grid gap-2">
             {client.serviceOrders.map((o) => (
-              <div key={o.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+              <div key={o.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-sm">
                 <span className="font-mono">{o.code}</span>
                 <span className="text-muted-foreground">{STATUS_LABELS[o.status]}</span>
                 <span className="text-muted-foreground">{formatDate(o.receivedAt)}</span>

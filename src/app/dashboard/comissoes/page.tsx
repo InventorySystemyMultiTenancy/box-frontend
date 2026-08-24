@@ -137,7 +137,7 @@ export default function ComissoesPage() {
         </Select>
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
