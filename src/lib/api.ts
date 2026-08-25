@@ -647,6 +647,8 @@ export const api = {
 
   truckTrips: (truckId: string, token: string) => request<{ trips: unknown[] }>(`/api/trucks/${truckId}/trips`, {}, token),
 
+  truckMovements: (token: string) => request<{ trips: unknown[] }>("/api/trucks/movements", {}, token),
+
   startTruckTrip: (
     truckId: string,
     payload: { startKm: number; startFuelLevel: string; startCondition?: string; photo?: File | null },
