@@ -364,9 +364,14 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     if (!order) return;
     if (!isAdmin && !(isCustomer && order.status === "READY_FOR_PICKUP")) return;
 
-    const approvedApprovals = order.approvals.filter((approval) => approval.status === "APPROVED");
-    const total = approvedApprovals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
+    // Valor final = trabalho de fato concluído (peça com status DONE), não só o que o
+    // cliente aprovou formalmente — mão de obra entra no total igual às peças, já que
+    // o admin pode finalizar/dar baixa mesmo sem resposta do cliente a uma aprovação.
     const completedParts = order.parts.filter((part) => part.status === "DONE");
+    const donePartIds = new Set(completedParts.map((part) => part.id));
+    const completedApprovals = order.approvals.filter((approval) => approval.partId && donePartIds.has(approval.partId));
+    const servicesTotal = completedApprovals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
+    const total = servicesTotal + (order.deliveryExtraValue ?? 0);
     const partsRows = order.parts
       .map(
         (part) => `
@@ -378,7 +383,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         `
       )
       .join("");
-    const rows = approvedApprovals
+    const rows = completedApprovals
       .map((approval) => {
         const parts = approval.partUsages?.length
           ? approval.partUsages.map((usage) => `${usage.quantity}x ${usage.inventoryPart.name}`).join(", ")
@@ -443,19 +448,24 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
           </table>
           <h2>Serviços realizados</h2>
           <ul>${completedList || "<li>Nenhum problema concluído registrado.</li>"}</ul>
-          <h2>Valores aprovados</h2>
+          <h2>Valores do serviço</h2>
           <table>
             <thead>
               <tr>
                 <th>Problema / serviço</th>
-                <th>Peças</th>
+                <th>Peças usadas</th>
                 <th>Mão de obra</th>
-                <th>Peças</th>
+                <th>Valor peças</th>
                 <th>Total</th>
               </tr>
             </thead>
-            <tbody>${rows || '<tr><td colspan="5">Nenhum valor aprovado registrado.</td></tr>'}</tbody>
+            <tbody>${rows || '<tr><td colspan="5">Nenhum valor de serviço concluído registrado.</td></tr>'}</tbody>
           </table>
+          ${
+            order.deliveryExtraValue
+              ? `<div class="muted" style="margin-top: 8px; text-align: right;">Valor extra na entrega: ${formatCurrency(order.deliveryExtraValue)}</div>`
+              : ""
+          }
           <div class="total">Valor final: ${formatCurrency(total)}</div>
         </body>
       </html>
