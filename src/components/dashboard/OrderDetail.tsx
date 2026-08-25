@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
-import { Approval, InventoryPart, SERVICE_ORDER_STATUSES, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
+import { Approval, InventoryPart, PART_STATUS_LABELS, SERVICE_ORDER_STATUSES, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
@@ -82,6 +82,8 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   const [advancePhoto, setAdvancePhoto] = useState<File | null>(null);
   const [advanceBusy, setAdvanceBusy] = useState(false);
   const [advanceMessage, setAdvanceMessage] = useState<string | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
@@ -137,12 +139,16 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         prev ? { ...prev, approvals: prev.approvals.map((a) => (a.id === payload.approval.id ? payload.approval : a)) } : prev
       );
     }
+    function onArchived(payload: { orderId: string; archivedAt: string }) {
+      setOrder((prev) => (prev && prev.id === payload.orderId ? { ...prev, archivedAt: payload.archivedAt } : prev));
+    }
 
     socket.on("status:update", onStatus);
     socket.on("timeline:new", onTimeline);
     socket.on("part:update", onPart);
     socket.on("approval:new", onApprovalNew);
     socket.on("approval:update", onApprovalUpdate);
+    socket.on("service-order:archived", onArchived);
 
     return () => {
       socket.off("status:update", onStatus);
@@ -150,6 +156,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
       socket.off("part:update", onPart);
       socket.off("approval:new", onApprovalNew);
       socket.off("approval:update", onApprovalUpdate);
+      socket.off("service-order:archived", onArchived);
     };
   }, [token, orderId]);
 
@@ -302,6 +309,24 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     }
   }
 
+  // "Dar baixa": encerra o projeto mesmo sem nenhuma confirmação/aceite do cliente —
+  // some da lista/kanban de projetos em andamento, mas o registro (e a garantia das
+  // peças/serviço, que independe disso) continua salvo e acessível normalmente.
+  async function archiveOrder() {
+    if (!token || !order) return;
+    if (!confirm("Dar baixa neste projeto? Ele sairá da lista de projetos em andamento, mas continua salvo como concluído.")) return;
+    setArchiveBusy(true);
+    setArchiveMessage(null);
+    try {
+      const result = await api.archiveServiceOrder(order.id, token);
+      setOrder(result.order as ServiceOrder);
+    } catch (err) {
+      setArchiveMessage(err instanceof ApiError ? err.message : "Não foi possível dar baixa neste projeto.");
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
+
   const updateProblemDetails = useCallback(
     async (approvalId: string, data: { note?: string; partUsages: { inventoryPartId: string; quantity: number }[]; files: File[] }) => {
       if (!token || !order) return;
@@ -332,12 +357,27 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     [token, order]
   );
 
+  // Admin pode gerar o PDF a qualquer momento, independente do status ou de qualquer
+  // confirmação do cliente — inclusive depois de o projeto já ter tido a baixa dada.
+  // O cliente só pode gerar quando o veículo está pronto para retirada.
   function generateServicePdf() {
-    if (!order || !isCustomer || order.status !== "READY_FOR_PICKUP") return;
+    if (!order) return;
+    if (!isAdmin && !(isCustomer && order.status === "READY_FOR_PICKUP")) return;
 
     const approvedApprovals = order.approvals.filter((approval) => approval.status === "APPROVED");
     const total = approvedApprovals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
     const completedParts = order.parts.filter((part) => part.status === "DONE");
+    const partsRows = order.parts
+      .map(
+        (part) => `
+          <tr>
+            <td>${escapeHtml(part.name)}</td>
+            <td>${escapeHtml(PART_STATUS_LABELS[part.status])}</td>
+            <td>${escapeHtml(part.note ?? "—")}</td>
+          </tr>
+        `
+      )
+      .join("");
     const rows = approvedApprovals
       .map((approval) => {
         const parts = approval.partUsages?.length
@@ -381,14 +421,26 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
           </style>
         </head>
         <body>
-          <h1>Relatório final de manutenção</h1>
-          <div class="muted">Gerado em ${printedAt}</div>
+          <h1>Relatório do projeto</h1>
+          <div class="muted">Gerado em ${printedAt} · Etapa atual: ${escapeHtml(STATUS_LABELS[order.status])}</div>
           <div class="summary">
             <div class="box"><strong>Ordem</strong><br />${escapeHtml(order.code)}</div>
+            <div class="box"><strong>Cliente</strong><br />${escapeHtml(order.vehicle.owner?.name ?? "Não informado")}</div>
             <div class="box"><strong>Veículo</strong><br />${escapeHtml(vehicle)}</div>
             <div class="box"><strong>Placa</strong><br />${escapeHtml(order.vehicle.plate ?? "Não informada")}</div>
             <div class="box"><strong>Quilometragem</strong><br />${order.vehicle.mileage.toLocaleString("pt-BR")} km</div>
           </div>
+          <h2>Problemas identificados</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Sistema</th>
+                <th>Status</th>
+                <th>Observação</th>
+              </tr>
+            </thead>
+            <tbody>${partsRows || '<tr><td colspan="3">Nenhum problema registrado.</td></tr>'}</tbody>
+          </table>
           <h2>Serviços realizados</h2>
           <ul>${completedList || "<li>Nenhum problema concluído registrado.</li>"}</ul>
           <h2>Valores aprovados</h2>
@@ -489,6 +541,23 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
           <i /> ATUALIZANDO AO VIVO
         </span>
       </div>
+
+      {isAdmin && (
+        <div className={styles.approvalActions} style={{ marginBottom: "1.2rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+          {order.archivedAt && (
+            <span className={styles.tlSub}>Baixa dada em {new Date(order.archivedAt).toLocaleString("pt-BR")} — projeto concluído</span>
+          )}
+          {archiveMessage && <span className={styles.tlSub}>{archiveMessage}</span>}
+          <button className={styles.btnApprove} type="button" onClick={generateServicePdf}>
+            Baixar PDF do projeto
+          </button>
+          {isReady && !order.archivedAt && (
+            <button className={styles.btnApprove} type="button" disabled={archiveBusy} onClick={archiveOrder}>
+              {archiveBusy ? "Dando baixa..." : "Dar baixa no projeto"}
+            </button>
+          )}
+        </div>
+      )}
 
       <StatusStrip current={order.status} />
 

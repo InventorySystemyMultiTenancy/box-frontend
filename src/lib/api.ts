@@ -172,6 +172,9 @@ export const api = {
     );
   },
 
+  archiveServiceOrder: (orderId: string, token: string) =>
+    request<{ order: unknown }>(`/api/service-orders/${orderId}/archive`, { method: "PATCH" }, token),
+
   resolvePart: (orderId: string, partId: string, token: string) =>
     request<{ part: unknown; event: unknown }>(
       `/api/service-orders/${orderId}/parts/${partId}/resolve`,

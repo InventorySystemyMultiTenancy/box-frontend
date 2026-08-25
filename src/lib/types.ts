@@ -160,6 +160,8 @@ export interface ServiceOrder {
   completedAt?: string | null;
   deliveryDescription?: string | null;
   deliveryExtraValue?: number | null;
+  // "Dar baixa" — projeto concluído e removido da lista/kanban de projetos em andamento.
+  archivedAt?: string | null;
   vehicle: Vehicle;
   timelineEvents: TimelineEvent[];
   parts: VehiclePart[];

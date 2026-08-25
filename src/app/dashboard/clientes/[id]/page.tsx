@@ -156,11 +156,16 @@ export default function ClienteDetailPage() {
           </CardHeader>
           <CardContent className="grid gap-2">
             {client.serviceOrders.map((o) => (
-              <div key={o.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-sm">
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => router.push(`/dashboard?order=${o.id}`)}
+                className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-md border px-3 py-2 text-left text-sm hover:bg-muted/50"
+              >
                 <span className="font-mono">{o.code}</span>
                 <span className="text-muted-foreground">{STATUS_LABELS[o.status]}</span>
                 <span className="text-muted-foreground">{formatDate(o.receivedAt)}</span>
-              </div>
+              </button>
             ))}
           </CardContent>
         </Card>

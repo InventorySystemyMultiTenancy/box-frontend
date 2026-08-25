@@ -37,12 +37,19 @@ export default function MechanicProjectsPanel() {
     function onStatusUpdate(payload: { orderId: string; status: ServiceOrderStatus; progress: number }) {
       setOrders((prev) => prev.map((o) => (o.id === payload.orderId ? { ...o, status: payload.status, progress: payload.progress } : o)));
     }
+    // Baixa dada em outra aba/usuário — some da lista/kanban de projetos em andamento
+    // (o registro continua acessível normalmente por fora deste painel).
+    function onOrderArchived(payload: { orderId: string }) {
+      setOrders((prev) => prev.filter((o) => o.id !== payload.orderId));
+    }
 
     socket.on("service-order:new", onOrderNew);
     socket.on("status:update", onStatusUpdate);
+    socket.on("service-order:archived", onOrderArchived);
     return () => {
       socket.off("service-order:new", onOrderNew);
       socket.off("status:update", onStatusUpdate);
+      socket.off("service-order:archived", onOrderArchived);
     };
   }, [token]);
 
