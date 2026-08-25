@@ -72,11 +72,16 @@ a {
   text-decoration: none;
 }
 
-button,
-input,
-textarea {
-  font-family: inherit;
-  color: inherit;
+/* @layer base garante que utilities do Tailwind (ex: text-primary-foreground nos
+   botões de toggle do /dashboard) continuem podendo sobrescrever esta cor — regras
+   fora de @layer sempre vencem regras em @layer, independente de especificidade. */
+@layer base {
+  button,
+  input,
+  textarea {
+    font-family: inherit;
+    color: inherit;
+  }
 }
 
 .eyebrow {
