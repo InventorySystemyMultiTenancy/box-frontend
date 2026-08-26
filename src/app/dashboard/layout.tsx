@@ -184,9 +184,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       {tabs.map((tab) => {
         const Icon = TAB_ICONS[tab.href];
         return (
-          <Link key={tab.href} href={tab.href} className={`${styles.tab} ${pathname === tab.href ? styles.tabActive : ""}`}>
+          <Link key={tab.href} href={tab.href} title={tab.label} className={`${styles.tab} ${pathname === tab.href ? styles.tabActive : ""}`}>
             {Icon && <Icon size={16} />}
-            <span>{tab.label}</span>
+            <span className={styles.tabLabel}>{tab.label}</span>
             {tab.href === "/dashboard/alertas" && unreadAlerts > 0 && <span className={styles.navBadge}>{unreadAlerts}</span>}
           </Link>
         );
