@@ -4,9 +4,46 @@ import { useEffect, useRef, useState, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Menu,
+  X,
+  Bell,
+  LogOut,
+  Sparkles,
+  ClipboardList,
+  FileText,
+  Users,
+  Cog,
+  Wallet,
+  Search,
+  UserRound,
+  Layers,
+  Truck,
+  Shield,
+  Package,
+  ShoppingCart,
+  Calendar,
+  CreditCard,
+  BadgeCheck,
+  BarChart3,
+  Percent,
+  Store,
+  UserCog,
+  type LucideIcon,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { api } from "@/lib/api";
+import { AppNotification } from "@/lib/types";
 import { Toaster } from "@/components/ui/sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import styles from "@/components/dashboard/dashboard.module.css";
 import "../dashboard.css";
 
@@ -22,6 +59,35 @@ const ADMIN_TABS = [
   { href: "/dashboard/financeiro", label: "Financeiro" },
 ];
 
+const TAB_ICONS: Record<string, LucideIcon> = {
+  "/dashboard": ClipboardList,
+  "/dashboard/solicitacoes": FileText,
+  "/dashboard/usuarios": Users,
+  "/dashboard/pecas": Cog,
+  "/dashboard/financeiro": Wallet,
+  "/dashboard/busca": Search,
+  "/dashboard/clientes": UserRound,
+  "/dashboard/complementos": Layers,
+  "/dashboard/alertas": Bell,
+  "/dashboard/caminhoes": Truck,
+  "/dashboard/seguradoras": Shield,
+  "/dashboard/fornecedores": Package,
+  "/dashboard/compras": ShoppingCart,
+  "/dashboard/agenda": Calendar,
+  "/dashboard/pdv": CreditCard,
+  "/dashboard/garantias": BadgeCheck,
+  "/dashboard/relatorios": BarChart3,
+  "/dashboard/comissoes": Percent,
+  "/dashboard/lojas": Store,
+  "/dashboard/cargos": UserCog,
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Administrador",
+  MECHANIC: "Mecânico",
+  CUSTOMER: "Cliente",
+};
+
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, token, loading, hasPermission, logout } = useAuth();
   const router = useRouter();
@@ -31,6 +97,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [lastPathname, setLastPathname] = useState(pathname);
+  const [unreadAlerts, setUnreadAlerts] = useState(0);
 
   useEffect(() => {
     if (!loading && !token) router.replace("/login");
@@ -82,6 +149,28 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     };
   }, [tabs.length]);
 
+  // Contagem de alertas não lidos para o sininho do header — mesma fonte de dados
+  // da página /dashboard/alertas, só filtrando por "read: false".
+  useEffect(() => {
+    if (!token || !isStaff) return;
+    let cancelled = false;
+    function load() {
+      api
+        .alerts(token!)
+        .then(({ notifications }) => {
+          if (cancelled) return;
+          setUnreadAlerts((notifications as AppNotification[]).filter((n) => !n.read).length);
+        })
+        .catch(() => {});
+    }
+    load();
+    const interval = setInterval(load, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [token, isStaff]);
+
   function scrollNav(direction: 1 | -1) {
     navRef.current?.scrollBy({ left: direction * 220, behavior: "smooth" });
   }
@@ -92,11 +181,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const navList = (
     <>
-      {tabs.map((tab) => (
-        <Link key={tab.href} href={tab.href} className={`${styles.tab} ${pathname === tab.href ? styles.tabActive : ""}`}>
-          {tab.label}
-        </Link>
-      ))}
+      {tabs.map((tab) => {
+        const Icon = TAB_ICONS[tab.href];
+        return (
+          <Link key={tab.href} href={tab.href} className={`${styles.tab} ${pathname === tab.href ? styles.tabActive : ""}`}>
+            {Icon && <Icon size={16} />}
+            <span>{tab.label}</span>
+            {tab.href === "/dashboard/alertas" && unreadAlerts > 0 && <span className={styles.navBadge}>{unreadAlerts}</span>}
+          </Link>
+        );
+      })}
     </>
   );
 
@@ -104,7 +198,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     <div className={styles.page}>
       <header className={styles.topbar}>
         <span className={styles.brand}>
-          <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} priority />
+          <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
         </span>
 
         {isStaff && (
@@ -144,9 +238,32 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <Menu size={18} />
             </button>
           )}
-          <button className={styles.logout} onClick={logout}>
-            Sair
-          </button>
+
+          {isStaff && (
+            <Link href="/dashboard/alertas" className={styles.notifBtn} aria-label="Alertas">
+              <Bell size={18} />
+              {unreadAlerts > 0 && <span className={styles.notifBadge}>{unreadAlerts > 9 ? "9+" : unreadAlerts}</span>}
+            </Link>
+          )}
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className={styles.userMenuBtn}>
+                <span className={styles.userAvatar}>{(user.name?.[0] ?? "U").toUpperCase()}</span>
+                <span className={styles.userMeta}>
+                  <strong>{user.name}</strong>
+                  <span>{ROLE_LABELS[user.role] ?? user.role}</span>
+                </span>
+                <ChevronDown size={14} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={logout}>
+                <LogOut className="size-4" />
+                Sair
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
@@ -154,6 +271,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         {isStaff && (
           <aside className={styles.sidebar}>
             <nav className={styles.sidebarNav}>{navList}</nav>
+            <div className={styles.sidebarPromo}>
+              <div className={styles.sidebarPromoIcon}>
+                <Sparkles size={18} />
+              </div>
+              <strong>Reblind ERP</strong>
+              <p>Gestão completa da oficina em um só lugar.</p>
+            </div>
           </aside>
         )}
         <div className={styles.mainArea}>{children}</div>
@@ -164,7 +288,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className={styles.mobileNavDrawer} onClick={(e) => e.stopPropagation()}>
             <div className={styles.mobileNavDrawerHeader}>
               <span className={styles.brand}>
-                <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} />
+                <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} />
               </span>
               <button type="button" className={styles.hamburgerBtn} aria-label="Fechar menu" onClick={() => setMobileNavOpen(false)}>
                 <X size={18} />

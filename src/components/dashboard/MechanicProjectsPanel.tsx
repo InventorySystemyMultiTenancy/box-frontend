@@ -10,8 +10,44 @@ import OrderDetail from "@/components/dashboard/OrderDetail";
 import KanbanBoard from "@/components/dashboard/KanbanBoard";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, ClipboardList, CheckCircle2, Clock, Wrench, Car } from "lucide-react";
 import styles from "./dashboard.module.css";
+
+const DONE_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);
+
+// Resumo abaixo do kanban/lista — sempre calculado a partir dos projetos em
+// andamento carregados (não conta ordens arquivadas, já excluídas pela API).
+function ProjectsSummary({ orders }: { orders: ServiceOrder[] }) {
+  const total = orders.length;
+  const done = orders.filter((o) => DONE_STATUSES.has(o.status)).length;
+  const active = total - done;
+  const awaitingApproval = orders.filter((o) => o.status === "AWAITING_APPROVAL").length;
+  const inRepair = orders.filter((o) => o.status === "IN_PROGRESS").length;
+
+  const cards = [
+    { icon: ClipboardList, value: active, label: "Total em andamento", wrap: "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300" },
+    { icon: CheckCircle2, value: done, label: "Concluídos", wrap: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300" },
+    { icon: Clock, value: awaitingApproval, label: "Aguardando aprovação", wrap: "bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-300" },
+    { icon: Wrench, value: inRepair, label: "Em reparação", wrap: "bg-rose-100 text-rose-600 dark:bg-rose-950 dark:text-rose-300" },
+    { icon: Car, value: total, label: "Total de projetos", wrap: "bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-300" },
+  ];
+
+  return (
+    <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+      {cards.map((c) => (
+        <div key={c.label} className="flex items-center gap-3 rounded-lg border bg-card p-3 shadow-sm">
+          <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${c.wrap}`}>
+            <c.icon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <div className="text-lg font-bold leading-tight">{c.value}</div>
+            <div className="truncate text-xs text-muted-foreground">{c.label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Lista de todos os projetos (carros) em andamento — o mecânico escolhe um para gerenciar. */
 export default function MechanicProjectsPanel() {
@@ -130,6 +166,8 @@ export default function MechanicProjectsPanel() {
           ))}
         </div>
       )}
+
+      {orders.length > 0 && <ProjectsSummary orders={orders} />}
 
       {selectedOrderId && (
         <div className={styles.detailWrap}>

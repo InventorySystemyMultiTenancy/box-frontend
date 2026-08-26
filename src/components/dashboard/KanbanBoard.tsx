@@ -3,6 +3,20 @@
 import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  Calendar,
+  Car,
+  Stethoscope,
+  ClipboardCheck,
+  Clock,
+  PackageSearch,
+  PackageCheck,
+  Wrench,
+  Gauge,
+  Droplets,
+  CheckCircle2,
+  type LucideIcon,
+} from "lucide-react";
+import {
   SERVICE_ORDER_STATUSES,
   STATUS_LABELS,
   STATUS_TONE,
@@ -20,29 +34,109 @@ const TONE_CLASSES: Record<string, string> = {
   ok: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
 };
 
-// Cor de fundo clara e transparente por etapa — cada coluna com um tom distinto
-// para diferenciar etapas mesmo dentro do mesmo grupo (ex.: as várias etapas "em
-// andamento" não ficam todas idênticas).
-const COLUMN_BG_CLASSES: Record<ServiceOrderStatus, string> = {
-  SCHEDULED: "bg-slate-100/70 dark:bg-slate-400/10",
-  RECEIVED: "bg-sky-100/70 dark:bg-sky-400/10",
-  AWAITING_DIAGNOSIS: "bg-cyan-100/70 dark:bg-cyan-400/10",
-  DIAGNOSIS_DONE: "bg-teal-100/70 dark:bg-teal-400/10",
-  AWAITING_APPROVAL: "bg-amber-100/70 dark:bg-amber-400/10",
-  PARTS_REQUESTED: "bg-orange-100/70 dark:bg-orange-400/10",
-  PARTS_RECEIVED: "bg-yellow-100/70 dark:bg-yellow-400/10",
-  IN_PROGRESS: "bg-blue-100/70 dark:bg-blue-400/10",
-  TESTING: "bg-indigo-100/70 dark:bg-indigo-400/10",
-  WASHING: "bg-purple-100/70 dark:bg-purple-400/10",
-  FINISHED: "bg-emerald-100/70 dark:bg-emerald-400/10",
-  READY_FOR_PICKUP: "bg-green-100/70 dark:bg-green-400/10",
-};
-
 const PRIORITY_CLASSES: Record<string, string> = {
   LOW: "bg-muted text-muted-foreground",
   NORMAL: "bg-muted text-muted-foreground",
   HIGH: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
   URGENT: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+};
+
+interface StatusTheme {
+  icon: LucideIcon;
+  border: string;
+  iconWrap: string;
+  badge: string;
+  empty: string;
+}
+
+// Um ícone e uma cor por etapa — cartão branco com faixa colorida no topo (em vez do
+// fundo inteiro pintado), ícone da etapa num chip colorido no cabeçalho da coluna e
+// como avatar de cada card, e o mesmo tom usado no badge de contagem e no estado vazio.
+const STATUS_THEME: Record<ServiceOrderStatus, StatusTheme> = {
+  SCHEDULED: {
+    icon: Calendar,
+    border: "border-t-slate-400",
+    iconWrap: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    badge: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+    empty: "text-slate-200 dark:text-slate-800",
+  },
+  RECEIVED: {
+    icon: Car,
+    border: "border-t-sky-500",
+    iconWrap: "bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-300",
+    badge: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+    empty: "text-sky-200 dark:text-sky-900",
+  },
+  AWAITING_DIAGNOSIS: {
+    icon: Stethoscope,
+    border: "border-t-cyan-500",
+    iconWrap: "bg-cyan-100 text-cyan-600 dark:bg-cyan-950 dark:text-cyan-300",
+    badge: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300",
+    empty: "text-cyan-200 dark:text-cyan-900",
+  },
+  DIAGNOSIS_DONE: {
+    icon: ClipboardCheck,
+    border: "border-t-teal-500",
+    iconWrap: "bg-teal-100 text-teal-600 dark:bg-teal-950 dark:text-teal-300",
+    badge: "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300",
+    empty: "text-teal-200 dark:text-teal-900",
+  },
+  AWAITING_APPROVAL: {
+    icon: Clock,
+    border: "border-t-amber-500",
+    iconWrap: "bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-300",
+    badge: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    empty: "text-amber-200 dark:text-amber-900",
+  },
+  PARTS_REQUESTED: {
+    icon: PackageSearch,
+    border: "border-t-orange-500",
+    iconWrap: "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-300",
+    badge: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+    empty: "text-orange-200 dark:text-orange-900",
+  },
+  PARTS_RECEIVED: {
+    icon: PackageCheck,
+    border: "border-t-yellow-500",
+    iconWrap: "bg-yellow-100 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-300",
+    badge: "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+    empty: "text-yellow-200 dark:text-yellow-900",
+  },
+  IN_PROGRESS: {
+    icon: Wrench,
+    border: "border-t-blue-500",
+    iconWrap: "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-300",
+    badge: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+    empty: "text-blue-200 dark:text-blue-900",
+  },
+  TESTING: {
+    icon: Gauge,
+    border: "border-t-indigo-500",
+    iconWrap: "bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300",
+    badge: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+    empty: "text-indigo-200 dark:text-indigo-900",
+  },
+  WASHING: {
+    icon: Droplets,
+    border: "border-t-purple-500",
+    iconWrap: "bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-300",
+    badge: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
+    empty: "text-purple-200 dark:text-purple-900",
+  },
+  FINISHED: {
+    icon: CheckCircle2,
+    border: "border-t-emerald-500",
+    iconWrap: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300",
+    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    empty: "text-emerald-200 dark:text-emerald-900",
+  },
+  READY_FOR_PICKUP: {
+    icon: CheckCircle2,
+    border: "border-t-green-500",
+    iconWrap: "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-300",
+    badge: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+    empty: "text-green-200 dark:text-green-900",
+  },
 };
 
 // Distância mínima (px) antes de um toque/clique virar arraste — evita competir
@@ -171,71 +265,90 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
       {/* Grid responsivo: quantas colunas couberem (mín. 240px cada) por linha; o que
           não couber quebra para a linha de baixo — nunca precisa rolar para o lado. */}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3">
-        {columns.map(({ status, orders: colOrders }) => (
-          <div
-            key={status}
-            ref={(el) => {
-              columnRefs.current.set(status, el);
-            }}
-            data-status={status}
-            className={`flex min-w-0 flex-col rounded-lg border ${COLUMN_BG_CLASSES[status]} ${dragOverStatus === status ? "ring-2 ring-primary" : ""}`}
-          >
-            <div className="flex items-center justify-between border-b px-3 py-2">
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{STATUS_LABELS[status]}</span>
-              <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium">{colOrders.length}</span>
-            </div>
-            <div className="flex flex-col gap-2 p-2">
-              {colOrders.length === 0 && <p className="px-2 py-3 text-center text-xs text-muted-foreground">Nenhum veículo</p>}
-              {colOrders.map((order) => {
-                const days = daysSince(order.updatedAt);
-                return (
-                  <div
-                    key={order.id}
-                    role="button"
-                    tabIndex={0}
-                    data-order-id={order.id}
-                    onPointerDown={(e) => handlePointerDown(e, order.id)}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerCancel={handlePointerCancel}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onSelect(order.id);
-                      }
-                    }}
-                    style={{ touchAction: "none" }}
-                    className={`cursor-grab select-none rounded-md border bg-card p-2.5 text-left text-sm shadow-sm transition-opacity hover:border-primary/50 active:cursor-grabbing ${
-                      order.id === selectedOrderId ? "border-primary ring-1 ring-primary" : ""
-                    } ${draggingId === order.id ? "opacity-40" : ""}`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">
-                        {order.vehicle.brand} {order.vehicle.model}
-                      </span>
-                      {order.priority && order.priority !== "NORMAL" && (
-                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${PRIORITY_CLASSES[order.priority]}`}>
-                          {PRIORITY_LABELS[order.priority]}
-                        </span>
-                      )}
-                    </div>
-                    {order.vehicle.owner && <div className="text-xs text-muted-foreground">{order.vehicle.owner.name}</div>}
-                    <div className="mt-0.5 font-mono text-xs text-muted-foreground">
-                      {order.code} {order.vehicle.plate ? `· ${order.vehicle.plate}` : ""}
-                    </div>
-                    {order.insuranceCompany && (
-                      <div className="mt-1 text-xs text-muted-foreground">{order.insuranceCompany.tradeName ?? order.insuranceCompany.legalName}</div>
-                    )}
-                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span className={`rounded-full px-1.5 py-0.5 ${TONE_CLASSES[STATUS_TONE[status]]}`}>{days != null ? `${days}d nesta etapa` : "—"}</span>
-                      {order.technician && <span>{order.technician.name}</span>}
-                    </div>
+        {columns.map(({ status, orders: colOrders }) => {
+          const theme = STATUS_THEME[status];
+          const ColumnIcon = theme.icon;
+          return (
+            <div
+              key={status}
+              ref={(el) => {
+                columnRefs.current.set(status, el);
+              }}
+              data-status={status}
+              className={`flex min-w-0 flex-col rounded-lg border border-t-4 bg-card shadow-sm ${theme.border} ${
+                dragOverStatus === status ? "ring-2 ring-primary" : ""
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className={`flex size-6 shrink-0 items-center justify-center rounded-md ${theme.iconWrap}`}>
+                    <ColumnIcon className="size-3.5" />
+                  </span>
+                  <span className="truncate text-xs font-semibold uppercase tracking-wide text-foreground">{STATUS_LABELS[status]}</span>
+                </div>
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${theme.badge}`}>{colOrders.length}</span>
+              </div>
+              <div className="flex flex-col gap-2 p-2">
+                {colOrders.length === 0 && (
+                  <div className="flex flex-col items-center justify-center gap-2 px-2 py-8 text-center">
+                    <ColumnIcon className={`size-9 ${theme.empty}`} />
+                    <p className="text-xs text-muted-foreground">Nenhum veículo</p>
                   </div>
-                );
-              })}
+                )}
+                {colOrders.map((order) => {
+                  const days = daysSince(order.updatedAt);
+                  return (
+                    <div
+                      key={order.id}
+                      role="button"
+                      tabIndex={0}
+                      data-order-id={order.id}
+                      onPointerDown={(e) => handlePointerDown(e, order.id)}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={handlePointerUp}
+                      onPointerCancel={handlePointerCancel}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelect(order.id);
+                        }
+                      }}
+                      style={{ touchAction: "none" }}
+                      className={`cursor-grab select-none rounded-md border bg-background p-2.5 text-left text-sm shadow-sm transition-opacity hover:border-primary/50 active:cursor-grabbing ${
+                        order.id === selectedOrderId ? "border-primary ring-1 ring-primary" : ""
+                      } ${draggingId === order.id ? "opacity-40" : ""}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`flex size-7 shrink-0 items-center justify-center rounded-full ${theme.iconWrap}`}>
+                          <Car className="size-3.5" />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-medium">
+                          {order.vehicle.brand} {order.vehicle.model}
+                        </span>
+                        {order.priority && order.priority !== "NORMAL" && (
+                          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${PRIORITY_CLASSES[order.priority]}`}>
+                            {PRIORITY_LABELS[order.priority]}
+                          </span>
+                        )}
+                      </div>
+                      {order.vehicle.owner && <div className="mt-1 truncate text-xs text-muted-foreground">{order.vehicle.owner.name}</div>}
+                      <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                        {order.code} {order.vehicle.plate ? `· ${order.vehicle.plate}` : ""}
+                      </div>
+                      {order.insuranceCompany && (
+                        <div className="mt-1 truncate text-xs text-muted-foreground">{order.insuranceCompany.tradeName ?? order.insuranceCompany.legalName}</div>
+                      )}
+                      <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
+                        <span className={`rounded-full px-1.5 py-0.5 ${TONE_CLASSES[STATUS_TONE[status]]}`}>{days != null ? `${days}d nesta etapa` : "—"}</span>
+                        {order.technician && <span className="truncate">{order.technician.name}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
