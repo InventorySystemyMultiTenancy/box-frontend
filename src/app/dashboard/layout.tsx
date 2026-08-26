@@ -202,9 +202,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className={styles.page}>
       <header className={styles.topbar}>
-        <span className={styles.brand}>
+        <Link href="/dashboard" className={styles.brand} aria-label="Ir para o painel">
           <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
-        </span>
+        </Link>
 
         {isStaff && (
           <div className={styles.navScrollerWrap}>
@@ -307,9 +307,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         <div className={styles.mobileNavOverlay} onClick={() => setMobileNavOpen(false)}>
           <div className={styles.mobileNavDrawer} onClick={(e) => e.stopPropagation()}>
             <div className={styles.mobileNavDrawerHeader}>
-              <span className={styles.brand}>
+              <Link href="/dashboard" className={styles.brand} aria-label="Ir para o painel">
                 <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} />
-              </span>
+              </Link>
               <button type="button" className={styles.hamburgerBtn} aria-label="Fechar menu" onClick={() => setMobileNavOpen(false)}>
                 <X size={18} />
               </button>
