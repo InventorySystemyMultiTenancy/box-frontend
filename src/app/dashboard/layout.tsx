@@ -65,7 +65,6 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   "/dashboard/usuarios": Users,
   "/dashboard/pecas": Cog,
   "/dashboard/financeiro": Wallet,
-  "/dashboard/busca": Search,
   "/dashboard/clientes": UserRound,
   "/dashboard/complementos": Layers,
   "/dashboard/alertas": Bell,
@@ -98,6 +97,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [lastPathname, setLastPathname] = useState(pathname);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!loading && !token) router.replace("/login");
@@ -113,7 +113,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const tabs = [
     ...(user?.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
-    ...(isStaff ? [{ href: "/dashboard/busca", label: "Busca" }] : []),
     ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes" }] : []),
     ...(isStaff ? [{ href: "/dashboard/complementos", label: "Complementos" }] : []),
     ...(isStaff ? [{ href: "/dashboard/alertas", label: "Alertas" }] : []),
@@ -173,6 +172,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   function scrollNav(direction: 1 | -1) {
     navRef.current?.scrollBy({ left: direction * 220, behavior: "smooth" });
+  }
+
+  function submitHeaderSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    router.push(q ? `/dashboard/busca?q=${encodeURIComponent(q)}` : "/dashboard/busca");
   }
 
   if (loading || !user) {
@@ -237,6 +242,21 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             >
               <Menu size={18} />
             </button>
+          )}
+
+          {isStaff && (
+            <form onSubmit={submitHeaderSearch} className={styles.headerSearch}>
+              <button type="submit" className={styles.headerSearchBtn} aria-label="Buscar">
+                <Search size={16} />
+              </button>
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar..."
+                className={styles.headerSearchInput}
+              />
+            </form>
           )}
 
           {isStaff && (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,9 @@ import { STATUS_LABELS, ServiceOrder, Estimate, ESTIMATE_STATUS_LABELS } from "@
 
 export default function BuscaGlobalPage() {
   const { token } = useAuth();
-  const [q, setQ] = useState("");
+  const searchParams = useSearchParams();
+  // Preenche com o termo vindo da busca do header (?q=...), se houver.
+  const [q, setQ] = useState(() => searchParams.get("q") ?? "");
 
   const { data, isFetching } = useQuery({
     queryKey: ["global-search", q],

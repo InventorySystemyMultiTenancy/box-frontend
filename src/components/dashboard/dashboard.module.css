@@ -133,6 +133,52 @@
   color: var(--shell-text-muted);
   flex-shrink: 0;
 }
+/* Busca global embutida no header — ícone + campo de texto, encolhe para só o
+   ícone no celular (o resultado ainda abre em /dashboard/busca ao tocar). */
+.headerSearch {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--shell-border);
+  background: var(--shell-hover);
+}
+.headerSearch:focus-within {
+  border-color: var(--shell-active);
+  background: var(--shell-hover-strong);
+}
+.headerSearchBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--shell-text-muted);
+  cursor: pointer;
+}
+.headerSearchBtn:hover {
+  color: var(--shell-text);
+}
+.headerSearchInput {
+  width: 170px;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--shell-text);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+}
+.headerSearchInput::placeholder {
+  color: var(--shell-text-muted);
+}
+.headerSearchInput::-webkit-search-cancel-button {
+  filter: invert(0.6);
+}
 .notifBtn {
   position: relative;
   display: flex;
@@ -234,28 +280,18 @@
 
 @media (max-width: 760px) {
   .topbar {
-    flex-wrap: wrap;
-    row-gap: 0.7rem;
-    padding: 0.85rem 1.1rem;
+    padding: 0.75rem 1.1rem;
+    justify-content: space-between;
   }
-  /* Escopado ao .topbar — .brand é reaproveitado no cabeçalho do drawer mobile,
-     que não deve herdar essa ordem (senão a logo é empurrada pra depois do botão
-     de fechar, que fica com order:0 por padrão). */
-  .topbar .brand { order: 1; }
-  .topbarRight { order: 2; }
-  .navScrollerWrap {
-    order: 3;
-    width: 100%;
-  }
-  /* No celular a rolagem é por toque direto na lista de abas — sem setas. */
-  .navArrow { display: none; }
-  .tabs {
-    width: 100%;
-    -webkit-overflow-scrolling: touch;
-  }
+  /* No celular a navegação inteira mora no menu hambúrguer — a roleta de ícones
+     some daqui, sem precisar de linha extra nem botões de rolar. */
+  .navScrollerWrap { display: none; }
   .userMeta { display: none; }
   .userMenuBtn { padding: 0.3rem; border-radius: 50%; }
   .hamburgerBtn { display: flex; }
+  /* Busca encolhe pra só o ícone — toca e abre a página de busca pra digitar lá. */
+  .headerSearch { width: 38px; padding: 0; justify-content: center; }
+  .headerSearchInput { display: none; }
 }
 
 .mobileNavOverlay {
