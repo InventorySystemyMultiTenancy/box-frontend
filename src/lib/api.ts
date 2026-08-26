@@ -680,6 +680,37 @@ export const api = {
     return request<{ trip: unknown }>(`/api/trucks/${truckId}/trips/${tripId}/finish`, { method: "PATCH", body: form }, token);
   },
 
+  recognizeTruckPanel: (photo: File, token: string) => {
+    const form = new FormData();
+    form.append("photo", photo);
+    return request<{ recognized: unknown }>("/api/trucks/recognize-panel", { method: "POST", body: form }, token);
+  },
+
+  recognizeFuelPump: (photo: File, token: string) => {
+    const form = new FormData();
+    form.append("photo", photo);
+    return request<{ recognized: unknown }>("/api/trucks/recognize-pump", { method: "POST", body: form }, token);
+  },
+
+  truckRefuelings: (truckId: string, token: string) => request<{ refuelings: unknown[] }>(`/api/trucks/${truckId}/refuelings`, {}, token),
+
+  allTruckRefuelings: (token: string) => request<{ refuelings: unknown[] }>("/api/trucks/refuelings", {}, token),
+
+  createTruckRefueling: (
+    truckId: string,
+    payload: { currentKm: number; liters: number; amountPaid: number; pricePerLiter?: number; notes?: string; photo: File },
+    token: string
+  ) => {
+    const form = new FormData();
+    form.append("currentKm", String(payload.currentKm));
+    form.append("liters", String(payload.liters));
+    form.append("amountPaid", String(payload.amountPaid));
+    if (payload.pricePerLiter != null) form.append("pricePerLiter", String(payload.pricePerLiter));
+    if (payload.notes) form.append("notes", payload.notes);
+    form.append("photo", payload.photo);
+    return request<{ refueling: unknown }>(`/api/trucks/${truckId}/refuelings`, { method: "POST", body: form }, token);
+  },
+
   // Novo projeto sem solicitação
   recognizeVehiclePhoto: (photo: File, token: string) => {
     const form = new FormData();

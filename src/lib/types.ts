@@ -853,6 +853,48 @@ export interface TruckWithTrips extends Truck {
   trips: TruckTrip[];
 }
 
+export type ConsumptionAlertType = "CONSUMO_ALTO" | "CONSUMO_BAIXO" | "PRECO_ACIMA_MEDIA";
+
+export interface ConsumptionAlert {
+  type: ConsumptionAlertType;
+  message: string;
+}
+
+export interface TruckRefueling {
+  id: string;
+  truckId: string;
+  truck?: { id: string; plate: string; brand?: string | null; model?: string | null };
+  tripId: string;
+  driverId: string;
+  driver?: { id: string; name: string };
+  photoUrl: string;
+  currentKm: number;
+  referenceKm: number;
+  liters: number;
+  amountPaid: number;
+  pricePerLiter?: number | null;
+  kmPerLiter?: number | null;
+  notes?: string | null;
+  createdAt: string;
+  // Só vem preenchido para o admin — mecânico não recebe este campo na resposta.
+  alerts?: ConsumptionAlert[];
+}
+
+// --- Reconhecimento de painel do caminhão / bomba de combustível por IA -----
+
+export interface RecognizedTruckPanel {
+  km: number | null;
+  fuelLevel: string | null;
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+}
+
+export interface RecognizedFuelPump {
+  amountPaid: number | null;
+  liters: number | null;
+  pricePerLiter: number | null;
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+}
+
 // --- Reconhecimento de veículo por IA ---------------------------------------
 
 export interface DetectedVehicleProblem {

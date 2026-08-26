@@ -10,7 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TruckFormDialog } from "@/components/dashboard/trucks/TruckFormDialog";
 import { StartTripDialog } from "@/components/dashboard/trucks/StartTripDialog";
 import { FinishTripDialog } from "@/components/dashboard/trucks/FinishTripDialog";
+import { RefuelingDialog } from "@/components/dashboard/trucks/RefuelingDialog";
 import { TruckMovementsPanel } from "@/components/dashboard/trucks/TruckMovementsPanel";
+import { TruckRefuelingsPanel } from "@/components/dashboard/trucks/TruckRefuelingsPanel";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { Truck } from "@/lib/types";
@@ -19,7 +21,7 @@ export default function CaminhoesPage() {
   const { user, token } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = user?.role === "ADMIN";
-  const [view, setView] = useState<"trucks" | "movements">("trucks");
+  const [view, setView] = useState<"trucks" | "movements" | "refuelings">("trucks");
 
   const { data: trucks, isLoading } = useQuery({
     queryKey: ["trucks"],
@@ -81,12 +83,21 @@ export default function CaminhoesPage() {
             >
               Movimentações
             </button>
+            <button
+              type="button"
+              className={`rounded px-3 py-1 ${view === "refuelings" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              onClick={() => setView("refuelings")}
+            >
+              Abastecimentos
+            </button>
           </div>
         </div>
       </div>
 
       {view === "movements" ? (
         <TruckMovementsPanel />
+      ) : view === "refuelings" ? (
+        <TruckRefuelingsPanel />
       ) : noTrucksAssigned ? (
         <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
           Nenhum caminhão está atribuído a você no momento.
@@ -132,6 +143,7 @@ export default function CaminhoesPage() {
 
                     <div className="mt-4 flex flex-wrap items-center gap-2">
                       {canOperate && !openTrip && <StartTripDialog truck={truck} onSaved={refetch} />}
+                      {canOperate && openTrip && <RefuelingDialog truck={truck} onSaved={refetch} />}
                       {canOperate && openTrip && <FinishTripDialog truck={truck} trip={openTrip} onSaved={refetch} />}
                       {isAdmin && (
                         <>
