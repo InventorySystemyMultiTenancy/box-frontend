@@ -14,8 +14,9 @@
   background: var(--bg);
 }
 
-/* Header: logo (num fade radial claro, para não perder contraste no fundo escuro
-   sem virar um quadrado branco chapado) fixa à esquerda, navegação em "roleta"
+/* Header: fundo com fade branco (esquerda, atrás da logo — que é azul-marinho e
+   precisa de um respiro claro para não sumir) para azul-marinho (a partir daí,
+   já sólido antes dos ícones de navegação) fixa à esquerda, navegação em "roleta"
    (só ícone, rolagem horizontal com setas) ocupando o meio, sino de alertas + menu
    do usuário fixos à direita. */
 .topbar {
@@ -24,20 +25,14 @@
   gap: 1rem;
   padding: 0.6rem clamp(1.25rem, 4vw, 2rem);
   border-bottom: 1px solid var(--shell-border);
-  background: var(--shell-bg);
+  background: linear-gradient(to right, #fff 0, #fff 40px, var(--shell-bg) 260px);
 }
 .brand {
   font-family: var(--font-display);
   font-weight: 750;
   display: flex;
   align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  padding: 0.5rem 1.6rem;
-  /* "farthest-side" ancora o raio do gradiente às bordas reais da caixa — com um
-     raio fixo em %, se ele for maior que a caixa o fade é cortado antes de chegar
-     a transparente, sobrando uma quina reta visível. */
-  background: radial-gradient(ellipse farthest-side at center, #fff 0%, #fff 30%, rgba(255, 255, 255, 0) 100%);
 }
 .brandLogo {
   height: 46px;
@@ -243,7 +238,10 @@
     row-gap: 0.7rem;
     padding: 0.85rem 1.1rem;
   }
-  .brand { order: 1; }
+  /* Escopado ao .topbar — .brand é reaproveitado no cabeçalho do drawer mobile,
+     que não deve herdar essa ordem (senão a logo é empurrada pra depois do botão
+     de fechar, que fica com order:0 por padrão). */
+  .topbar .brand { order: 1; }
   .topbarRight { order: 2; }
   .navScrollerWrap {
     order: 3;
@@ -286,6 +284,9 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1rem;
+  margin: -1rem -1rem 1rem;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(to right, #fff 0, #fff 40px, var(--shell-bg) 220px);
 }
 @keyframes fadeIn {
   from { opacity: 0; }
