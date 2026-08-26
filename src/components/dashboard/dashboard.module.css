@@ -33,8 +33,11 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  padding: 0.4rem 1.3rem;
-  background: radial-gradient(ellipse 75% 85% at center, #fff 0%, #fff 40%, rgba(255, 255, 255, 0) 78%);
+  padding: 0.5rem 1.6rem;
+  /* "farthest-side" ancora o raio do gradiente às bordas reais da caixa — com um
+     raio fixo em %, se ele for maior que a caixa o fade é cortado antes de chegar
+     a transparente, sobrando uma quina reta visível. */
+  background: radial-gradient(ellipse farthest-side at center, #fff 0%, #fff 30%, rgba(255, 255, 255, 0) 100%);
 }
 .brandLogo {
   height: 46px;
