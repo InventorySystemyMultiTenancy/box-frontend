@@ -523,6 +523,8 @@ export interface AccountPayable {
   installmentNumber?: number | null;
   installmentTotal?: number | null;
   notes?: string | null;
+  // Preenchido quando esta conta nasceu de um boleto de nota fiscal.
+  invoice?: { id: string; number?: string | null } | null;
 }
 
 export interface AccountReceivable {

@@ -16,6 +16,7 @@ const TYPE_LABELS: Record<string, string> = {
   LOW_STOCK: "Estoque baixo",
   INSPECTION_TODAY: "Vistoria hoje",
   DELIVERY_TOMORROW: "Entrega amanhã",
+  PAYABLE_OVERDUE: "Conta vencida",
 };
 
 type AlertCategory = "VEICULOS" | "FINANCEIRO" | "ESTOQUE" | "AGENDA";
@@ -27,6 +28,7 @@ const TYPE_CATEGORY: Record<string, AlertCategory> = {
   STALE_STATUS: "VEICULOS",
   DELIVERY_TOMORROW: "VEICULOS",
   SUPPLEMENT_PENDING: "FINANCEIRO",
+  PAYABLE_OVERDUE: "FINANCEIRO",
   LOW_STOCK: "ESTOQUE",
   INSPECTION_TODAY: "AGENDA",
 };

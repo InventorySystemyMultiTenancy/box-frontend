@@ -313,8 +313,19 @@ export const api = {
     request<void>(`/api/finance/bank-accounts/${id}`, { method: "DELETE" }, token),
 
   // Financeiro — contas a pagar
-  payables: (token: string, params: { status?: string; category?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) =>
-    request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/payables${toQuery(params)}`, {}, token),
+  payables: (
+    token: string,
+    params: {
+      status?: string;
+      category?: string;
+      from?: string;
+      to?: string;
+      payeeName?: string;
+      invoiceNumber?: string;
+      page?: number;
+      pageSize?: number;
+    } = {}
+  ) => request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/payables${toQuery(params)}`, {}, token),
 
   createPayables: (payload: Record<string, unknown>, token: string) =>
     request<{ installments: unknown[] }>("/api/finance/payables", { method: "POST", body: JSON.stringify(payload) }, token),

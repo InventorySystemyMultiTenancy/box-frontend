@@ -23,15 +23,37 @@ const STATUS_VARIANTS: Record<PayableStatus, "default" | "secondary" | "outline"
   CANCELLED: "secondary",
 };
 
+// A partir de "YYYY-MM" devolve o primeiro e o último dia do mês (para os
+// parâmetros from/to que a listagem já aceita) — "" quando nenhum mês escolhido.
+function monthRange(month: string): { from?: string; to?: string } {
+  if (!month) return {};
+  const [year, mo] = month.split("-").map(Number);
+  const from = new Date(Date.UTC(year, mo - 1, 1));
+  const to = new Date(Date.UTC(year, mo, 0));
+  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+}
+
 export default function PayablesPanel() {
   const { token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManage = hasPermission("finance", "manage");
   const [status, setStatus] = useState<string>("");
+  const [month, setMonth] = useState("");
+  const [payeeName, setPayeeName] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["payables", status],
-    queryFn: async () => (await api.payables(token!, { status: status || undefined, pageSize: 50 })).items as AccountPayable[],
+    queryKey: ["payables", status, month, payeeName, invoiceNumber],
+    queryFn: async () =>
+      (
+        await api.payables(token!, {
+          status: status || undefined,
+          ...monthRange(month),
+          payeeName: payeeName.trim() || undefined,
+          invoiceNumber: invoiceNumber.trim() || undefined,
+          pageSize: 50,
+        })
+      ).items as AccountPayable[],
     enabled: !!token,
   });
 
@@ -53,18 +75,47 @@ export default function PayablesPanel() {
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Select value={status || "ALL"} onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Todos os status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">Todos os status</SelectItem>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>{label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="grid gap-1">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select value={status || "ALL"} onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="Todos os status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todos os status</SelectItem>
+                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="p-filter-month" className="text-xs text-muted-foreground">Mês de vencimento</Label>
+            <Input id="p-filter-month" type="month" className="w-40" value={month} onChange={(e) => setMonth(e.target.value)} />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="p-filter-name" className="text-xs text-muted-foreground">Nome</Label>
+            <Input
+              id="p-filter-name"
+              placeholder="Fornecedor/beneficiário"
+              className="w-48"
+              value={payeeName}
+              onChange={(e) => setPayeeName(e.target.value)}
+            />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="p-filter-invoice" className="text-xs text-muted-foreground">Nº da nota</Label>
+            <Input
+              id="p-filter-invoice"
+              placeholder="Número da nota fiscal"
+              className="w-40"
+              value={invoiceNumber}
+              onChange={(e) => setInvoiceNumber(e.target.value)}
+            />
+          </div>
+        </div>
         {canManage && <PayableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a pagar</Button>} />}
       </div>
 
@@ -96,6 +147,9 @@ export default function PayablesPanel() {
                     <span className="ml-1 text-xs text-muted-foreground">
                       ({payable.installmentNumber}/{payable.installmentTotal})
                     </span>
+                  )}
+                  {payable.invoice?.number && (
+                    <span className="block text-xs text-muted-foreground">Nota {payable.invoice.number}</span>
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{payable.payeeName}</TableCell>
