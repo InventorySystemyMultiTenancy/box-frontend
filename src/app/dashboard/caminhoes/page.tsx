@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Trash2, Truck as TruckIcon } from "lucide-react";
+import { Plus, Search, Trash2, Truck as TruckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { TruckFormDialog } from "@/components/dashboard/trucks/TruckFormDialog";
 import { StartTripDialog } from "@/components/dashboard/trucks/StartTripDialog";
 import { FinishTripDialog } from "@/components/dashboard/trucks/FinishTripDialog";
@@ -15,6 +16,7 @@ import { TruckMovementsPanel } from "@/components/dashboard/trucks/TruckMovement
 import { TruckRefuelingsPanel } from "@/components/dashboard/trucks/TruckRefuelingsPanel";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
+import { matchesSearch } from "@/lib/utils";
 import type { Truck } from "@/lib/types";
 
 export default function CaminhoesPage() {
@@ -22,6 +24,7 @@ export default function CaminhoesPage() {
   const queryClient = useQueryClient();
   const isAdmin = user?.role === "ADMIN";
   const [view, setView] = useState<"trucks" | "movements" | "refuelings">("trucks");
+  const [search, setSearch] = useState("");
 
   const { data: trucks, isLoading } = useQuery({
     queryKey: ["trucks"],
@@ -46,8 +49,25 @@ export default function CaminhoesPage() {
     }
   }
 
-  const visibleTrucks = isAdmin ? trucks ?? [] : myTrucks;
+  const visibleTrucks = useMemo(() => (isAdmin ? trucks ?? [] : myTrucks), [isAdmin, trucks, myTrucks]);
   const noTrucksAssigned = !isAdmin && !isLoading && myTrucks.length === 0;
+
+  const filteredTrucks = useMemo(
+    () =>
+      visibleTrucks.filter((truck) => {
+        const openTrip = truck.trips?.[0];
+        return matchesSearch(search, [
+          truck.plate,
+          truck.brand,
+          truck.model,
+          truck.assignedEmployee?.name,
+          openTrip?.driver?.name,
+          new Date(truck.createdAt).toLocaleDateString("pt-BR"),
+          openTrip ? new Date(openTrip.startedAt).toLocaleDateString("pt-BR") : null,
+        ]);
+      }),
+    [visibleTrucks, search]
+  );
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -104,13 +124,26 @@ export default function CaminhoesPage() {
         </p>
       ) : (
         <>
+          <div className="relative mb-4 max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por placa, caminhão, data ou usuário..."
+              className="pl-8"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
           {isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
           {!isLoading && visibleTrucks.length === 0 && (
             <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Nenhum caminhão cadastrado.</p>
           )}
+          {!isLoading && visibleTrucks.length > 0 && filteredTrucks.length === 0 && (
+            <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Nenhum caminhão encontrado para essa busca.</p>
+          )}
 
           <div className="grid gap-3">
-            {visibleTrucks.map((truck) => {
+            {filteredTrucks.map((truck) => {
               const openTrip = truck.trips?.[0];
               const canOperate = isAdmin || truck.assignedEmployeeId === user?.id;
               return (

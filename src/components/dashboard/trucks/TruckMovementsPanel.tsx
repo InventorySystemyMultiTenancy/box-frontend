@@ -1,10 +1,14 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { api, API_URL } from "@/lib/api";
+import { matchesSearch } from "@/lib/utils";
 import type { TruckTrip } from "@/lib/types";
 
 function mediaUrl(url: string) {
@@ -76,12 +80,28 @@ function MovementCard({ trip }: { trip: TruckTrip }) {
 
 export function TruckMovementsPanel() {
   const { token } = useAuth();
+  const [search, setSearch] = useState("");
 
   const { data: trips, isLoading } = useQuery({
     queryKey: ["truck-movements"],
     queryFn: async () => (await api.truckMovements(token!)).trips as TruckTrip[],
     enabled: !!token,
   });
+
+  const filteredTrips = useMemo(
+    () =>
+      (trips ?? []).filter((trip) =>
+        matchesSearch(search, [
+          trip.truck?.plate,
+          trip.truck?.brand,
+          trip.truck?.model,
+          trip.driver?.name,
+          formatDate(trip.startedAt),
+          formatDate(trip.endedAt),
+        ])
+      ),
+    [trips, search]
+  );
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
 
@@ -90,10 +110,21 @@ export function TruckMovementsPanel() {
   }
 
   return (
-    <div className="grid gap-3">
-      {trips.map((trip) => (
-        <MovementCard key={trip.id} trip={trip} />
-      ))}
+    <div>
+      <div className="relative mb-4 max-w-sm">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input placeholder="Buscar por placa, caminhão, data ou usuário..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
+      {filteredTrips.length === 0 ? (
+        <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Nenhuma movimentação encontrada para essa busca.</p>
+      ) : (
+        <div className="grid gap-3">
+          {filteredTrips.map((trip) => (
+            <MovementCard key={trip.id} trip={trip} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

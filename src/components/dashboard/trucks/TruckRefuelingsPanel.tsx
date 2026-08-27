@@ -1,10 +1,13 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { api, API_URL } from "@/lib/api";
+import { matchesSearch } from "@/lib/utils";
 import type { ConsumptionAlert, TruckRefueling } from "@/lib/types";
 
 function mediaUrl(url: string) {
@@ -79,12 +82,21 @@ function RefuelingCard({ refueling }: { refueling: TruckRefueling }) {
 
 export function TruckRefuelingsPanel() {
   const { token } = useAuth();
+  const [search, setSearch] = useState("");
 
   const { data: refuelings, isLoading } = useQuery({
     queryKey: ["truck-refuelings"],
     queryFn: async () => (await api.allTruckRefuelings(token!)).refuelings as TruckRefueling[],
     enabled: !!token,
   });
+
+  const filteredRefuelings = useMemo(
+    () =>
+      (refuelings ?? []).filter((r) =>
+        matchesSearch(search, [r.truck?.plate, r.truck?.brand, r.truck?.model, r.driver?.name, formatDate(r.createdAt)])
+      ),
+    [refuelings, search]
+  );
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
 
@@ -93,10 +105,21 @@ export function TruckRefuelingsPanel() {
   }
 
   return (
-    <div className="grid gap-3">
-      {refuelings.map((refueling) => (
-        <RefuelingCard key={refueling.id} refueling={refueling} />
-      ))}
+    <div>
+      <div className="relative mb-4 max-w-sm">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input placeholder="Buscar por placa, caminhão, data ou usuário..." className="pl-8" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
+      {filteredRefuelings.length === 0 ? (
+        <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Nenhum abastecimento encontrado para essa busca.</p>
+      ) : (
+        <div className="grid gap-3">
+          {filteredRefuelings.map((refueling) => (
+            <RefuelingCard key={refueling.id} refueling={refueling} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

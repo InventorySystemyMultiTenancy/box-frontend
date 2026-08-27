@@ -822,6 +822,7 @@ export interface Truck {
   assignedEmployee?: { id: string; name: string; phone?: string | null } | null;
   active: boolean;
   notes?: string | null;
+  createdAt: string;
   // Pilotagem em andamento (0 ou 1 item) — vem junto na listagem para saber se o
   // caminhão está disponível sem uma chamada extra por caminhão.
   trips?: TruckTrip[];
