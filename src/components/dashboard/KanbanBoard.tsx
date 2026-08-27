@@ -26,6 +26,7 @@ import {
 } from "@/lib/types";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const TONE_CLASSES: Record<string, string> = {
   muted: "bg-muted text-muted-foreground",
@@ -143,6 +144,10 @@ const STATUS_THEME: Record<ServiceOrderStatus, StatusTheme> = {
 // com o tap que abre a ficha do veículo.
 const DRAG_THRESHOLD = 8;
 
+// Acima disso a coluna vira um resumo clicável em vez de listar todos os cards —
+// evita que uma etapa cheia vire uma lista enorme dominando a tela toda.
+const COMPACT_THRESHOLD = 2;
+
 function daysSince(iso?: string) {
   if (!iso) return null;
   const ms = Date.now() - new Date(iso).getTime();
@@ -168,6 +173,7 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
   const { token } = useAuth();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStatus, setDragOverStatus] = useState<ServiceOrderStatus | null>(null);
+  const [expandedStatus, setExpandedStatus] = useState<ServiceOrderStatus | null>(null);
   const columnRefs = useRef(new Map<ServiceOrderStatus, HTMLDivElement | null>());
   const dragState = useRef<DragState | null>(null);
 
@@ -295,28 +301,73 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
                     <p className="text-xs text-muted-foreground">Nenhum veículo</p>
                   </div>
                 )}
-                {colOrders.map((order) => {
-                  const days = daysSince(order.updatedAt);
-                  return (
-                    <div
+                {colOrders.length > COMPACT_THRESHOLD ? (
+                  <button
+                    type="button"
+                    onClick={() => setExpandedStatus(status)}
+                    className="flex flex-col items-center justify-center gap-1.5 rounded-md border border-dashed p-4 text-center transition-colors hover:bg-muted/40"
+                  >
+                    <span className={`flex size-9 items-center justify-center rounded-full ${theme.iconWrap}`}>
+                      <ColumnIcon className="size-4" />
+                    </span>
+                    <span className="text-sm font-semibold">{colOrders.length} veículos</span>
+                    <span className="text-xs text-muted-foreground">Toque para ver a lista</span>
+                  </button>
+                ) : (
+                  colOrders.map((order) => (
+                    <OrderCard
                       key={order.id}
-                      role="button"
-                      tabIndex={0}
-                      data-order-id={order.id}
+                      order={order}
+                      status={status}
+                      theme={theme}
+                      selected={order.id === selectedOrderId}
+                      dragging={draggingId === order.id}
                       onPointerDown={(e) => handlePointerDown(e, order.id)}
                       onPointerMove={handlePointerMove}
                       onPointerUp={handlePointerUp}
                       onPointerCancel={handlePointerCancel}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onSelect(order.id);
-                        }
+                      onSelect={() => onSelect(order.id)}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Etapas com mais de duas OS abrem aqui a lista completa, em vez de lotar a
+          coluna — tocar num item seleciona a OS e fecha a lista. */}
+      <Dialog open={expandedStatus !== null} onOpenChange={(open) => !open && setExpandedStatus(null)}>
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
+          {expandedStatus && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <span className={`flex size-7 items-center justify-center rounded-full ${STATUS_THEME[expandedStatus].iconWrap}`}>
+                    {(() => {
+                      const Icon = STATUS_THEME[expandedStatus].icon;
+                      return <Icon className="size-3.5" />;
+                    })()}
+                  </span>
+                  {STATUS_LABELS[expandedStatus]}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-2">
+                {(columns.find((c) => c.status === expandedStatus)?.orders ?? []).map((order) => {
+                  const days = daysSince(order.updatedAt);
+                  const theme = STATUS_THEME[expandedStatus];
+                  return (
+                    <button
+                      key={order.id}
+                      type="button"
+                      onClick={() => {
+                        onSelect(order.id);
+                        setExpandedStatus(null);
                       }}
-                      style={{ touchAction: "none" }}
-                      className={`cursor-grab select-none rounded-md border bg-background p-2.5 text-left text-sm shadow-sm transition-opacity hover:border-primary/50 active:cursor-grabbing ${
+                      className={`rounded-md border bg-background p-2.5 text-left text-sm shadow-sm hover:border-primary/50 ${
                         order.id === selectedOrderId ? "border-primary ring-1 ring-primary" : ""
-                      } ${draggingId === order.id ? "opacity-40" : ""}`}
+                      }`}
                     >
                       <div className="flex items-center gap-2">
                         <span className={`flex size-7 shrink-0 items-center justify-center rounded-full ${theme.iconWrap}`}>
@@ -335,20 +386,85 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
                       <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                         {order.code} {order.vehicle.plate ? `· ${order.vehicle.plate}` : ""}
                       </div>
-                      {order.insuranceCompany && (
-                        <div className="mt-1 truncate text-xs text-muted-foreground">{order.insuranceCompany.tradeName ?? order.insuranceCompany.legalName}</div>
-                      )}
                       <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
-                        <span className={`rounded-full px-1.5 py-0.5 ${TONE_CLASSES[STATUS_TONE[status]]}`}>{days != null ? `${days}d nesta etapa` : "—"}</span>
+                        <span className={`rounded-full px-1.5 py-0.5 ${TONE_CLASSES[STATUS_TONE[expandedStatus]]}`}>
+                          {days != null ? `${days}d nesta etapa` : "—"}
+                        </span>
                         {order.technician && <span className="truncate">{order.technician.name}</span>}
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>
-            </div>
-          );
-        })}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+interface OrderCardProps {
+  order: ServiceOrder;
+  status: ServiceOrderStatus;
+  theme: StatusTheme;
+  selected: boolean;
+  dragging: boolean;
+  onPointerDown: (e: React.PointerEvent) => void;
+  onPointerMove: (e: React.PointerEvent) => void;
+  onPointerUp: (e: React.PointerEvent) => void;
+  onPointerCancel: (e: React.PointerEvent) => void;
+  onSelect: () => void;
+}
+
+// Card arrastável de uma OS dentro da coluna — só é renderizado quando a coluna tem
+// poucas OS (COMPACT_THRESHOLD ou menos); acima disso a coluna vira um resumo e a
+// mesma informação aparece nas linhas (não arrastáveis) do diálogo expandido.
+function OrderCard({ order, status, theme, selected, dragging, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onSelect }: OrderCardProps) {
+  const days = daysSince(order.updatedAt);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      data-order-id={order.id}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      style={{ touchAction: "none" }}
+      className={`cursor-grab select-none rounded-md border bg-background p-2.5 text-left text-sm shadow-sm transition-opacity hover:border-primary/50 active:cursor-grabbing ${
+        selected ? "border-primary ring-1 ring-primary" : ""
+      } ${dragging ? "opacity-40" : ""}`}
+    >
+      <div className="flex items-center gap-2">
+        <span className={`flex size-7 shrink-0 items-center justify-center rounded-full ${theme.iconWrap}`}>
+          <Car className="size-3.5" />
+        </span>
+        <span className="min-w-0 flex-1 truncate font-medium">
+          {order.vehicle.brand} {order.vehicle.model}
+        </span>
+        {order.priority && order.priority !== "NORMAL" && (
+          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${PRIORITY_CLASSES[order.priority]}`}>
+            {PRIORITY_LABELS[order.priority]}
+          </span>
+        )}
+      </div>
+      {order.vehicle.owner && <div className="mt-1 truncate text-xs text-muted-foreground">{order.vehicle.owner.name}</div>}
+      <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+        {order.code} {order.vehicle.plate ? `· ${order.vehicle.plate}` : ""}
+      </div>
+      {order.insuranceCompany && (
+        <div className="mt-1 truncate text-xs text-muted-foreground">{order.insuranceCompany.tradeName ?? order.insuranceCompany.legalName}</div>
+      )}
+      <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
+        <span className={`rounded-full px-1.5 py-0.5 ${TONE_CLASSES[STATUS_TONE[status]]}`}>{days != null ? `${days}d nesta etapa` : "—"}</span>
+        {order.technician && <span className="truncate">{order.technician.name}</span>}
       </div>
     </div>
   );
