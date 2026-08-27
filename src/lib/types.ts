@@ -597,6 +597,9 @@ export interface Invoice {
   client?: { id: string; name: string } | null;
   serviceOrder?: { id: string; code: string } | null;
   createdAt: string;
+  // Boletos gerados a partir desta nota (paymentMethod "Boleto" + quantidade de
+  // parcelas informada no cadastro) — ver AccountPayable.invoiceId no backend.
+  payables?: AccountPayable[];
 }
 
 export interface ExtractedInvoiceData {
