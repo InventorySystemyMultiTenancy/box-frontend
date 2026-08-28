@@ -10,16 +10,18 @@ export function Presentation() {
           <span className="eyebrow">A oficina</span>
           <h2>Uma equipe técnica que documenta cada passo.</h2>
           <p>
-            Somos uma oficina multimarcas que trata cada ordem de serviço como um relatório de
-            engenharia: tudo o que é encontrado, trocado ou testado fica registrado e visível para
-            você, no momento em que acontece.
+            Somos a Reblind, especializada em blindagem — reparo, recuperação e documentação —,
+            funilaria, pintura e mecânica, homologada pelo Ministério da Defesa (Exército Brasileiro)
+            e associada à ABRABLIN. Tratamos cada ordem de serviço como um relatório de engenharia:
+            tudo o que é encontrado, trocado ou testado fica registrado e visível para você, no
+            momento em que acontece.
           </p>
         </div>
       </Reveal>
       <Reveal delay={80}>
         <div className={styles.statsRow}>
           <div className={styles.stat}>
-            <div className={`mono ${styles.v}`}>11</div>
+            <div className={`mono ${styles.v}`}>17</div>
             <div className={styles.l}>anos de operação</div>
           </div>
           <div className={styles.stat}>
@@ -154,9 +156,9 @@ export function Testimonials() {
 }
 
 const TEAM = [
-  { initials: "DM", name: "Diego M.", role: "Mecânico-chefe · motor e transmissão" },
-  { initials: "AP", name: "Ana P.", role: "Elétrica e diagnóstico automotivo" },
-  { initials: "RS", name: "Rafael S.", role: "Suspensão e freios" },
+  { initials: "DM", name: "Diego M.", role: "Reparo e recuperação de blindagem" },
+  { initials: "AP", name: "Ana P.", role: "Funilaria e pintura" },
+  { initials: "RS", name: "Rafael S.", role: "Mecânica e gestão de frotas" },
 ];
 
 export function Team() {
@@ -189,11 +191,10 @@ export function Partners() {
     <section className={styles.section}>
       <Reveal>
         <div className={styles.partnersRow}>
-          <span>Bosch</span>
-          <span>NGK</span>
-          <span>Porto Seguro</span>
-          <span>Mapfre</span>
-          <span>Cofap</span>
+          <span>Exército Brasileiro · homologada</span>
+          <span>ABRABLIN</span>
+          <span>Jaguar</span>
+          <span>Land Rover</span>
         </div>
       </Reveal>
     </section>
@@ -242,7 +243,8 @@ export function SiteFooter() {
       <div className={styles.footerBrand}>
         <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} />
       </div>
-      Reblind — acompanhamento de manutenção em tempo real.
+      <p>Reblind — acompanhamento de manutenção em tempo real.</p>
+      <p>Rua Antônio das Chagas, 530 — Chácara Santo Antônio, São Paulo/SP · (11) 2337-0101</p>
     </footer>
   );
 }

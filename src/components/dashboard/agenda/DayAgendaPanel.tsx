@@ -112,7 +112,7 @@ export default function DayAgendaPanel() {
 
       <div className="grid gap-4">
         {grouped.map(([bayName, list]) => (
-          <div key={bayName} className="rounded-lg border bg-card">
+          <div key={bayName} className="min-w-0 rounded-lg border bg-card">
             <div className="border-b px-4 py-2 text-sm font-medium">{bayName}</div>
             <div className="divide-y">
               {list.map((appt) => (

@@ -61,7 +61,7 @@ export default function LojasPage() {
         {canManage && <StoreFormDialog onSaved={refetch} trigger={<Button><Plus className="size-4" />Nova loja</Button>} />}
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -141,7 +141,7 @@ function StoreFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onSav
             <Label htmlFor="store-address">Endereço</Label>
             <Input id="store-address" value={form.addressLine} onChange={(e) => set("addressLine", e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="store-city">Cidade</Label>
               <Input id="store-city" value={form.city} onChange={(e) => set("city", e.target.value)} />

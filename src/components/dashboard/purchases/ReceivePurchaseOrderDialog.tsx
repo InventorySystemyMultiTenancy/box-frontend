@@ -62,7 +62,7 @@ export function ReceivePurchaseOrderDialog({ order, trigger, onSaved }: ReceiveP
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           {pending.map((item) => (
-            <div key={item.id} className="grid grid-cols-[1fr_100px] items-end gap-3">
+            <div key={item.id} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_100px]">
               <div>
                 <Label>{item.inventoryPart.name}</Label>
                 <p className="text-xs text-muted-foreground">

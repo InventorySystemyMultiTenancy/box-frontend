@@ -119,7 +119,7 @@ export default function ComprasPage() {
           </CardHeader>
           <CardContent className="grid gap-2">
             {suggestions.map((s) => (
-              <div key={s.id} className="flex items-center justify-between text-sm">
+              <div key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
                 <span>
                   {s.name} <span className="text-muted-foreground">— estoque {s.stockQty}, mínimo {s.minStockQty}</span>
                 </span>
@@ -133,7 +133,7 @@ export default function ComprasPage() {
         </Card>
       )}
 
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>

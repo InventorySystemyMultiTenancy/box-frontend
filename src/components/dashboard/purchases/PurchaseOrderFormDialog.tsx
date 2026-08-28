@@ -128,7 +128,7 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
           <DialogTitle>Novo pedido de compra</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label>Fornecedor *</Label>
               <Select value={supplierId} onValueChange={setSupplierId}>
@@ -167,8 +167,8 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
           <div className="grid gap-2">
             <Label>Itens</Label>
             {items.map((row, index) => (
-              <div key={index} className="flex items-end gap-2">
-                <div className="grid flex-1 gap-1.5">
+              <div key={index} className="flex flex-wrap items-end gap-2">
+                <div className="grid min-w-40 flex-1 gap-1.5">
                   <Select value={row.inventoryPartId} onValueChange={(v) => onSelectPart(index, v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Peça..." />
@@ -191,7 +191,7 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
                     onChange={(e) => updateItem(index, { quantity: e.target.value })}
                   />
                 </div>
-                <div className="grid w-28 gap-1.5">
+                <div className="grid w-24 gap-1.5 sm:w-28">
                   <Input
                     type="number"
                     min="0"
@@ -201,7 +201,7 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
                     onChange={(e) => updateItem(index, { unitCost: e.target.value })}
                   />
                 </div>
-                <Button type="button" variant="outline" size="icon" onClick={() => removeRow(index)} disabled={items.length === 1}>
+                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => removeRow(index)} disabled={items.length === 1}>
                   <Trash2 className="size-4" />
                 </Button>
               </div>

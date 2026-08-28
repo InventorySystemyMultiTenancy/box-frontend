@@ -68,7 +68,7 @@ export default function ReceivablesPanel() {
         {canManage && <ReceivableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a receber</Button>} />}
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -178,7 +178,7 @@ function ReceivableFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; 
             <Label htmlFor="r-description">Descrição *</Label>
             <Input id="r-description" required value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="r-category">Categoria *</Label>
               <Input id="r-category" required value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="SERVIÇO" />
@@ -196,7 +196,7 @@ function ReceivableFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; 
               </Select>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label htmlFor="r-amount">Valor *</Label>
               <Input id="r-amount" type="number" min="0" step="0.01" required value={form.amount} onChange={(e) => set("amount", e.target.value)} />

@@ -82,12 +82,12 @@ export default function ApprovalCard({
       ) : (
         <>
           <span
-            className={`${styles.badge} ${approval.status === "APPROVED" ? styles["tone-ok"] : styles["tone-crit"]} ${
-              styles.resolvedTag
-            }`}
+            className={`${styles.badge} ${
+              approval.status === "APPROVED" ? styles["tone-ok"] : approval.status === "REJECTED" ? styles["tone-crit"] : styles["tone-warn"]
+            } ${styles.resolvedTag}`}
           >
             <i className={styles.dot} />
-            {approval.status === "APPROVED" ? "Aprovado" : "Reprovado"}
+            {approval.status === "APPROVED" ? "Aprovado" : approval.status === "REJECTED" ? "Reprovado" : "Aguardando resposta do cliente"}
           </span>
           {approval.responseNote && <p className={styles.responseNote}>{approval.responseNote}</p>}
         </>

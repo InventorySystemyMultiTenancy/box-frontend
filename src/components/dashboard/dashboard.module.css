@@ -1,99 +1,428 @@
+:global(:root) {
+  --shell-bg: #0e1c33;
+  --shell-active: #2563eb;
+  --shell-active-soft: rgba(37, 99, 235, 0.22);
+  --shell-hover: rgba(255, 255, 255, 0.07);
+  --shell-hover-strong: rgba(255, 255, 255, 0.13);
+  --shell-text: #f1f5fb;
+  --shell-text-muted: #93a4c6;
+  --shell-border: rgba(255, 255, 255, 0.09);
+}
+
 .page {
   min-height: 100vh;
   background: var(--bg);
 }
 
+/* Header: fundo com fade branco (esquerda, atrás da logo — que é azul-marinho e
+   precisa de um respiro claro para não sumir) para azul-marinho (a partir daí,
+   já sólido antes dos ícones de navegação) fixa à esquerda, navegação em "roleta"
+   (só ícone, rolagem horizontal com setas) ocupando o meio, sino de alertas + menu
+   do usuário fixos à direita. */
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1rem clamp(1.25rem, 4vw, 2.5rem);
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-elevated);
+  gap: 1rem;
+  padding: 0.6rem clamp(1.25rem, 4vw, 2rem);
+  border-bottom: 1px solid var(--shell-border);
+  background: linear-gradient(to right, #fff 0, #fff 40px, var(--shell-bg) 260px);
 }
 .brand {
   font-family: var(--font-display);
   font-weight: 750;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 .brandLogo {
-  height: 48px;
+  height: 46px;
   width: auto;
+  display: block;
+  /* drop-shadow segue o alfa do PNG (não é um retângulo por cima) — dá um halo neon
+     ao redor do desenho da logo sem nunca cobrir/escurecer a própria logo. */
+  animation: brandNeon 2.8s ease-in-out infinite;
 }
-.topbarLeft {
+@keyframes brandNeon {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(37, 99, 235, 0.55)) drop-shadow(0 0 9px rgba(37, 99, 235, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(96, 165, 250, 0.9)) drop-shadow(0 0 20px rgba(59, 130, 246, 0.6));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brandLogo {
+    animation: none;
+    filter: drop-shadow(0 0 6px rgba(37, 99, 235, 0.55));
+  }
+}
+.navScrollerWrap {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+}
+.navArrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--shell-border);
+  border-radius: 7px;
+  background: var(--shell-hover);
+  color: var(--shell-text-muted);
+  cursor: pointer;
+}
+.navArrow:hover:not(:disabled) {
+  color: var(--shell-text);
+  background: var(--shell-hover-strong);
+}
+.navArrow:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 .tabs {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
 }
+.tabs::-webkit-scrollbar { display: none; }
+/* No header a roleta mostra só o ícone (o nome de cada aba já aparece na sidebar). */
+.tabs .tab {
+  padding: 0.55rem;
+  gap: 0.2rem;
+}
+.tabs .tabLabel { display: none; }
 .tab {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   font-family: var(--font-display);
   font-size: 0.84rem;
   font-weight: 600;
-  color: var(--text-muted);
-  padding: 0.45rem 0.8rem;
-  border-radius: 7px;
+  color: var(--shell-text-muted);
+  padding: 0.5rem 0.8rem;
+  border-radius: 9px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
+.tab svg { flex-shrink: 0; }
 .tab:hover {
-  color: var(--text);
-  background: var(--bg-panel);
+  color: var(--shell-text);
+  background: var(--shell-hover);
 }
 .tabActive {
-  color: var(--accent-blue);
-  background: var(--accent-blue-soft);
+  color: #fff;
+  background: var(--shell-active);
 }
 .tabActive:hover {
-  color: var(--accent-blue);
+  color: #fff;
+  background: var(--shell-active);
+}
+.navBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: var(--critical);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  flex-shrink: 0;
 }
 .topbarRight {
   display: flex;
   align-items: center;
-  gap: 1.2rem;
+  gap: 0.6rem;
   font-size: 0.85rem;
-  color: var(--text-muted);
-}
-.logout {
-  background: none;
-  border: 1px solid var(--border-strong);
-  border-radius: 7px;
-  padding: 0.4rem 0.8rem;
-  cursor: pointer;
-  font-family: var(--font-display);
-  font-size: 0.8rem;
-  color: var(--text);
+  color: var(--shell-text-muted);
   flex-shrink: 0;
+}
+/* Busca global embutida no header — ícone + campo de texto, encolhe para só o
+   ícone no celular (o resultado ainda abre em /dashboard/busca ao tocar). */
+.headerSearch {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 0.6rem;
+  border-radius: 10px;
+  border: 1px solid var(--shell-border);
+  background: var(--shell-hover);
+}
+.headerSearch:focus-within {
+  border-color: var(--shell-active);
+  background: var(--shell-hover-strong);
+}
+.headerSearchBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--shell-text-muted);
+  cursor: pointer;
+}
+.headerSearchBtn:hover {
+  color: var(--shell-text);
+}
+.headerSearchInput {
+  width: 170px;
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--shell-text);
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+}
+.headerSearchInput::placeholder {
+  color: var(--shell-text-muted);
+}
+.headerSearchInput::-webkit-search-cancel-button {
+  filter: invert(0.6);
+}
+.notifBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--shell-border);
+  background: var(--shell-hover);
+  color: var(--shell-text-muted);
+  cursor: pointer;
+}
+.notifBtn:hover {
+  color: var(--shell-text);
+  background: var(--shell-hover-strong);
+}
+.notifBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 3px;
+  border-radius: 99px;
+  background: var(--critical);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--shell-bg);
+}
+.userMenuBtn {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.28rem 0.6rem 0.28rem 0.28rem;
+  border-radius: 11px;
+  border: 1px solid var(--shell-border);
+  background: var(--shell-hover);
+  color: var(--shell-text);
+  cursor: pointer;
+}
+.userMenuBtn:hover {
+  background: var(--shell-hover-strong);
+}
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--shell-active);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.userMeta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+}
+.userMeta strong {
+  font-size: 0.8rem;
+  font-family: var(--font-display);
+  color: var(--shell-text);
+}
+.userMeta span {
+  font-size: 0.68rem;
+  color: var(--shell-text-muted);
+}
+
+/* Menu hambúrguer — só no celular, complementa a roleta de abas com a lista
+   completa de navegação (mesmo conteúdo da sidebar do computador). */
+.hamburgerBtn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--shell-border);
+  border-radius: 9px;
+  background: var(--shell-hover);
+  color: var(--shell-text);
+  cursor: pointer;
+}
+.hamburgerBtn:hover {
+  background: var(--shell-hover-strong);
 }
 
 @media (max-width: 760px) {
   .topbar {
-    flex-wrap: wrap;
-    row-gap: 0.7rem;
-    padding: 0.85rem 1.1rem;
+    padding: 0.75rem 1.1rem;
+    justify-content: space-between;
   }
-  /* "desembrulha" o agrupamento brand+tabs para que cada um vire um item flex
-     independente do .topbar e possa ser reordenado — sem mexer no JSX. */
-  .topbarLeft {
-    display: contents;
+  /* No celular a navegação inteira mora no menu hambúrguer — a roleta de ícones
+     some daqui, sem precisar de linha extra nem botões de rolar. */
+  .navScrollerWrap { display: none; }
+  .userMeta { display: none; }
+  .userMenuBtn { padding: 0.3rem; border-radius: 50%; }
+  .hamburgerBtn { display: flex; }
+  /* Busca encolhe pra só o ícone — toca e abre a página de busca pra digitar lá. */
+  .headerSearch { width: 38px; padding: 0; justify-content: center; }
+  .headerSearchInput { display: none; }
+}
+
+.mobileNavOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(16, 24, 32, 0.45);
+  z-index: 60;
+  animation: fadeIn 0.15s ease;
+}
+.mobileNavDrawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 80vw;
+  max-width: 300px;
+  background: var(--shell-bg);
+  box-shadow: var(--shadow);
+  padding: 1rem;
+  box-sizing: border-box;
+  overflow-y: auto;
+  animation: slideIn 0.2s ease;
+}
+.mobileNavDrawerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  margin: -1rem -1rem 1rem;
+  padding: 0.9rem 1rem;
+  background: linear-gradient(to right, #fff 0, #fff 40px, var(--shell-bg) 220px);
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobileNavOverlay, .mobileNavDrawer { animation: none; }
+}
+@media (min-width: 761px) {
+  .mobileNavOverlay { display: none; }
+}
+
+/* Corpo do painel: sidebar de navegação (só computador) + área de conteúdo. */
+.body {
+  display: flex;
+  align-items: flex-start;
+}
+.sidebar {
+  display: none;
+}
+.mainArea {
+  flex: 1;
+  min-width: 0;
+}
+@media (min-width: 761px) {
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 220px;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    background: var(--shell-bg);
+    border-right: 1px solid var(--shell-border);
+    padding: 1.1rem 0.85rem;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    overflow-y: auto;
   }
-  .brand { order: 1; }
-  .topbarRight { order: 2; }
-  .tabs {
-    order: 3;
-    width: 100%;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: 0.3rem;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab { white-space: nowrap; flex-shrink: 0; }
-  .topbarRight span { display: none; }
+}
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.sidebarNav .tab {
+  width: 100%;
+}
+
+.sidebarPromo {
+  margin-top: 1.4rem;
+  padding: 1rem 0.9rem;
+  border-radius: 12px;
+  background: linear-gradient(160deg, var(--shell-active) 0%, #10254d 100%);
+  color: #fff;
+  flex-shrink: 0;
+}
+.sidebarPromoIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.65rem;
+}
+.sidebarPromo strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  margin-bottom: 0.3rem;
+}
+.sidebarPromo p {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.45;
 }
 
 .content {

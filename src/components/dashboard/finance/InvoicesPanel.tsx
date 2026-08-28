@@ -68,7 +68,7 @@ export default function InvoicesPanel() {
         {canManage && <InvoiceFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova nota fiscal</Button>} />}
       </div>
 
-      <div className="rounded-lg border bg-card">
+      <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -97,6 +97,11 @@ export default function InvoicesPanel() {
                   <Badge variant={STATUS_VARIANTS[invoice.status]}>{STATUS_LABELS[invoice.status]}</Badge>
                   {invoice.status === "ERROR" && invoice.errorMessage && (
                     <p className="mt-1 text-xs text-destructive">{invoice.errorMessage}</p>
+                  )}
+                  {invoice.payables && invoice.payables.length > 0 && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {invoice.payables.length} boleto{invoice.payables.length > 1 ? "s" : ""} em contas a pagar
+                    </p>
                   )}
                 </TableCell>
                 <TableCell>
@@ -137,7 +142,14 @@ const EMPTY_FORM = {
   discountAmount: "",
   taxAmount: "",
   issueDate: "",
+  // Só usados quando paymentMethod é "boleto" — geram as parcelas em contas a pagar.
+  dueDate: "",
+  installments: "1",
 };
+
+function isBoleto(paymentMethod: string) {
+  return paymentMethod.trim().toLowerCase().includes("boleto");
+}
 
 function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onSaved: () => void }) {
   const { token } = useAuth();
@@ -209,12 +221,18 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
     }
   }
 
+  const boleto = isBoleto(form.paymentMethod);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
+    if (boleto && !form.dueDate) {
+      toast.error("Informe a data de vencimento do primeiro boleto.");
+      return;
+    }
     setSaving(true);
     try {
-      await api.createInvoice(
+      const { invoice } = await api.createInvoice(
         {
           type: form.type,
           clientId: form.clientId || undefined,
@@ -232,10 +250,13 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
           taxAmount: form.taxAmount ? Number(form.taxAmount) : undefined,
           issueDate: form.issueDate || undefined,
+          dueDate: boleto ? form.dueDate : undefined,
+          installments: boleto ? Number(form.installments) || 1 : undefined,
         },
         token
       );
-      toast.success("Nota fiscal salva.");
+      const payablesCount = (invoice as Invoice).payables?.length ?? 0;
+      toast.success(payablesCount > 0 ? `Nota fiscal salva — ${payablesCount} boleto(s) lançados em contas a pagar.` : "Nota fiscal salva.");
       setOpen(false);
       onSaved();
     } catch (err) {
@@ -262,7 +283,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             {autoClientMessage && <p className="text-xs text-muted-foreground">{autoClientMessage}</p>}
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label>Tipo</Label>
               <Select value={form.type} onValueChange={(v) => set("type", v as InvoiceType)}>
@@ -289,7 +310,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             <Input id="inv-access-key" value={form.accessKey} onChange={(e) => set("accessKey", e.target.value)} placeholder="44 dígitos (NF-e/NFC-e)" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="inv-issuer-name">Emitente</Label>
               <Input id="inv-issuer-name" value={form.issuerName} onChange={(e) => set("issuerName", e.target.value)} />
@@ -312,7 +333,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="inv-recipient-name">Destinatário (nome na nota)</Label>
               <Input id="inv-recipient-name" value={form.recipientName} onChange={(e) => set("recipientName", e.target.value)} />
@@ -323,23 +344,47 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
               <Label htmlFor="inv-operation">Natureza da operação</Label>
               <Input id="inv-operation" value={form.operationNature} onChange={(e) => set("operationNature", e.target.value)} placeholder="Venda de mercadoria" />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="inv-payment">Forma de pagamento</Label>
-              <Input id="inv-payment" value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)} placeholder="PIX" />
+              <Input id="inv-payment" value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)} placeholder="PIX, Boleto, Dinheiro..." />
             </div>
           </div>
+
+          {boleto && (
+            <div className="grid grid-cols-1 gap-3 rounded-md border border-dashed p-3 sm:grid-cols-2">
+              <div className="col-span-full text-xs font-medium text-muted-foreground">
+                Gera automaticamente uma conta a pagar por boleto, vencendo mês a mês.
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="inv-due-date">Vencimento do 1º boleto *</Label>
+                <Input id="inv-due-date" type="date" required={boleto} value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="inv-installments">Quantidade de boletos *</Label>
+                <Input
+                  id="inv-installments"
+                  type="number"
+                  min="1"
+                  max="60"
+                  required={boleto}
+                  value={form.installments}
+                  onChange={(e) => set("installments", e.target.value)}
+                />
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-1.5">
             <Label htmlFor="inv-description">Descrição / discriminação *</Label>
             <Input id="inv-description" required value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
               <Label htmlFor="inv-amount">Valor total *</Label>
               <Input id="inv-amount" type="number" min="0" step="0.01" required value={form.totalAmount} onChange={(e) => set("totalAmount", e.target.value)} />

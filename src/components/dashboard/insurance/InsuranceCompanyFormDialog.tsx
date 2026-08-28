@@ -5,53 +5,58 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Supplier } from "@/lib/types";
+import type { InsuranceCompany } from "@/lib/types";
 
-interface SupplierFormDialogProps {
-  supplier?: Supplier;
+interface InsuranceCompanyFormDialogProps {
+  company?: InsuranceCompany;
   trigger: React.ReactNode;
   onSaved: () => void;
 }
 
 const EMPTY_FORM = {
-  name: "",
-  cpfCnpj: "",
-  contactName: "",
-  phone: "",
-  whatsapp: "",
-  email: "",
+  legalName: "",
+  tradeName: "",
+  cnpj: "",
   addressLine: "",
   city: "",
   state: "",
+  phone: "",
+  email: "",
+  contactName: "",
   notes: "",
 };
 
-export function SupplierFormDialog({ supplier, trigger, onSaved }: SupplierFormDialogProps) {
+export function InsuranceCompanyFormDialog({ company, trigger, onSaved }: InsuranceCompanyFormDialogProps) {
   const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [accredited, setAccredited] = useState(false);
 
-  function buildForm(source?: Supplier): typeof EMPTY_FORM {
+  function buildForm(source?: InsuranceCompany): typeof EMPTY_FORM {
     return {
-      name: source?.name ?? "",
-      cpfCnpj: source?.cpfCnpj ?? "",
-      contactName: source?.contactName ?? "",
-      phone: source?.phone ?? "",
-      whatsapp: source?.whatsapp ?? "",
-      email: source?.email ?? "",
+      legalName: source?.legalName ?? "",
+      tradeName: source?.tradeName ?? "",
+      cnpj: source?.cnpj ?? "",
       addressLine: source?.addressLine ?? "",
       city: source?.city ?? "",
       state: source?.state ?? "",
+      phone: source?.phone ?? "",
+      email: source?.email ?? "",
+      contactName: source?.contactName ?? "",
       notes: source?.notes ?? "",
     };
   }
 
   function handleOpenChange(next: boolean) {
-    if (next) setForm(buildForm(supplier));
+    if (next) {
+      setForm(buildForm(company));
+      setAccredited(company?.accredited ?? false);
+    }
     setOpen(next);
   }
 
@@ -61,21 +66,21 @@ export function SupplierFormDialog({ supplier, trigger, onSaved }: SupplierFormD
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token || !form.name.trim()) return;
+    if (!token || !form.legalName.trim()) return;
     setSaving(true);
     try {
-      const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ""));
-      if (supplier) {
-        await api.updateSupplier(supplier.id, payload, token);
-        toast.success("Fornecedor atualizado.");
+      const payload = { ...Object.fromEntries(Object.entries(form).filter(([, v]) => v !== "")), accredited };
+      if (company) {
+        await api.updateInsuranceCompany(company.id, payload, token);
+        toast.success("Seguradora atualizada.");
       } else {
-        await api.createSupplier(payload, token);
-        toast.success("Fornecedor cadastrado.");
+        await api.createInsuranceCompany(payload, token);
+        toast.success("Seguradora cadastrada.");
       }
       setOpen(false);
       onSaved();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar o fornecedor.");
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar a seguradora.");
     } finally {
       setSaving(false);
     }
@@ -86,29 +91,29 @@ export function SupplierFormDialog({ supplier, trigger, onSaved }: SupplierFormD
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{supplier ? "Editar fornecedor" : "Novo fornecedor"}</DialogTitle>
+          <DialogTitle>{company ? "Editar seguradora" : "Nova seguradora"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="col-span-2 grid gap-1.5">
-              <Label htmlFor="name">Nome/Razão social *</Label>
-              <Input id="name" required value={form.name} onChange={(e) => set("name", e.target.value)} />
+              <Label htmlFor="legalName">Razão social *</Label>
+              <Input id="legalName" required value={form.legalName} onChange={(e) => set("legalName", e.target.value)} />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="cpfCnpj">CNPJ/CPF</Label>
-              <Input id="cpfCnpj" value={form.cpfCnpj} onChange={(e) => set("cpfCnpj", e.target.value)} />
+              <Label htmlFor="tradeName">Nome fantasia</Label>
+              <Input id="tradeName" value={form.tradeName} onChange={(e) => set("tradeName", e.target.value)} />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="contactName">Contato</Label>
+              <Label htmlFor="cnpj">CNPJ</Label>
+              <Input id="cnpj" value={form.cnpj} onChange={(e) => set("cnpj", e.target.value)} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="contactName">Contato responsável</Label>
               <Input id="contactName" value={form.contactName} onChange={(e) => set("contactName", e.target.value)} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="phone">Telefone</Label>
               <Input id="phone" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="whatsapp">WhatsApp</Label>
-              <Input id="whatsapp" value={form.whatsapp} onChange={(e) => set("whatsapp", e.target.value)} />
             </div>
             <div className="col-span-2 grid gap-1.5">
               <Label htmlFor="email">E-mail</Label>
@@ -129,6 +134,10 @@ export function SupplierFormDialog({ supplier, trigger, onSaved }: SupplierFormD
             <div className="col-span-2 grid gap-1.5">
               <Label htmlFor="notes">Observações</Label>
               <Input id="notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+            </div>
+            <div className="col-span-2 flex items-center gap-2">
+              <Checkbox id="accredited" checked={accredited} onCheckedChange={(v) => setAccredited(v === true)} />
+              <Label htmlFor="accredited" className="font-normal">Seguradora credenciada</Label>
             </div>
           </div>
           <DialogFooter>

@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
-import { Approval, InventoryPart, ServiceOrder, ServiceOrderStatus, TimelineEvent, VehiclePart } from "@/lib/types";
+import { Approval, InventoryPart, PART_STATUS_LABELS, SERVICE_ORDER_STATUSES, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
@@ -78,6 +79,11 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [finalizeForm, setFinalizeForm] = useState({ description: "", extraValue: "", photo: null as File | null });
+  const [advancePhoto, setAdvancePhoto] = useState<File | null>(null);
+  const [advanceBusy, setAdvanceBusy] = useState(false);
+  const [advanceMessage, setAdvanceMessage] = useState<string | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
@@ -133,12 +139,16 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         prev ? { ...prev, approvals: prev.approvals.map((a) => (a.id === payload.approval.id ? payload.approval : a)) } : prev
       );
     }
+    function onArchived(payload: { orderId: string; archivedAt: string }) {
+      setOrder((prev) => (prev && prev.id === payload.orderId ? { ...prev, archivedAt: payload.archivedAt } : prev));
+    }
 
     socket.on("status:update", onStatus);
     socket.on("timeline:new", onTimeline);
     socket.on("part:update", onPart);
     socket.on("approval:new", onApprovalNew);
     socket.on("approval:update", onApprovalUpdate);
+    socket.on("service-order:archived", onArchived);
 
     return () => {
       socket.off("status:update", onStatus);
@@ -146,6 +156,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
       socket.off("part:update", onPart);
       socket.off("approval:new", onApprovalNew);
       socket.off("approval:update", onApprovalUpdate);
+      socket.off("service-order:archived", onArchived);
     };
   }, [token, orderId]);
 
@@ -216,6 +227,35 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     setOrder((prev) => (prev ? { ...prev, status: "RECEIVED" } : prev));
   }
 
+  // Avança para a próxima etapa da sequência (mesmo botão usado no Kanban, só que
+  // aqui dentro do projeto e com a opção de anexar uma foto documentando a etapa.
+  async function advanceStage(nextStatus: ServiceOrderStatus) {
+    if (!token || !order) return;
+    setAdvanceBusy(true);
+    setAdvanceMessage(null);
+    try {
+      const result = await api.updateOrderStatus(order.id, nextStatus, token, advancePhoto);
+      const updatedOrder = result.order as Partial<ServiceOrder>;
+      const event = result.event as TimelineEvent | null;
+      setOrder((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          status: (updatedOrder.status as ServiceOrderStatus) ?? nextStatus,
+          progress: updatedOrder.progress ?? prev.progress,
+          timelineEvents:
+            event && !prev.timelineEvents.some((t) => t.id === event.id) ? [...prev.timelineEvents, event] : prev.timelineEvents,
+        };
+      });
+      if (event) setJustArrivedId(event.id);
+      setAdvancePhoto(null);
+    } catch {
+      setAdvanceMessage("Não foi possível avançar a etapa.");
+    } finally {
+      setAdvanceBusy(false);
+    }
+  }
+
   async function resolvePart(partId: string) {
     if (!token || !order) return;
     const result = await api.resolvePart(order.id, partId, token);
@@ -269,6 +309,24 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     }
   }
 
+  // "Dar baixa": encerra o projeto mesmo sem nenhuma confirmação/aceite do cliente —
+  // some da lista/kanban de projetos em andamento, mas o registro (e a garantia das
+  // peças/serviço, que independe disso) continua salvo e acessível normalmente.
+  async function archiveOrder() {
+    if (!token || !order) return;
+    if (!confirm("Dar baixa neste projeto? Ele sairá da lista de projetos em andamento, mas continua salvo como concluído.")) return;
+    setArchiveBusy(true);
+    setArchiveMessage(null);
+    try {
+      const result = await api.archiveServiceOrder(order.id, token);
+      setOrder(result.order as ServiceOrder);
+    } catch (err) {
+      setArchiveMessage(err instanceof ApiError ? err.message : "Não foi possível dar baixa neste projeto.");
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
+
   const updateProblemDetails = useCallback(
     async (approvalId: string, data: { note?: string; partUsages: { inventoryPartId: string; quantity: number }[]; files: File[] }) => {
       if (!token || !order) return;
@@ -299,13 +357,33 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     [token, order]
   );
 
+  // Admin pode gerar o PDF a qualquer momento, independente do status ou de qualquer
+  // confirmação do cliente — inclusive depois de o projeto já ter tido a baixa dada.
+  // O cliente só pode gerar quando o veículo está pronto para retirada.
   function generateServicePdf() {
-    if (!order || !isCustomer || order.status !== "READY_FOR_PICKUP") return;
+    if (!order) return;
+    if (!isAdmin && !(isCustomer && order.status === "READY_FOR_PICKUP")) return;
 
-    const approvedApprovals = order.approvals.filter((approval) => approval.status === "APPROVED");
-    const total = approvedApprovals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
+    // Valor final = trabalho de fato concluído (peça com status DONE), não só o que o
+    // cliente aprovou formalmente — mão de obra entra no total igual às peças, já que
+    // o admin pode finalizar/dar baixa mesmo sem resposta do cliente a uma aprovação.
     const completedParts = order.parts.filter((part) => part.status === "DONE");
-    const rows = approvedApprovals
+    const donePartIds = new Set(completedParts.map((part) => part.id));
+    const completedApprovals = order.approvals.filter((approval) => approval.partId && donePartIds.has(approval.partId));
+    const servicesTotal = completedApprovals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
+    const total = servicesTotal + (order.deliveryExtraValue ?? 0);
+    const partsRows = order.parts
+      .map(
+        (part) => `
+          <tr>
+            <td>${escapeHtml(part.name)}</td>
+            <td>${escapeHtml(PART_STATUS_LABELS[part.status])}</td>
+            <td>${escapeHtml(part.note ?? "—")}</td>
+          </tr>
+        `
+      )
+      .join("");
+    const rows = completedApprovals
       .map((approval) => {
         const parts = approval.partUsages?.length
           ? approval.partUsages.map((usage) => `${usage.quantity}x ${usage.inventoryPart.name}`).join(", ")
@@ -348,29 +426,46 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
           </style>
         </head>
         <body>
-          <h1>Relatório final de manutenção</h1>
-          <div class="muted">Gerado em ${printedAt}</div>
+          <h1>Relatório do projeto</h1>
+          <div class="muted">Gerado em ${printedAt} · Etapa atual: ${escapeHtml(STATUS_LABELS[order.status])}</div>
           <div class="summary">
             <div class="box"><strong>Ordem</strong><br />${escapeHtml(order.code)}</div>
+            <div class="box"><strong>Cliente</strong><br />${escapeHtml(order.vehicle.owner?.name ?? "Não informado")}</div>
             <div class="box"><strong>Veículo</strong><br />${escapeHtml(vehicle)}</div>
             <div class="box"><strong>Placa</strong><br />${escapeHtml(order.vehicle.plate ?? "Não informada")}</div>
             <div class="box"><strong>Quilometragem</strong><br />${order.vehicle.mileage.toLocaleString("pt-BR")} km</div>
           </div>
+          <h2>Problemas identificados</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Sistema</th>
+                <th>Status</th>
+                <th>Observação</th>
+              </tr>
+            </thead>
+            <tbody>${partsRows || '<tr><td colspan="3">Nenhum problema registrado.</td></tr>'}</tbody>
+          </table>
           <h2>Serviços realizados</h2>
           <ul>${completedList || "<li>Nenhum problema concluído registrado.</li>"}</ul>
-          <h2>Valores aprovados</h2>
+          <h2>Valores do serviço</h2>
           <table>
             <thead>
               <tr>
                 <th>Problema / serviço</th>
-                <th>Peças</th>
+                <th>Peças usadas</th>
                 <th>Mão de obra</th>
-                <th>Peças</th>
+                <th>Valor peças</th>
                 <th>Total</th>
               </tr>
             </thead>
-            <tbody>${rows || '<tr><td colspan="5">Nenhum valor aprovado registrado.</td></tr>'}</tbody>
+            <tbody>${rows || '<tr><td colspan="5">Nenhum valor de serviço concluído registrado.</td></tr>'}</tbody>
           </table>
+          ${
+            order.deliveryExtraValue
+              ? `<div class="muted" style="margin-top: 8px; text-align: right;">Valor extra na entrega: ${formatCurrency(order.deliveryExtraValue)}</div>`
+              : ""
+          }
           <div class="total">Valor final: ${formatCurrency(total)}</div>
         </body>
       </html>
@@ -418,10 +513,27 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
 
   const pendingApproval = order.approvals.find((a) => a.status === "PENDING");
   const unresolvedParts = order.parts.filter((p) => p.status === "CRITICAL" || p.status === "WARNING" || p.status === "IN_PROGRESS");
-  const blockedForPickup = unresolvedParts.length > 0 || Boolean(pendingApproval);
+  // A liberação do veículo depende só do trabalho da oficina estar concluído (peças
+  // sem pendência) — mecânico/admin podem avançar e entregar mesmo com uma aprovação
+  // do cliente ainda pendente, forçando a peça correspondente para "concluído".
+  const blockedForPickup = unresolvedParts.length > 0;
   const isReady = order.status === "READY_FOR_PICKUP";
   const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
   const pendingNeedsPrice = pendingApproval && pendingApproval.estimatedValue == null;
+
+  // Próxima etapa da sequência — para no FINISHED, já que ir para "pronto para
+  // retirada" exige o fluxo de finalização (peças concluídas), não um simples avanço.
+  const statusIndex = SERVICE_ORDER_STATUSES.indexOf(order.status);
+  const nextStatus: ServiceOrderStatus | null =
+    statusIndex >= 0 && statusIndex < SERVICE_ORDER_STATUSES.length - 2 ? SERVICE_ORDER_STATUSES[statusIndex + 1] : null;
+
+  const whatsAppLink =
+    isStaff && order.vehicle.owner
+      ? buildWhatsAppLink(
+          order.vehicle.owner.phone,
+          `Olá, ${order.vehicle.owner.name}! Seu ${order.vehicle.brand} ${order.vehicle.model} (OS ${order.code}) está na etapa: "${STATUS_LABELS[order.status]}". Acompanhe pelo sistema: ${typeof window !== "undefined" ? window.location.origin : ""}/dashboard`
+        )
+      : null;
 
   return (
     <div>
@@ -439,6 +551,23 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
           <i /> ATUALIZANDO AO VIVO
         </span>
       </div>
+
+      {isAdmin && (
+        <div className={styles.approvalActions} style={{ marginBottom: "1.2rem", justifyContent: "flex-end", flexWrap: "wrap" }}>
+          {order.archivedAt && (
+            <span className={styles.tlSub}>Baixa dada em {new Date(order.archivedAt).toLocaleString("pt-BR")} — projeto concluído</span>
+          )}
+          {archiveMessage && <span className={styles.tlSub}>{archiveMessage}</span>}
+          <button className={styles.btnApprove} type="button" onClick={generateServicePdf}>
+            Baixar PDF do projeto
+          </button>
+          {isReady && !order.archivedAt && (
+            <button className={styles.btnApprove} type="button" disabled={archiveBusy} onClick={archiveOrder}>
+              {archiveBusy ? "Dando baixa..." : "Dar baixa no projeto"}
+            </button>
+          )}
+        </div>
+      )}
 
       <StatusStrip current={order.status} />
 
@@ -472,14 +601,16 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
           <h2>Finalização</h2>
           {blockedForPickup ? (
             <p>
-              {unresolvedParts.length > 0
-                ? `Ainda há ${unresolvedParts.length} problema${unresolvedParts.length > 1 ? "s" : ""} aguardando aprovação ou reparo`
-                : "Ainda há uma aprovação pendente"}{" "}
-              antes de liberar o veículo.
+              Ainda há {unresolvedParts.length} problema{unresolvedParts.length > 1 ? "s" : ""} aguardando reparo antes de liberar o veículo.
             </p>
           ) : (
             <>
               <p>Todos os problemas identificados foram resolvidos.</p>
+              {pendingApproval && (
+                <p className={styles.tlSub}>
+                  Há uma aprovação do cliente ainda pendente, mas isso não impede a liberação do veículo.
+                </p>
+              )}
               {isAdmin ? (
                 <div className={styles.approvalActions}>
                   <button className={styles.btnApprove} disabled={finalizing} onClick={() => setFinalizing(true)}>
@@ -498,6 +629,170 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         </div>
       )}
 
+      {isStaff && (nextStatus || whatsAppLink) && (
+        <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
+          <h2>Avançar etapa</h2>
+          {nextStatus && (
+            <>
+              <p>
+                Etapa atual: <strong>{STATUS_LABELS[order.status]}</strong>. Próxima etapa: <strong>{STATUS_LABELS[nextStatus]}</strong>.
+              </p>
+              <label className={styles.fullField} style={{ display: "block", marginBottom: "0.8rem" }}>
+                Foto desta etapa (opcional)
+                <input type="file" accept="image/*" onChange={(e) => setAdvancePhoto(e.target.files?.[0] ?? null)} />
+                {advancePhoto && <span>{advancePhoto.name}</span>}
+              </label>
+            </>
+          )}
+          {advanceMessage && <div className={styles.formMessage}>{advanceMessage}</div>}
+          <div className={styles.approvalActions}>
+            {nextStatus && (
+              <button className={styles.btnApprove} disabled={advanceBusy} onClick={() => advanceStage(nextStatus)}>
+                {advanceBusy ? "Avançando..." : `Avançar para "${STATUS_LABELS[nextStatus]}"`}
+              </button>
+            )}
+            {whatsAppLink ? (
+              <a className={styles.btnApprove} href={whatsAppLink} target="_blank" rel="noreferrer">
+                Avisar cliente (WhatsApp)
+              </a>
+            ) : (
+              isStaff && <span className={styles.tlSub}>Cliente sem telefone cadastrado.</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modelo do veículo com acompanhamento dos problemas — em destaque, logo no topo. */}
+      <div style={{ marginBottom: "1.6rem" }}>
+        <div className={`${styles.panel} ${isReady ? styles.panelReady : ""}`}>
+          <h2>Modelo do veículo</h2>
+          {isReady && <div className={styles.readyBanner}>Veículo pronto e em ótimo estado — pode retirar!</div>}
+          {isCustomer && isReady && (
+            <div className={styles.approvalActions}>
+              <button className={styles.btnApprove} onClick={generateServicePdf}>
+                Gerar PDF do serviço
+              </button>
+            </div>
+          )}
+          <VehicleSchematic
+            parts={order.parts}
+            approvals={order.approvals}
+            canRespond={user?.role === "CUSTOMER"}
+            canViewPrices={canViewPrices}
+            onRespondApproval={respondApproval}
+            canManageMaintenance={isStaff}
+            onStartPart={startPart}
+            onResolvePart={resolvePart}
+            canEditPrice={isAdmin}
+            inventoryParts={inventoryParts}
+            onPriceProblem={priceProblem}
+            onUpdateProblem={updateProblemDetails}
+          />
+          {isStaff && canRegisterProblems && !blockedForPickup && (
+            <div className={styles.approvalActions}>
+              {isAdmin ? (
+                !finalizing && (
+                  <button className={styles.btnApprove} onClick={() => setFinalizing(true)}>
+                    Veículo pronto para retirada
+                  </button>
+                )
+              ) : (
+                <button className={styles.btnApprove} type="button" disabled>
+                  Aguardando admin liberar retirada
+                </button>
+              )}
+            </div>
+          )}
+          {isAdmin && isStaff && canRegisterProblems && !blockedForPickup && finalizing && (
+            <div className={styles.panel}>
+              <h2>Confirmar entrega</h2>
+              <form className={styles.formGrid} onSubmit={finalizeOrder}>
+                <label className={styles.fullField}>
+                  Descrição da entrega
+                  <textarea
+                    value={finalizeForm.description}
+                    onChange={(e) => setFinalizeForm((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </label>
+                <label>
+                  Valor extra
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={finalizeForm.extraValue}
+                    onChange={(e) => setFinalizeForm((prev) => ({ ...prev, extraValue: e.target.value }))}
+                  />
+                </label>
+                <label className={styles.fullField}>
+                  Foto do veículo finalizado
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setFinalizeForm((prev) => ({ ...prev, photo: e.target.files?.[0] ?? null }))}
+                  />
+                </label>
+                <button className={styles.actionButton} type="submit" disabled={finalizeBusy}>
+                  {finalizeBusy ? "Finalizando..." : "Confirmar entrega"}
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+
+        {canViewPrices && pendingApproval && pendingApproval.estimatedValue != null && (
+          <ApprovalCard
+            approval={pendingApproval}
+            canRespond={isCustomer}
+            canViewPrices={canViewPrices}
+            onRespond={(status, responseNote) => respondApproval(pendingApproval.id, status, responseNote)}
+          />
+        )}
+
+        {isAdmin && pendingNeedsPrice && (
+          <div className={styles.panel}>
+            <h2>Precificar problema</h2>
+            <form className={styles.formGrid} onSubmit={pricePendingProblem}>
+              <label>
+                Mão de obra
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={priceForm.laborValue}
+                  onChange={(e) => setPriceForm((prev) => ({ ...prev, laborValue: e.target.value }))}
+                  required
+                />
+              </label>
+              <label>
+                Peça utilizada
+                <select value={priceForm.inventoryPartId} onChange={(e) => setPriceForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}>
+                  <option value="">Nenhuma peça</option>
+                  {inventoryParts.map((part) => (
+                    <option key={part.id} value={part.id}>
+                      {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Quantidade
+                <input
+                  type="number"
+                  min="1"
+                  value={priceForm.quantity}
+                  onChange={(e) => setPriceForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                />
+              </label>
+              <button className={styles.actionButton} type="submit">
+                Enviar orçamento ao cliente
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+
+      {/* Timeline e cadastro de problemas — histórico e administração, abaixo do modelo. */}
       <div className={styles.columns}>
         <div className={styles.panel}>
           <h2>Timeline da manutenção</h2>
@@ -505,57 +800,6 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
         </div>
 
         <div>
-          {canViewPrices && pendingApproval && pendingApproval.estimatedValue != null && (
-            <ApprovalCard
-              approval={pendingApproval}
-              canRespond={isCustomer}
-              canViewPrices={canViewPrices}
-              onRespond={(status, responseNote) => respondApproval(pendingApproval.id, status, responseNote)}
-            />
-          )}
-
-          {isAdmin && pendingNeedsPrice && (
-            <div className={styles.panel}>
-              <h2>Precificar problema</h2>
-              <form className={styles.formGrid} onSubmit={pricePendingProblem}>
-                <label>
-                  Mão de obra
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={priceForm.laborValue}
-                    onChange={(e) => setPriceForm((prev) => ({ ...prev, laborValue: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label>
-                  Peça utilizada
-                  <select value={priceForm.inventoryPartId} onChange={(e) => setPriceForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}>
-                    <option value="">Nenhuma peça</option>
-                    {inventoryParts.map((part) => (
-                      <option key={part.id} value={part.id}>
-                        {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Quantidade
-                  <input
-                    type="number"
-                    min="1"
-                    value={priceForm.quantity}
-                    onChange={(e) => setPriceForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                  />
-                </label>
-                <button className={styles.actionButton} type="submit">
-                  Enviar orçamento ao cliente
-                </button>
-              </form>
-            </div>
-          )}
-
           {isStaff && canRegisterProblems && (
             <div className={styles.panel}>
               <h2>{isAdmin ? "Diagnóstico com preço" : "Novo problema diagnosticado"}</h2>
@@ -670,82 +914,6 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
               </form>
             </div>
           )}
-
-          <div className={`${styles.panel} ${isReady ? styles.panelReady : ""}`}>
-            <h2>Modelo do veículo</h2>
-            {isReady && <div className={styles.readyBanner}>Veículo pronto e em ótimo estado — pode retirar!</div>}
-            {isCustomer && isReady && (
-              <div className={styles.approvalActions}>
-                <button className={styles.btnApprove} onClick={generateServicePdf}>
-                  Gerar PDF do serviço
-                </button>
-              </div>
-            )}
-            <VehicleSchematic
-              parts={order.parts}
-              approvals={order.approvals}
-              canRespond={user?.role === "CUSTOMER"}
-              canViewPrices={canViewPrices}
-              onRespondApproval={respondApproval}
-              canManageMaintenance={isStaff}
-              onStartPart={startPart}
-              onResolvePart={resolvePart}
-              canEditPrice={isAdmin}
-              inventoryParts={inventoryParts}
-              onPriceProblem={priceProblem}
-              onUpdateProblem={updateProblemDetails}
-            />
-            {isStaff && canRegisterProblems && !blockedForPickup && (
-              <div className={styles.approvalActions}>
-                {isAdmin ? (
-                  !finalizing && (
-                    <button className={styles.btnApprove} onClick={() => setFinalizing(true)}>
-                      Veículo pronto para retirada
-                    </button>
-                  )
-                ) : (
-                  <button className={styles.btnApprove} type="button" disabled>
-                    Aguardando admin liberar retirada
-                  </button>
-                )}
-              </div>
-            )}
-            {isAdmin && isStaff && canRegisterProblems && !blockedForPickup && finalizing && (
-              <div className={styles.panel}>
-                <h2>Confirmar entrega</h2>
-                <form className={styles.formGrid} onSubmit={finalizeOrder}>
-                  <label className={styles.fullField}>
-                    Descrição da entrega
-                    <textarea
-                      value={finalizeForm.description}
-                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, description: e.target.value }))}
-                    />
-                  </label>
-                  <label>
-                    Valor extra
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={finalizeForm.extraValue}
-                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, extraValue: e.target.value }))}
-                    />
-                  </label>
-                  <label className={styles.fullField}>
-                    Foto do veículo finalizado
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, photo: e.target.files?.[0] ?? null }))}
-                    />
-                  </label>
-                  <button className={styles.actionButton} type="submit" disabled={finalizeBusy}>
-                    {finalizeBusy ? "Finalizando..." : "Confirmar entrega"}
-                  </button>
-                </form>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>

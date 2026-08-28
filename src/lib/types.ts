@@ -84,6 +84,7 @@ export interface Vehicle {
   engine?: string | null;
   plate?: string | null;
   mileage: number;
+  owner?: { id: string; name: string; email?: string; phone?: string | null };
 }
 
 export interface Media {
@@ -159,11 +160,232 @@ export interface ServiceOrder {
   completedAt?: string | null;
   deliveryDescription?: string | null;
   deliveryExtraValue?: number | null;
+  // "Dar baixa" — projeto concluído e removido da lista/kanban de projetos em andamento.
+  archivedAt?: string | null;
   vehicle: Vehicle;
   timelineEvents: TimelineEvent[];
   parts: VehiclePart[];
   approvals: Approval[];
   media: Media[];
+
+  // Gaps SIGMA (Fase 1) — todos opcionais para não quebrar telas que já consomem ServiceOrder.
+  consultantId?: string | null;
+  consultant?: { id: string; name: string } | null;
+  estimatorId?: string | null;
+  estimator?: { id: string; name: string } | null;
+  technicianId?: string | null;
+  technician?: { id: string; name: string } | null;
+  priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+  deliveryForecastAt?: string | null;
+  deliveryForecastReason?: string | null;
+  currentSectorId?: string | null;
+  currentSector?: Sector | null;
+  insuranceCompanyId?: string | null;
+  insuranceCompany?: InsuranceCompany | null;
+  claimNumber?: string | null;
+  deductibleAmount?: number | null;
+  serviceType?: string | null;
+  authorizationNumber?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// --- Gaps SIGMA (fases 1-8) -------------------------------------------------
+
+export const SERVICE_ORDER_PRIORITIES = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
+export type ServiceOrderPriority = (typeof SERVICE_ORDER_PRIORITIES)[number];
+
+export const PRIORITY_LABELS: Record<ServiceOrderPriority, string> = {
+  LOW: "Baixa",
+  NORMAL: "Normal",
+  HIGH: "Alta",
+  URGENT: "Urgente",
+};
+
+export interface InsuranceCompany {
+  id: string;
+  legalName: string;
+  tradeName?: string | null;
+  cnpj?: string | null;
+  addressLine?: string | null;
+  city?: string | null;
+  state?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  contactName?: string | null;
+  accredited: boolean;
+  active: boolean;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface Sector {
+  id: string;
+  name: string;
+  storeId?: string | null;
+  isSystem: boolean;
+  active: boolean;
+}
+
+export interface ServiceCatalogItem {
+  id: string;
+  code?: string | null;
+  category?: string | null;
+  name: string;
+  description?: string | null;
+  standardTimeMin?: number | null;
+  hourlyRate?: number | null;
+  standardPrice?: number | null;
+  sector?: string | null;
+  active: boolean;
+}
+
+export const ESTIMATE_STATUSES = [
+  "DRAFT",
+  "AWAITING_APPROVAL",
+  "APPROVED",
+  "PARTIALLY_APPROVED",
+  "REJECTED",
+  "SUPPLEMENT_REQUESTED",
+  "CANCELLED",
+  "CONVERTED",
+] as const;
+export type EstimateStatus = (typeof ESTIMATE_STATUSES)[number];
+
+export const ESTIMATE_STATUS_LABELS: Record<EstimateStatus, string> = {
+  DRAFT: "Rascunho",
+  AWAITING_APPROVAL: "Aguardando aprovação",
+  APPROVED: "Aprovado",
+  PARTIALLY_APPROVED: "Parcialmente aprovado",
+  REJECTED: "Recusado",
+  SUPPLEMENT_REQUESTED: "Complemento solicitado",
+  CANCELLED: "Cancelado",
+  CONVERTED: "Convertido em OS",
+};
+
+export interface EstimateItem {
+  id: string;
+  description: string;
+  classification: "REPAIR" | "REPLACE" | "REUSE" | "PENDING";
+  quantity: number;
+  unitValue: number;
+  totalValue: number;
+  approvalId?: string | null;
+}
+
+export interface Estimate {
+  id: string;
+  code: string;
+  serviceOrderId: string;
+  serviceOrder?: { id: string; code: string; vehicle: Vehicle };
+  insuranceCompanyId?: string | null;
+  insuranceCompany?: InsuranceCompany | null;
+  status: EstimateStatus;
+  validUntil?: string | null;
+  laborTotal: number;
+  partsTotal: number;
+  materialsTotal: number;
+  thirdPartyTotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  deductibleAmount: number;
+  totalAmount: number;
+  notes?: string | null;
+  items: EstimateItem[];
+  createdAt: string;
+}
+
+export const INSPECTION_STATUSES = ["TO_SCHEDULE", "SCHEDULED", "DONE", "RESCHEDULED", "CANCELLED", "ADJUSTMENT_PENDING"] as const;
+export type InspectionStatus = (typeof INSPECTION_STATUSES)[number];
+
+export const INSPECTION_STATUS_LABELS: Record<InspectionStatus, string> = {
+  TO_SCHEDULE: "A marcar",
+  SCHEDULED: "Marcada",
+  DONE: "Realizada",
+  RESCHEDULED: "Reagendada",
+  CANCELLED: "Cancelada",
+  ADJUSTMENT_PENDING: "Pendente de ajuste",
+};
+
+export interface InspectionIssue {
+  id: string;
+  item: string;
+  description?: string | null;
+  responsible?: { id: string; name: string } | null;
+  dueDate?: string | null;
+  status: "OPEN" | "IN_PROGRESS" | "RESOLVED";
+}
+
+export interface Inspection {
+  id: string;
+  serviceOrder: { id: string; code: string; vehicle: Vehicle };
+  insuranceCompany?: InsuranceCompany | null;
+  inspector?: { id: string; name: string } | null;
+  scheduledAt?: string | null;
+  location?: string | null;
+  type?: string | null;
+  status: InspectionStatus;
+  result?: string | null;
+  notes?: string | null;
+  issues: InspectionIssue[];
+}
+
+export interface PendingSupplement {
+  id: string;
+  title: string;
+  description: string;
+  justification?: string | null;
+  extraHours?: number | null;
+  estimatedValue?: number | null;
+  createdAt: string;
+  daysWaiting: number;
+  overdue: boolean;
+  serviceOrder: { id: string; code: string; status: ServiceOrderStatus };
+  vehicle: { brand: string; model: string; plate?: string | null };
+  owner?: { id: string; name: string } | null;
+  insuranceCompany?: { id: string; tradeName: string } | null;
+}
+
+export interface TimeEntry {
+  id: string;
+  employeeId: string;
+  employee?: { id: string; name: string };
+  serviceOrderId?: string | null;
+  serviceOrder?: { id: string; code: string } | null;
+  serviceId?: string | null;
+  service?: { id: string; name: string; standardTimeMin?: number | null } | null;
+  sector?: string | null;
+  startedAt: string;
+  endedAt?: string | null;
+  pausedMinutes: number;
+  status: "RUNNING" | "PAUSED" | "DONE";
+  notes?: string | null;
+}
+
+export interface CapacityPanel {
+  byEmployee: { employeeId: string; name: string; weeklyHours: number; allocatedHours: number; freeHours: number }[];
+  bySector: { sector: string; allocatedHours: number }[];
+}
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  entity?: string | null;
+  entityId?: string | null;
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  action: string;
+  entity: string;
+  entityId: string;
+  before?: string | null;
+  after?: string | null;
+  user?: { id: string; name: string } | null;
+  createdAt: string;
 }
 
 export interface InventoryPart {
@@ -301,6 +523,8 @@ export interface AccountPayable {
   installmentNumber?: number | null;
   installmentTotal?: number | null;
   notes?: string | null;
+  // Preenchido quando esta conta nasceu de um boleto de nota fiscal.
+  invoice?: { id: string; number?: string | null } | null;
 }
 
 export interface AccountReceivable {
@@ -375,6 +599,9 @@ export interface Invoice {
   client?: { id: string; name: string } | null;
   serviceOrder?: { id: string; code: string } | null;
   createdAt: string;
+  // Boletos gerados a partir desta nota (paymentMethod "Boleto" + quantidade de
+  // parcelas informada no cadastro) — ver AccountPayable.invoiceId no backend.
+  payables?: AccountPayable[];
 }
 
 export interface ExtractedInvoiceData {
@@ -586,4 +813,108 @@ export interface QuoteRequest {
   mechanic?: { id: string; name: string } | null;
   vehicle: Vehicle;
   serviceOrder?: { id: string; code: string; status: ServiceOrderStatus } | null;
+}
+
+// --- Caminhões (controle de pilotagem) --------------------------------------
+
+export interface Truck {
+  id: string;
+  plate: string;
+  brand?: string | null;
+  model?: string | null;
+  year?: number | null;
+  assignedEmployeeId?: string | null;
+  assignedEmployee?: { id: string; name: string; phone?: string | null } | null;
+  active: boolean;
+  notes?: string | null;
+  createdAt: string;
+  // Pilotagem em andamento (0 ou 1 item) — vem junto na listagem para saber se o
+  // caminhão está disponível sem uma chamada extra por caminhão.
+  trips?: TruckTrip[];
+}
+
+export type TruckTripStatus = "IN_PROGRESS" | "COMPLETED";
+
+export interface TruckTrip {
+  id: string;
+  truckId: string;
+  truck?: Truck;
+  driverId: string;
+  driver?: { id: string; name: string };
+  status: TruckTripStatus;
+  startedAt: string;
+  startKm: number;
+  startFuelLevel: string;
+  startCondition?: string | null;
+  startPhotoUrl?: string | null;
+  endedAt?: string | null;
+  endKm?: number | null;
+  endFuelLevel?: string | null;
+  endCondition?: string | null;
+  endPhotoUrl?: string | null;
+  notes?: string | null;
+}
+
+export interface TruckWithTrips extends Truck {
+  trips: TruckTrip[];
+}
+
+export type ConsumptionAlertType = "CONSUMO_ALTO" | "CONSUMO_BAIXO" | "PRECO_ACIMA_MEDIA";
+
+export interface ConsumptionAlert {
+  type: ConsumptionAlertType;
+  message: string;
+}
+
+export interface TruckRefueling {
+  id: string;
+  truckId: string;
+  truck?: { id: string; plate: string; brand?: string | null; model?: string | null };
+  tripId: string;
+  driverId: string;
+  driver?: { id: string; name: string };
+  photoUrl: string;
+  currentKm: number;
+  referenceKm: number;
+  liters: number;
+  amountPaid: number;
+  pricePerLiter?: number | null;
+  kmPerLiter?: number | null;
+  notes?: string | null;
+  createdAt: string;
+  // Só vem preenchido para o admin — mecânico não recebe este campo na resposta.
+  alerts?: ConsumptionAlert[];
+}
+
+// --- Reconhecimento de painel do caminhão / bomba de combustível por IA -----
+
+export interface RecognizedTruckPanel {
+  km: number | null;
+  fuelLevel: string | null;
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+}
+
+export interface RecognizedFuelPump {
+  amountPaid: number | null;
+  liters: number | null;
+  pricePerLiter: number | null;
+  confidence: "LOW" | "MEDIUM" | "HIGH";
+}
+
+// --- Reconhecimento de veículo por IA ---------------------------------------
+
+export interface DetectedVehicleProblem {
+  description: string;
+  location?: string | null;
+  severity?: "LOW" | "MEDIUM" | "HIGH" | null;
+}
+
+export interface RecognizedVehicleData {
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  color: string | null;
+  plate: string | null;
+  visibleProblems: DetectedVehicleProblem[];
+  confidence: "LOW" | "MEDIUM" | "HIGH";
 }
