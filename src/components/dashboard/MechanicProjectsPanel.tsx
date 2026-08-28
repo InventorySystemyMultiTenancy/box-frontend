@@ -171,7 +171,7 @@ export default function MechanicProjectsPanel() {
 
       {selectedOrderId && (
         <div className={styles.detailWrap}>
-          <OrderDetail key={selectedOrderId} orderId={selectedOrderId} />
+          <OrderDetail key={selectedOrderId} orderId={selectedOrderId} scrollToTimelineOnLoad />
         </div>
       )}
     </div>

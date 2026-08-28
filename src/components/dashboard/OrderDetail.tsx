@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
@@ -55,11 +55,12 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#039;");
 }
 
-export default function OrderDetail({ orderId }: { orderId: string }) {
+export default function OrderDetail({ orderId, scrollToTimelineOnLoad = false }: { orderId: string; scrollToTimelineOnLoad?: boolean }) {
   const { user, token } = useAuth();
   const [order, setOrder] = useState<ServiceOrder | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [justArrivedId, setJustArrivedId] = useState<string | null>(null);
+  const scrolledForOrderRef = useRef<string | null>(null);
   const [problemForm, setProblemForm] = useState({
     key: "motor",
     name: "Motor",
@@ -102,6 +103,14 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
     if (!token || !isStaff) return;
     api.inventoryParts(token).then(({ parts }) => setInventoryParts(parts as InventoryPart[]));
   }, [token, isStaff]);
+
+  // Ao escolher um carro (mecânico/admin selecionando no Kanban/lista), rola até a
+  // timeline dele — só uma vez por carro escolhido, não a cada atualização em tempo real.
+  useEffect(() => {
+    if (!scrollToTimelineOnLoad || !order || scrolledForOrderRef.current === order.id) return;
+    scrolledForOrderRef.current = order.id;
+    document.getElementById("vehicle-timeline")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [order, scrollToTimelineOnLoad]);
 
   useEffect(() => {
     if (!token || !orderId) return;
@@ -517,6 +526,11 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
   // sem pendência) — mecânico/admin podem avançar e entregar mesmo com uma aprovação
   // do cliente ainda pendente, forçando a peça correspondente para "concluído".
   const blockedForPickup = unresolvedParts.length > 0;
+  // Sem nenhum problema resolvido ainda (inclusive quando nenhum problema sequer foi
+  // identificado), não faz sentido oferecer "pronto para retirada" — precisa ter pelo
+  // menos uma peça concluída.
+  const hasResolvedProblem = order.parts.some((p) => p.status === "DONE");
+  const canOfferPickup = !blockedForPickup && hasResolvedProblem;
   const isReady = order.status === "READY_FOR_PICKUP";
   const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
   const pendingNeedsPrice = pendingApproval && pendingApproval.estimatedValue == null;
@@ -603,6 +617,8 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
             <p>
               Ainda há {unresolvedParts.length} problema{unresolvedParts.length > 1 ? "s" : ""} aguardando reparo antes de liberar o veículo.
             </p>
+          ) : !hasResolvedProblem ? (
+            <p>Nenhum problema identificado e resolvido ainda — registre e conclua ao menos um para liberar o veículo.</p>
           ) : (
             <>
               <p>Todos os problemas identificados foram resolvidos.</p>
@@ -688,7 +704,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
             onPriceProblem={priceProblem}
             onUpdateProblem={updateProblemDetails}
           />
-          {isStaff && canRegisterProblems && !blockedForPickup && (
+          {isStaff && canRegisterProblems && canOfferPickup && (
             <div className={styles.approvalActions}>
               {isAdmin ? (
                 !finalizing && (
@@ -703,7 +719,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
               )}
             </div>
           )}
-          {isAdmin && isStaff && canRegisterProblems && !blockedForPickup && finalizing && (
+          {isAdmin && isStaff && canRegisterProblems && canOfferPickup && finalizing && (
             <div className={styles.panel}>
               <h2>Confirmar entrega</h2>
               <form className={styles.formGrid} onSubmit={finalizeOrder}>
@@ -793,7 +809,7 @@ export default function OrderDetail({ orderId }: { orderId: string }) {
       </div>
 
       {/* Timeline e cadastro de problemas — histórico e administração, abaixo do modelo. */}
-      <div className={styles.columns}>
+      <div className={styles.columns} id="vehicle-timeline">
         <div className={styles.panel}>
           <h2>Timeline da manutenção</h2>
           <Timeline events={order.timelineEvents} justArrivedId={justArrivedId} canViewPrices={canViewPrices} />
