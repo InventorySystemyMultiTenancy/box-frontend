@@ -30,20 +30,20 @@
   opacity: 1;
 }
 
-/* leve gradiente para o texto do overlay continuar legível sobre qualquer frame do vídeo */
+/* gradiente mais forte para o texto do overlay ficar bem legível sobre qualquer frame do vídeo */
 .scrim {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(11, 13, 16, 0.55) 0%, rgba(11, 13, 16, 0.7) 100%),
-    radial-gradient(circle at 50% 40%, rgba(11, 13, 16, 0.25), transparent 55%);
+    linear-gradient(180deg, rgba(11, 13, 16, 0.62) 0%, rgba(11, 13, 16, 0.78) 100%),
+    radial-gradient(circle at 50% 40%, rgba(11, 13, 16, 0.3), transparent 55%);
 }
 
 .overlaySlot {
   position: relative;
   z-index: 1;
-  min-height: 100vh;
-  min-height: 100svh;
+  min-height: 72vh;
+  min-height: 72svh;
 }
 
 .content {

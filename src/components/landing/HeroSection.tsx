@@ -18,18 +18,34 @@ const NAV_LINKS = [
   { href: "#agendamento", label: "Agendamento" },
 ];
 
+function scrollToId(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 export default function HeroSection({ children }: { children?: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className={styles.heroWrap}>
       <nav className={styles.nav}>
-        <span className={styles.navBrand}>
+        <button
+          type="button"
+          className={styles.navBrand}
+          aria-label="Voltar ao topo"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        >
           <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
-        </span>
+        </button>
         <div className={styles.navLinks}>
           {NAV_LINKS.map((link) => (
-            <a key={link.href} href={link.href}>
+            <a
+              key={link.href}
+              href={link.href}
+              onClick={(e) => {
+                e.preventDefault();
+                scrollToId(link.href.slice(1));
+              }}
+            >
               {link.label}
             </a>
           ))}
@@ -53,9 +69,16 @@ export default function HeroSection({ children }: { children?: ReactNode }) {
       {menuOpen && (
         <div className={styles.navMobileMenu}>
           {NAV_LINKS.map((link) => (
-            <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}>
+            <button
+              key={link.href}
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                scrollToId(link.href.slice(1));
+              }}
+            >
               {link.label}
-            </a>
+            </button>
           ))}
           <Link href="/login" className={styles.navCta} onClick={() => setMenuOpen(false)}>
             Área do cliente
@@ -75,11 +98,15 @@ export default function HeroSection({ children }: { children?: ReactNode }) {
               fotos, laudos e aprovação, sem precisar perguntar o que está sendo feito.
             </p>
             <div className={styles.heroActions}>
-              <a href="#orcamento" className={`${styles.btn} ${styles.btnPrimary}`}>
+              <a
+                href="#orcamento"
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                onClick={(e) => {
+                  e.preventDefault();
+                  scrollToId("orcamento");
+                }}
+              >
                 Montar orçamento
-              </a>
-              <a href="#agendamento" className={`${styles.btn} ${styles.btnGhost}`}>
-                Agendar visita
               </a>
             </div>
           </section>
