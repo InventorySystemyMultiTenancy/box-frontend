@@ -14,14 +14,19 @@ export default function ApprovalCard({
   onRespond,
   canRespond = true,
   canViewPrices = true,
+  canForceResolve = false,
+  onForceResolve,
 }: {
   approval: Approval;
   onRespond: (status: "APPROVED" | "REJECTED", responseNote?: string) => Promise<void>;
   canRespond?: boolean;
   canViewPrices?: boolean;
+  canForceResolve?: boolean;
+  onForceResolve?: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState<"APPROVED" | "REJECTED" | null>(null);
   const [responseNote, setResponseNote] = useState("");
+  const [forcingResolve, setForcingResolve] = useState(false);
 
   async function respond(status: "APPROVED" | "REJECTED") {
     if (status === "REJECTED" && !responseNote.trim()) return;
@@ -30,6 +35,16 @@ export default function ApprovalCard({
       await onRespond(status, status === "REJECTED" ? responseNote : undefined);
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function forceResolve() {
+    if (!onForceResolve) return;
+    setForcingResolve(true);
+    try {
+      await onForceResolve();
+    } finally {
+      setForcingResolve(false);
     }
   }
 
@@ -90,6 +105,13 @@ export default function ApprovalCard({
             {approval.status === "APPROVED" ? "Aprovado" : approval.status === "REJECTED" ? "Reprovado" : "Aguardando resposta do cliente"}
           </span>
           {approval.responseNote && <p className={styles.responseNote}>{approval.responseNote}</p>}
+          {canForceResolve && approval.status === "PENDING" && onForceResolve && (
+            <div className={styles.approvalActions} style={{ marginTop: "0.6rem" }}>
+              <button className={styles.btnApprove} disabled={forcingResolve} onClick={forceResolve}>
+                {forcingResolve ? "Avançando..." : "Avançar mesmo sem aprovação do cliente"}
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

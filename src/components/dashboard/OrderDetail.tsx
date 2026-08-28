@@ -762,6 +762,12 @@ export default function OrderDetail({ orderId, scrollToTimelineOnLoad = false }:
             canRespond={isCustomer}
             canViewPrices={canViewPrices}
             onRespond={(status, responseNote) => respondApproval(pendingApproval.id, status, responseNote)}
+            canForceResolve={
+              isStaff &&
+              !!pendingApproval.partId &&
+              order.parts.find((p) => p.id === pendingApproval.partId)?.status !== "DONE"
+            }
+            onForceResolve={pendingApproval.partId ? () => resolvePart(pendingApproval.partId!) : undefined}
           />
         )}
 
