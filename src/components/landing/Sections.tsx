@@ -1,6 +1,16 @@
 import Image from "next/image";
 import Reveal from "./Reveal";
+import { api, API_URL } from "@/lib/api";
 import styles from "./landing.module.css";
+
+function mediaUrl(url: string) {
+  return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
+}
 
 export function Presentation() {
   return (
@@ -155,13 +165,25 @@ export function Testimonials() {
   );
 }
 
-const TEAM = [
-  { initials: "DM", name: "Diego M.", role: "Reparo e recuperação de blindagem" },
-  { initials: "AP", name: "Ana P.", role: "Funilaria e pintura" },
-  { initials: "RS", name: "Rafael S.", role: "Mecânica e gestão de frotas" },
+// Usado só se a API não responder (ex.: cold start) — a lista real vem de /api/team,
+// alimentada pela foto de perfil que cada mecânico/admin sobe em "Meu perfil".
+const FALLBACK_TEAM = [
+  { id: "fallback-1", name: "Diego M.", role: "Reparo e recuperação de blindagem", avatarUrl: null },
+  { id: "fallback-2", name: "Ana P.", role: "Funilaria e pintura", avatarUrl: null },
+  { id: "fallback-3", name: "Rafael S.", role: "Mecânica e gestão de frotas", avatarUrl: null },
 ];
 
-export function Team() {
+async function getTeam() {
+  try {
+    const { team } = await api.team();
+    return team.length > 0 ? team : FALLBACK_TEAM;
+  } catch {
+    return FALLBACK_TEAM;
+  }
+}
+
+export async function Team() {
+  const team = await getTeam();
   return (
     <section className={styles.section} id="equipe">
       <Reveal>
@@ -172,10 +194,14 @@ export function Team() {
         </div>
       </Reveal>
       <div className={styles.teamGrid}>
-        {TEAM.map((m, i) => (
-          <Reveal key={m.name} delay={i * 60}>
+        {team.map((m, i) => (
+          <Reveal key={m.id} delay={i * 60}>
             <div className={styles.teamCard}>
-              <div className={styles.avatar}>{m.initials}</div>
+              {m.avatarUrl ? (
+                <img src={mediaUrl(m.avatarUrl)} alt="" className={styles.avatarImg} />
+              ) : (
+                <div className={styles.avatar}>{initials(m.name)}</div>
+              )}
               <h4>{m.name}</h4>
               <p>{m.role}</p>
             </div>

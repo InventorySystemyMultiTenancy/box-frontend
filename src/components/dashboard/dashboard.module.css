@@ -255,6 +255,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  object-fit: cover;
+  flex-shrink: 0;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 0.85rem;
@@ -571,6 +573,33 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.8rem;
+}
+
+.avatarUploadRow {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-bottom: 1.2rem;
+}
+.avatarPreview {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--shell-active);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.8rem;
+  flex-shrink: 0;
+}
+.avatarUploadActions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
 .formGrid label {

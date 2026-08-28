@@ -12,6 +12,11 @@ import {
   SiteFooter,
 } from "@/components/landing/Sections";
 
+// A seção "Equipe" busca a lista de mecânicos/admins (com foto de perfil) da API a
+// cada request — sem isso, o Next congelaria essa lista no build e uma foto nova só
+// apareceria depois do próximo deploy.
+export const dynamic = "force-dynamic";
+
 export default function LandingPage() {
   return (
     <main>

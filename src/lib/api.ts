@@ -79,7 +79,20 @@ export const api = {
       token
     ),
 
-  me: (token: string) => request<{ user: { id: string; name: string; email: string; role: string } }>("/api/auth/me", {}, token),
+  me: (token: string) =>
+    request<{ user: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } }>("/api/auth/me", {}, token),
+
+  updateMyAvatar: (file: File, token: string) => {
+    const form = new FormData();
+    form.append("avatar", file);
+    return request<{ user: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } }>(
+      "/api/auth/me/avatar",
+      { method: "PATCH", body: form },
+      token
+    );
+  },
+
+  team: () => request<{ team: { id: string; name: string; role: string; avatarUrl: string | null }[] }>("/api/team"),
 
   serviceOrders: (token: string) => request<{ orders: unknown[] }>("/api/service-orders", {}, token),
 

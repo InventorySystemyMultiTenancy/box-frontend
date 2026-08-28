@@ -10,6 +10,7 @@ interface AuthUser {
   email: string;
   role: string;
   roleId?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface AuthContextValue {
@@ -21,6 +22,7 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<void>;
   registerCustomer: (payload: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => void;
+  updateAvatar: (file: File) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -78,8 +80,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/");
   }, [router]);
 
+  const updateAvatar = useCallback(
+    async (file: File) => {
+      if (!token) throw new Error("Não autenticado.");
+      const { user } = await api.updateMyAvatar(file, token);
+      setUser(user as AuthUser);
+    },
+    [token]
+  );
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, permissions, hasPermission, login, registerCustomer, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, permissions, hasPermission, login, registerCustomer, logout, updateAvatar }}>
       {children}
     </AuthContext.Provider>
   );

@@ -74,6 +74,7 @@ export interface User {
   roleId?: string | null;
   phone?: string | null;
   commissionRate?: number | null;
+  avatarUrl?: string | null;
 }
 
 export interface Vehicle {

@@ -353,6 +353,13 @@
   font-family: var(--font-display);
   font-weight: 700;
 }
+.teamCard .avatarImg {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
 .teamCard h4 {
   margin-top: 0.8rem;
   font-family: var(--font-display);

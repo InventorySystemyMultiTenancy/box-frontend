@@ -35,7 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
+import { api, API_URL } from "@/lib/api";
 import { AppNotification } from "@/lib/types";
 import { Toaster } from "@/components/ui/sonner";
 import {
@@ -86,6 +86,10 @@ const ROLE_LABELS: Record<string, string> = {
   MECHANIC: "Mecânico",
   CUSTOMER: "Cliente",
 };
+
+function mediaUrl(url: string) {
+  return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
+}
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, token, loading, hasPermission, logout } = useAuth();
@@ -269,7 +273,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className={styles.userMenuBtn}>
-                <span className={styles.userAvatar}>{(user.name?.[0] ?? "U").toUpperCase()}</span>
+                {user.avatarUrl ? (
+                  <img src={mediaUrl(user.avatarUrl)} alt="" className={styles.userAvatar} />
+                ) : (
+                  <span className={styles.userAvatar}>{(user.name?.[0] ?? "U").toUpperCase()}</span>
+                )}
                 <span className={styles.userMeta}>
                   <strong>{user.name}</strong>
                   <span>{ROLE_LABELS[user.role] ?? user.role}</span>
@@ -278,6 +286,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => router.push("/dashboard/perfil")}>
+                <UserRound className="size-4" />
+                Meu perfil
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={logout}>
                 <LogOut className="size-4" />
                 Sair
