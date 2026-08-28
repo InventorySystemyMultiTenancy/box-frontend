@@ -188,6 +188,9 @@ export const api = {
   archiveServiceOrder: (orderId: string, token: string) =>
     request<{ order: unknown }>(`/api/service-orders/${orderId}/archive`, { method: "PATCH" }, token),
 
+  deleteServiceOrder: (orderId: string, token: string) =>
+    request<{ ok: true }>(`/api/service-orders/${orderId}`, { method: "DELETE" }, token),
+
   resolvePart: (orderId: string, partId: string, token: string) =>
     request<{ part: unknown; event: unknown }>(
       `/api/service-orders/${orderId}/parts/${partId}/resolve`,

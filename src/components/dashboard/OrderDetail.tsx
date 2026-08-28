@@ -10,6 +10,9 @@ import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
 import ApprovalCard from "@/components/dashboard/ApprovalCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import styles from "./dashboard.module.css";
 
 const PART_OPTIONS = [
@@ -55,7 +58,15 @@ function escapeHtml(value: string) {
     .replace(/'/g, "&#039;");
 }
 
-export default function OrderDetail({ orderId, scrollToTimelineOnLoad = false }: { orderId: string; scrollToTimelineOnLoad?: boolean }) {
+export default function OrderDetail({
+  orderId,
+  scrollToTimelineOnLoad = false,
+  onDeleted,
+}: {
+  orderId: string;
+  scrollToTimelineOnLoad?: boolean;
+  onDeleted?: () => void;
+}) {
   const { user, token } = useAuth();
   const [order, setOrder] = useState<ServiceOrder | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -85,6 +96,11 @@ export default function OrderDetail({ orderId, scrollToTimelineOnLoad = false }:
   const [advanceMessage, setAdvanceMessage] = useState<string | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [deleteCode, setDeleteCode] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
@@ -336,6 +352,34 @@ export default function OrderDetail({ orderId, scrollToTimelineOnLoad = false }:
     }
   }
 
+  function handleDeleteDialogChange(open: boolean) {
+    setDeleteOpen(open);
+    if (!open) {
+      setDeleteConfirmed(false);
+      setDeleteCode("");
+      setDeleteError(null);
+    }
+  }
+
+  // Exclusão definitiva do projeto — diferente de "dar baixa" (que só encerra e
+  // mantém o histórico). O backend recusa se já houver rastro financeiro; aqui a
+  // confirmação dupla é: 1) o admin clica em "Continuar" cientre do aviso, 2) precisa
+  // digitar o código exato da OS para liberar o botão final de exclusão.
+  async function deleteOrder() {
+    if (!token || !order) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await api.deleteServiceOrder(order.id, token);
+      setDeleteOpen(false);
+      onDeleted?.();
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : "Não foi possível excluir o projeto.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
+
   const updateProblemDetails = useCallback(
     async (approvalId: string, data: { note?: string; partUsages: { inventoryPartId: string; quantity: number }[]; files: File[] }) => {
       if (!token || !order) return;
@@ -580,6 +624,61 @@ export default function OrderDetail({ orderId, scrollToTimelineOnLoad = false }:
               {archiveBusy ? "Dando baixa..." : "Dar baixa no projeto"}
             </button>
           )}
+          <Dialog open={deleteOpen} onOpenChange={handleDeleteDialogChange}>
+            <DialogTrigger asChild>
+              <Button variant="destructive" size="sm" type="button">
+                Excluir projeto
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              {!deleteConfirmed ? (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>Excluir projeto {order.code}?</DialogTitle>
+                    <DialogDescription>
+                      Isso apaga definitivamente a timeline, os problemas, aprovações, fotos e mensagens deste
+                      projeto. Não pode ser desfeito. Se o projeto já tem nota fiscal, comissão ou lançamento
+                      financeiro, a exclusão será recusada — use &quot;Dar baixa&quot; nesse caso.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button variant="destructive" onClick={() => setDeleteConfirmed(true)}>
+                      Continuar
+                    </Button>
+                  </DialogFooter>
+                </>
+              ) : (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>Confirme digitando o código da OS</DialogTitle>
+                    <DialogDescription>
+                      Para confirmar, digite <strong>{order.code}</strong> abaixo. Esta é a última chance de
+                      cancelar.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <input
+                    className={styles.fullField}
+                    value={deleteCode}
+                    onChange={(e) => setDeleteCode(e.target.value)}
+                    placeholder={order.code}
+                    autoFocus
+                  />
+                  {deleteError && <div className={styles.formMessage}>{deleteError}</div>}
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleteBusy}>
+                      Cancelar
+                    </Button>
+                    <Button variant="destructive" disabled={deleteBusy || deleteCode !== order.code} onClick={deleteOrder}>
+                      {deleteBusy ? "Excluindo..." : "Excluir definitivamente"}
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
