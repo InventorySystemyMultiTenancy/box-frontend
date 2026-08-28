@@ -7,7 +7,6 @@ import {
   Testimonials,
   Team,
   Partners,
-  SchedulingCta,
   FinalCta,
   SiteFooter,
 } from "@/components/landing/Sections";
@@ -28,7 +27,6 @@ export default function LandingPage() {
         <Testimonials />
         <Team />
         <Partners />
-        <SchedulingCta />
         <FinalCta />
         <SiteFooter />
       </HeroSection>

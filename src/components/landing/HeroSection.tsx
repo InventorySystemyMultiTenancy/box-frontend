@@ -15,7 +15,6 @@ const NAV_LINKS = [
   { href: "#diferenciais", label: "Diferenciais" },
   { href: "#servicos", label: "Serviços" },
   { href: "#equipe", label: "Equipe" },
-  { href: "#agendamento", label: "Agendamento" },
 ];
 
 function scrollToId(id: string) {

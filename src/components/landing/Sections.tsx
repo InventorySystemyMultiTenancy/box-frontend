@@ -227,24 +227,6 @@ export function Partners() {
   );
 }
 
-export function SchedulingCta() {
-  return (
-    <section className={styles.section} id="agendamento">
-      <Reveal>
-        <div className={styles.ctaBand}>
-          <div>
-            <span className="eyebrow">Agendamento</span>
-            <h2>Escolha um horário real na oficina.</h2>
-          </div>
-          <a href="#orcamento" className={`${styles.btn} ${styles.btnPrimary}`}>
-            Ver horários disponíveis
-          </a>
-        </div>
-      </Reveal>
-    </section>
-  );
-}
-
 export function FinalCta() {
   return (
     <section className={styles.section} id="orcamento">
