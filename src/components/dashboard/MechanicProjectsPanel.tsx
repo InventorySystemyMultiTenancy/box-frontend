@@ -93,6 +93,11 @@ export default function MechanicProjectsPanel() {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
   }
 
+  function handleOrderDeleted() {
+    setOrders((prev) => prev.filter((o) => o.id !== selectedOrderId));
+    setSelectedOrderId(null);
+  }
+
   function handleProjectCreated(orderId: string) {
     if (token) api.serviceOrders(token).then(({ orders }) => setOrders(orders as ServiceOrder[]));
     setSelectedOrderId(orderId);
@@ -171,7 +176,7 @@ export default function MechanicProjectsPanel() {
 
       {selectedOrderId && (
         <div className={styles.detailWrap}>
-          <OrderDetail key={selectedOrderId} orderId={selectedOrderId} scrollToTimelineOnLoad />
+          <OrderDetail key={selectedOrderId} orderId={selectedOrderId} scrollToTimelineOnLoad onDeleted={handleOrderDeleted} />
         </div>
       )}
     </div>

@@ -659,8 +659,7 @@ export default function OrderDetail({
                       cancelar.
                     </DialogDescription>
                   </DialogHeader>
-                  <input
-                    className={styles.fullField}
+                  <Input
                     value={deleteCode}
                     onChange={(e) => setDeleteCode(e.target.value)}
                     placeholder={order.code}
