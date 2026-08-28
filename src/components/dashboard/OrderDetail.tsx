@@ -577,6 +577,10 @@ export default function OrderDetail({
   const canOfferPickup = !blockedForPickup && hasResolvedProblem;
   const isReady = order.status === "READY_FOR_PICKUP";
   const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
+  // Diferente de canRegisterProblems: o painel de finalização precisa continuar visível
+  // em FINISHED, já que é exatamente esse status que precede "pronto para retirada" —
+  // só SCHEDULED (veículo nem chegou) e READY_FOR_PICKUP (já finalizado) ficam de fora.
+  const canFinalize = !["SCHEDULED", "READY_FOR_PICKUP"].includes(order.status);
   const pendingNeedsPrice = pendingApproval && pendingApproval.estimatedValue == null;
 
   // Próxima etapa da sequência — para no FINISHED, já que ir para "pronto para
@@ -708,7 +712,7 @@ export default function OrderDetail({
         </div>
       )}
 
-      {isStaff && canRegisterProblems && (
+      {isStaff && canFinalize && (
         <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
           <h2>Finalização</h2>
           {blockedForPickup ? (
@@ -802,7 +806,7 @@ export default function OrderDetail({
             onPriceProblem={priceProblem}
             onUpdateProblem={updateProblemDetails}
           />
-          {isStaff && canRegisterProblems && canOfferPickup && (
+          {isStaff && canFinalize && canOfferPickup && (
             <div className={styles.approvalActions}>
               {isAdmin ? (
                 !finalizing && (
@@ -817,7 +821,7 @@ export default function OrderDetail({
               )}
             </div>
           )}
-          {isAdmin && isStaff && canRegisterProblems && canOfferPickup && finalizing && (
+          {isAdmin && isStaff && canFinalize && canOfferPickup && finalizing && (
             <div className={styles.panel}>
               <h2>Confirmar entrega</h2>
               <form className={styles.formGrid} onSubmit={finalizeOrder}>
