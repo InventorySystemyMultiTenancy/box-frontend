@@ -269,17 +269,33 @@ export default function BuscaGlobalPage() {
               <p className="mb-3 text-sm text-muted-foreground">Nenhum resultado encontrado para &quot;{q.trim()}&quot;.</p>
 
               {assistLoading && (
-                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Sparkles className="size-4 animate-pulse" /> Consultando a IA...
-                </p>
+                <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/10 p-4 shadow-sm">
+                  <span className="relative flex size-10 shrink-0 items-center justify-center">
+                    <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/50" />
+                    <span className="relative flex size-9 items-center justify-center rounded-full bg-primary">
+                      <Sparkles className="size-5 text-primary-foreground" />
+                    </span>
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold text-primary">Analisando com IA...</p>
+                    <p className="text-xs text-muted-foreground">Só um instante, buscando uma sugestão pra você.</p>
+                  </div>
+                </div>
               )}
 
               {assist && assistQuery === q.trim() && (
                 <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
                   <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
-                    <Sparkles className="size-3.5" /> Sugestão da IA
+                    <Sparkles className="size-3.5" /> {assist.steps ? "Tutorial rápido da IA" : "Sugestão da IA"}
                   </div>
                   <p className="mb-3 text-sm text-foreground">{assist.message}</p>
+                  {assist.steps && (
+                    <ol className="mb-3 list-decimal space-y-1.5 pl-5 text-sm text-foreground">
+                      {assist.steps.map((step, i) => (
+                        <li key={i}>{step}</li>
+                      ))}
+                    </ol>
+                  )}
                   <div className="flex flex-wrap gap-2">
                     {assist.suggestedQuery && (
                       <button
