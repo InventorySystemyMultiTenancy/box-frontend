@@ -670,6 +670,13 @@ export const api = {
       insuranceCompanies: unknown[];
     }>(`/api/search${toQuery({ q })}`, {}, token),
 
+  searchAssist: (q: string, token: string) =>
+    request<{ message: string; suggestedQuery: string | null; actions: { path: string; label: string }[] }>(
+      "/api/search/assist",
+      { method: "POST", body: JSON.stringify({ q }) },
+      token
+    ),
+
   // Caminhões
   trucks: (token: string) => request<{ trucks: unknown[] }>("/api/trucks", {}, token),
 

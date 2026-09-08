@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Search, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
@@ -58,6 +58,26 @@ export default function BuscaGlobalPage() {
       data.trucks.length +
       data.insuranceCompanies.length
     : 0;
+
+  // Só pergunta à IA depois que a busca "de verdade" (banco de dados) já rodou e
+  // confirmou 0 resultados, e só depois que a pessoa parou de digitar — evita
+  // chamar a IA a cada tecla enquanto o termo ainda está sendo escrito.
+  const [assistQuery, setAssistQuery] = useState<string | null>(null);
+  useEffect(() => {
+    if (isFetching || q.trim().length < 2 || totalResults > 0) {
+      setAssistQuery(null);
+      return;
+    }
+    const timer = setTimeout(() => setAssistQuery(q.trim()), 700);
+    return () => clearTimeout(timer);
+  }, [q, isFetching, totalResults]);
+
+  const { data: assist, isFetching: assistLoading } = useQuery({
+    queryKey: ["search-assist", assistQuery],
+    queryFn: () => api.searchAssist(assistQuery!, token!),
+    enabled: !!token && !!assistQuery,
+    retry: false,
+  });
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -245,7 +265,44 @@ export default function BuscaGlobalPage() {
           )}
 
           {q.trim().length >= 2 && totalResults === 0 && !isFetching && (
-            <p className="text-sm text-muted-foreground">Nenhum resultado encontrado.</p>
+            <div>
+              <p className="mb-3 text-sm text-muted-foreground">Nenhum resultado encontrado para &quot;{q.trim()}&quot;.</p>
+
+              {assistLoading && (
+                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Sparkles className="size-4 animate-pulse" /> Consultando a IA...
+                </p>
+              )}
+
+              {assist && assistQuery === q.trim() && (
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                  <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+                    <Sparkles className="size-3.5" /> Sugestão da IA
+                  </div>
+                  <p className="mb-3 text-sm text-foreground">{assist.message}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {assist.suggestedQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setQ(assist.suggestedQuery!)}
+                        className="rounded-md border border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+                      >
+                        Buscar por &quot;{assist.suggestedQuery}&quot;
+                      </button>
+                    )}
+                    {assist.actions.map((action) => (
+                      <Link
+                        key={action.path}
+                        href={action.path}
+                        className="rounded-md border border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+                      >
+                        Ir para {action.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
