@@ -35,14 +35,14 @@ export default function BuscaGlobalPage() {
     queryFn: async () => {
       const res = await api.globalSearch(q, token!);
       return {
-        orders: res.orders as ServiceOrder[],
-        estimates: res.estimates as Estimate[],
-        users: res.users as User[],
-        vehicles: res.vehicles as Vehicle[],
-        suppliers: res.suppliers as Supplier[],
-        parts: res.parts as InventoryPart[],
-        trucks: res.trucks as Truck[],
-        insuranceCompanies: res.insuranceCompanies as InsuranceCompany[],
+        orders: (res.orders ?? []) as ServiceOrder[],
+        estimates: (res.estimates ?? []) as Estimate[],
+        users: (res.users ?? []) as User[],
+        vehicles: (res.vehicles ?? []) as Vehicle[],
+        suppliers: (res.suppliers ?? []) as Supplier[],
+        parts: (res.parts ?? []) as InventoryPart[],
+        trucks: (res.trucks ?? []) as Truck[],
+        insuranceCompanies: (res.insuranceCompanies ?? []) as InsuranceCompany[],
       };
     },
     enabled: !!token && q.trim().length >= 2,
