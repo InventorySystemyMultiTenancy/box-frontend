@@ -30,7 +30,7 @@ export default function BuscaGlobalPage() {
   // Preenche com o termo vindo da busca do header (?q=...), se houver.
   const [q, setQ] = useState(() => searchParams.get("q") ?? "");
 
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, isError } = useQuery({
     queryKey: ["global-search", q],
     queryFn: async () => {
       const res = await api.globalSearch(q, token!);
@@ -68,13 +68,14 @@ export default function BuscaGlobalPage() {
         </p>
       </div>
 
-      <div className="relative mb-6 max-w-md">
+      <form onSubmit={(e) => e.preventDefault()} className="relative mb-6 max-w-md">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input placeholder="Buscar..." className="pl-8" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-      </div>
+      </form>
 
       {q.trim().length < 2 && <p className="text-sm text-muted-foreground">Digite ao menos 2 caracteres.</p>}
       {isFetching && <p className="text-sm text-muted-foreground">Buscando...</p>}
+      {isError && <p className="text-sm text-destructive">Não foi possível buscar agora. Tente de novo.</p>}
 
       {data && (
         <div className="grid gap-6">

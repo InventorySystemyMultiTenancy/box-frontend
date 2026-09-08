@@ -1151,7 +1151,7 @@
 .usersTable th,
 .usersTable td {
   padding: 0.75rem 1rem;
-  text-align: left;
+  text-align: center;
   border-bottom: 1px solid var(--border);
   font-size: 0.86rem;
   vertical-align: middle;
@@ -1192,6 +1192,23 @@
   color: var(--text);
   font-family: var(--font-body);
   font-size: 0.82rem;
+  text-align: center;
+}
+.commissionField {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+.commissionField input {
+  width: auto;
+  min-width: 70px;
+  flex: 0 1 80px;
+}
+.commissionIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 .usersTableEmpty {
   padding: 1.5rem 1rem;

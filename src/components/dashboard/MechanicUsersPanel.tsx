@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Percent } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { User, Role } from "@/lib/types";
@@ -176,16 +177,19 @@ export default function MechanicUsersPanel() {
                 </td>
                 <td>
                   {user.role === "MECHANIC" ? (
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      defaultValue={user.commissionRate != null ? user.commissionRate * 100 : ""}
-                      onBlur={(e) => updateUserCommission(user, e.target.value)}
-                      placeholder="%"
-                      title="Percentual de comissão"
-                    />
+                    <div className={styles.commissionField}>
+                      <Percent size={13} className={styles.commissionIcon} />
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        defaultValue={user.commissionRate != null ? user.commissionRate * 100 : ""}
+                        onBlur={(e) => updateUserCommission(user, e.target.value)}
+                        placeholder="0.0"
+                        title="Percentual de comissão"
+                      />
+                    </div>
                   ) : (
                     <span>—</span>
                   )}
