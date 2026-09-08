@@ -9,7 +9,20 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
-import { STATUS_LABELS, ServiceOrder, Estimate, ESTIMATE_STATUS_LABELS } from "@/lib/types";
+import {
+  STATUS_LABELS,
+  ServiceOrder,
+  Estimate,
+  ESTIMATE_STATUS_LABELS,
+  User,
+  Vehicle,
+  Supplier,
+  InventoryPart,
+  Truck,
+  InsuranceCompany,
+} from "@/lib/types";
+
+const ROLE_LABELS: Record<string, string> = { CUSTOMER: "Cliente", MECHANIC: "Mecânico", ADMIN: "Admin" };
 
 export default function BuscaGlobalPage() {
   const { token } = useAuth();
@@ -21,16 +34,38 @@ export default function BuscaGlobalPage() {
     queryKey: ["global-search", q],
     queryFn: async () => {
       const res = await api.globalSearch(q, token!);
-      return { orders: res.orders as ServiceOrder[], estimates: res.estimates as Estimate[] };
+      return {
+        orders: res.orders as ServiceOrder[],
+        estimates: res.estimates as Estimate[],
+        users: res.users as User[],
+        vehicles: res.vehicles as Vehicle[],
+        suppliers: res.suppliers as Supplier[],
+        parts: res.parts as InventoryPart[],
+        trucks: res.trucks as Truck[],
+        insuranceCompanies: res.insuranceCompanies as InsuranceCompany[],
+      };
     },
     enabled: !!token && q.trim().length >= 2,
   });
+
+  const totalResults = data
+    ? data.orders.length +
+      data.estimates.length +
+      data.users.length +
+      data.vehicles.length +
+      data.suppliers.length +
+      data.parts.length +
+      data.trucks.length +
+      data.insuranceCompanies.length
+    : 0;
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Busca global</h1>
-        <p className="text-sm text-muted-foreground">Nº de OS, orçamento, placa, cliente, veículo, seguradora, consultor ou orçamentista.</p>
+        <p className="text-sm text-muted-foreground">
+          Busca em tudo: OS, orçamento, clientes, usuários, veículos, peças, fornecedores, caminhões e seguradoras.
+        </p>
       </div>
 
       <div className="relative mb-6 max-w-md">
@@ -44,7 +79,7 @@ export default function BuscaGlobalPage() {
       {data && (
         <div className="grid gap-6">
           {data.orders.length > 0 && (
-            <div>
+            <section>
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ordens de serviço</h2>
               <div className="grid gap-2">
                 {data.orders.map((order) => (
@@ -62,11 +97,11 @@ export default function BuscaGlobalPage() {
                   </Link>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
           {data.estimates.length > 0 && (
-            <div>
+            <section>
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Orçamentos</h2>
               <div className="grid gap-2">
                 {data.estimates.map((estimate) => (
@@ -80,10 +115,135 @@ export default function BuscaGlobalPage() {
                   </Link>
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
-          {q.trim().length >= 2 && data.orders.length === 0 && data.estimates.length === 0 && !isFetching && (
+          {data.users.length > 0 && (
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Usuários e clientes</h2>
+              <div className="grid gap-2">
+                {data.users.map((u) => (
+                  <Link
+                    key={u.id}
+                    href={u.role === "CUSTOMER" ? "/dashboard/clientes" : "/dashboard/usuarios"}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm hover:border-primary/50"
+                  >
+                    <span>
+                      <strong>{u.name}</strong>{" "}
+                      <span className="text-muted-foreground">{u.email}</span>
+                      {u.phone && <span className="text-muted-foreground"> · {u.phone}</span>}
+                    </span>
+                    <Badge variant="outline">{ROLE_LABELS[u.role] ?? u.role}</Badge>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {data.vehicles.length > 0 && (
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Veículos</h2>
+              <div className="grid gap-2">
+                {data.vehicles.map((v) => (
+                  <Link
+                    key={v.id}
+                    href={v.owner ? `/dashboard/clientes/${v.owner.id}` : "/dashboard/clientes"}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm hover:border-primary/50"
+                  >
+                    <span>
+                      <strong>{v.brand} {v.model}</strong>
+                      {v.plate && <span className="font-mono text-xs text-muted-foreground"> · {v.plate}</span>}
+                      {v.owner && <span className="text-muted-foreground"> · {v.owner.name}</span>}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {data.suppliers.length > 0 && (
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fornecedores</h2>
+              <div className="grid gap-2">
+                {data.suppliers.map((s) => (
+                  <Link
+                    key={s.id}
+                    href="/dashboard/fornecedores"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm hover:border-primary/50"
+                  >
+                    <span>
+                      <strong>{s.name}</strong>
+                      {s.phone && <span className="text-muted-foreground"> · {s.phone}</span>}
+                      {s.email && <span className="text-muted-foreground"> · {s.email}</span>}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {data.parts.length > 0 && (
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Peças e materiais</h2>
+              <div className="grid gap-2">
+                {data.parts.map((p) => (
+                  <Link
+                    key={p.id}
+                    href="/dashboard/pecas"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm hover:border-primary/50"
+                  >
+                    <span>
+                      <strong>{p.name}</strong>
+                      {p.sku && <span className="font-mono text-xs text-muted-foreground"> · {p.sku}</span>}
+                    </span>
+                    <Badge variant="outline">{p.stockQty} em estoque</Badge>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {data.trucks.length > 0 && (
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Caminhões</h2>
+              <div className="grid gap-2">
+                {data.trucks.map((t) => (
+                  <Link
+                    key={t.id}
+                    href="/dashboard/caminhoes"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm hover:border-primary/50"
+                  >
+                    <span>
+                      <strong>{t.plate}</strong>
+                      {(t.brand || t.model) && <span className="text-muted-foreground"> · {t.brand} {t.model}</span>}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {data.insuranceCompanies.length > 0 && (
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seguradoras</h2>
+              <div className="grid gap-2">
+                {data.insuranceCompanies.map((i) => (
+                  <Link
+                    key={i.id}
+                    href="/dashboard/seguradoras"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-card p-3 text-sm hover:border-primary/50"
+                  >
+                    <span>
+                      <strong>{i.legalName}</strong>
+                      {i.tradeName && <span className="text-muted-foreground"> · {i.tradeName}</span>}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {q.trim().length >= 2 && totalResults === 0 && !isFetching && (
             <p className="text-sm text-muted-foreground">Nenhum resultado encontrado.</p>
           )}
         </div>

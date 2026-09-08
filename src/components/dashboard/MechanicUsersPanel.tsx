@@ -135,42 +135,72 @@ export default function MechanicUsersPanel() {
         </form>
       </div>
 
-      <div className={styles.sectionTitle}>Usuários existentes</div>
-      <div className={styles.ordersList}>
-        {users.map((user) => (
-          <div key={user.id} className={styles.orderRow}>
-            <div className={styles.orderRowInfo}>
-              <strong>{user.name}</strong>
-              <span>{user.email}</span>
-            </div>
-            <select value={user.role} onChange={(e) => updateUser(user, e.target.value as User["role"])}>
-              <option value="CUSTOMER">Cliente</option>
-              <option value="MECHANIC">Mecânico</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-            <select value={user.roleId ?? ""} onChange={(e) => updateUserCargo(user, e.target.value)}>
-              <option value="">Sem cargo</option>
-              {roles.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {role.name}
-                </option>
-              ))}
-            </select>
-            {user.role === "MECHANIC" && (
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                style={{ width: 90 }}
-                defaultValue={user.commissionRate != null ? user.commissionRate * 100 : ""}
-                onBlur={(e) => updateUserCommission(user, e.target.value)}
-                placeholder="Comissão %"
-                title="Percentual de comissão"
-              />
+      <div className={styles.sectionTitle}>Usuários existentes ({users.length})</div>
+      <div className={styles.usersTableWrap}>
+        <table className={styles.usersTable}>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Contato</th>
+              <th>Perfil</th>
+              <th>Cargo</th>
+              <th>Comissão</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td>
+                  <strong>{user.name}</strong>
+                </td>
+                <td>
+                  <span>{user.email}</span>
+                  {user.phone && <span> · {user.phone}</span>}
+                </td>
+                <td>
+                  <select value={user.role} onChange={(e) => updateUser(user, e.target.value as User["role"])}>
+                    <option value="CUSTOMER">Cliente</option>
+                    <option value="MECHANIC">Mecânico</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </td>
+                <td>
+                  <select value={user.roleId ?? ""} onChange={(e) => updateUserCargo(user, e.target.value)}>
+                    <option value="">Sem cargo</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>
+                  {user.role === "MECHANIC" ? (
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      defaultValue={user.commissionRate != null ? user.commissionRate * 100 : ""}
+                      onBlur={(e) => updateUserCommission(user, e.target.value)}
+                      placeholder="%"
+                      title="Percentual de comissão"
+                    />
+                  ) : (
+                    <span>—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+            {users.length === 0 && (
+              <tr>
+                <td colSpan={5} className={styles.usersTableEmpty}>
+                  Nenhum usuário cadastrado.
+                </td>
+              </tr>
             )}
-          </div>
-        ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

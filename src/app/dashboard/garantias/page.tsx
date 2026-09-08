@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth-context";
@@ -20,12 +22,33 @@ export default function GarantiasPage() {
   }, [user, allowed, router]);
 
   const [withinDays, setWithinDays] = useState("30");
+  const [search, setSearch] = useState("");
 
   const { data: parts, isLoading } = useQuery({
     queryKey: ["expiring-warranties", withinDays],
     queryFn: async () => (await api.expiringWarranties(token!, Number(withinDays))).parts as ExpiringWarrantyPart[],
     enabled: !!token && allowed,
   });
+
+  const filteredParts = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return parts ?? [];
+    return (parts ?? []).filter((part) => {
+      const haystack = [
+        part.name,
+        part.note,
+        part.serviceOrder.code,
+        part.serviceOrder.vehicle.brand,
+        part.serviceOrder.vehicle.model,
+        part.serviceOrder.vehicle.plate,
+        part.serviceOrder.vehicle.owner.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(term);
+    });
+  }, [parts, search]);
 
   if (!allowed) return null;
 
@@ -50,6 +73,16 @@ export default function GarantiasPage() {
         </Select>
       </div>
 
+      <div className="relative mb-4 max-w-md">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Buscar por cliente, veículo, placa, problema, peça ou OS..."
+          className="pl-8"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
@@ -58,18 +91,22 @@ export default function GarantiasPage() {
               <TableHead>OS</TableHead>
               <TableHead>Veículo</TableHead>
               <TableHead>Cliente</TableHead>
+              <TableHead>Problema</TableHead>
               <TableHead>Vence em</TableHead>
               <TableHead>Situação</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             )}
             {!isLoading && (parts ?? []).length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhuma garantia vencendo neste período.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Nenhuma garantia vencendo neste período.</TableCell></TableRow>
             )}
-            {(parts ?? []).map((part) => (
+            {!isLoading && (parts ?? []).length > 0 && filteredParts.length === 0 && (
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Nenhum resultado para essa busca.</TableCell></TableRow>
+            )}
+            {filteredParts.map((part) => (
               <TableRow key={part.id}>
                 <TableCell className="font-medium">{part.name}</TableCell>
                 <TableCell className="font-mono text-sm">{part.serviceOrder.code}</TableCell>
@@ -77,6 +114,7 @@ export default function GarantiasPage() {
                   {part.serviceOrder.vehicle.brand} {part.serviceOrder.vehicle.model} {part.serviceOrder.vehicle.plate ? `(${part.serviceOrder.vehicle.plate})` : ""}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{part.serviceOrder.vehicle.owner.name}</TableCell>
+                <TableCell className="max-w-56 truncate text-muted-foreground" title={part.note ?? ""}>{part.note || "—"}</TableCell>
                 <TableCell>{part.warrantyExpiresAt ? new Date(part.warrantyExpiresAt).toLocaleDateString("pt-BR") : "—"}</TableCell>
                 <TableCell>
                   <Badge variant={isExpired(part.warrantyExpiresAt) ? "destructive" : "outline"}>

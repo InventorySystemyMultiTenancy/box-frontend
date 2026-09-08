@@ -658,7 +658,17 @@ export const api = {
     request<{ document: { name: string; html: string } }>(`/api/document-templates/${key}/render/${serviceOrderId}`, {}, token),
 
   // Busca global
-  globalSearch: (q: string, token: string) => request<{ orders: unknown[]; estimates: unknown[] }>(`/api/search${toQuery({ q })}`, {}, token),
+  globalSearch: (q: string, token: string) =>
+    request<{
+      orders: unknown[];
+      estimates: unknown[];
+      users: unknown[];
+      vehicles: unknown[];
+      suppliers: unknown[];
+      parts: unknown[];
+      trucks: unknown[];
+      insuranceCompanies: unknown[];
+    }>(`/api/search${toQuery({ q })}`, {}, token),
 
   // Caminhões
   trucks: (token: string) => request<{ trucks: unknown[] }>("/api/trucks", {}, token),
