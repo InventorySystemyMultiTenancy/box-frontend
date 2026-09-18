@@ -12,8 +12,8 @@ export default function LoginPage() {
   const { login, registerCustomer } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("cliente@box.demo");
-  const [password, setPassword] = useState("cliente123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -40,13 +40,8 @@ export default function LoginPage() {
   function switchMode(nextMode: "login" | "register") {
     setMode(nextMode);
     setError(null);
-    if (nextMode === "login") {
-      setEmail("cliente@box.demo");
-      setPassword("cliente123");
-    } else {
-      setEmail("");
-      setPassword("");
-    }
+    setEmail("");
+    setPassword("");
   }
 
   return (
@@ -111,12 +106,6 @@ export default function LoginPage() {
         <button className={styles.submit} type="submit" disabled={loading}>
           {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
         </button>
-
-        <div className={styles.hint}>
-          demo: cliente@box.demo / cliente123
-          <br />
-          mecânico: diego@box.demo / mecanico123
-        </div>
       </form>
     </div>
   );
