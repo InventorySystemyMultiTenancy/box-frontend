@@ -9,7 +9,6 @@ import { buildWhatsAppLink } from "@/lib/whatsapp";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
-import ApprovalCard from "@/components/dashboard/ApprovalCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -279,6 +278,24 @@ export default function OrderDetail({
     } finally {
       setAdvanceBusy(false);
     }
+  }
+
+  // Botão "Finalizar projeto" (dentro da box de avançar etapa) — valida no clique em
+  // vez de simplesmente ficar desabilitado, para o mecânico/admin saber por que não
+  // pode finalizar ainda.
+  function handleFinalizeClick() {
+    if (blockedForPickup) {
+      setAdvanceMessage(
+        `Ainda há ${unresolvedParts.length} problema${unresolvedParts.length > 1 ? "s" : ""} não resolvido${unresolvedParts.length > 1 ? "s" : ""} — resolva antes de finalizar.`
+      );
+      return;
+    }
+    if (!hasResolvedProblem) {
+      setAdvanceMessage("Nenhum problema identificado e resolvido ainda — registre e conclua ao menos um para finalizar.");
+      return;
+    }
+    setAdvanceMessage(null);
+    setFinalizing(true);
   }
 
   async function resolvePart(partId: string) {
@@ -739,21 +756,6 @@ export default function OrderDetail({
               onPriceProblem={priceProblem}
               onUpdateProblem={updateProblemDetails}
             />
-            {isStaff && canFinalize && canOfferPickup && (
-              <div className={styles.approvalActions}>
-                {isAdmin ? (
-                  !finalizing && (
-                    <button className={styles.btnApprove} onClick={() => setFinalizing(true)}>
-                      Veículo pronto para retirada
-                    </button>
-                  )
-                ) : (
-                  <button className={styles.btnApprove} type="button" disabled>
-                    Aguardando admin liberar retirada
-                  </button>
-                )}
-              </div>
-            )}
             {isAdmin && isStaff && canFinalize && canOfferPickup && finalizing && (
               <div className={styles.panel}>
                 <h2>Confirmar entrega</h2>
@@ -791,42 +793,7 @@ export default function OrderDetail({
             )}
           </div>
 
-          {isStaff && canFinalize && (
-            <div className={`${styles.panel} ${styles.approval}`}>
-              <h2>Finalização</h2>
-              {blockedForPickup ? (
-                <p>
-                  Ainda há {unresolvedParts.length} problema{unresolvedParts.length > 1 ? "s" : ""} aguardando reparo antes de liberar o veículo.
-                </p>
-              ) : !hasResolvedProblem ? (
-                <p>Nenhum problema identificado e resolvido ainda — registre e conclua ao menos um para liberar o veículo.</p>
-              ) : (
-                <>
-                  <p>Todos os problemas identificados foram resolvidos.</p>
-                  {pendingApproval && (
-                    <p className={styles.tlSub}>
-                      Há uma aprovação do cliente ainda pendente, mas isso não impede a liberação do veículo.
-                    </p>
-                  )}
-                  {isAdmin ? (
-                    <div className={styles.approvalActions}>
-                      <button className={styles.btnApprove} disabled={finalizing} onClick={() => setFinalizing(true)}>
-                        {finalizing ? "Preencha a entrega abaixo, junto ao modelo do veículo" : "Veículo pronto para retirada"}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className={styles.approvalActions}>
-                      <button className={styles.btnApprove} type="button" disabled>
-                        Aguardando admin liberar retirada
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {isStaff && (nextStatus || whatsAppLink) && (
+          {isStaff && (nextStatus || whatsAppLink || canFinalize) && (
             <div className={`${styles.panel} ${styles.approval}`}>
               <h2>Avançar etapa</h2>
               {nextStatus && (
@@ -848,6 +815,16 @@ export default function OrderDetail({
                     {advanceBusy ? "Avançando..." : `Avançar para "${STATUS_LABELS[nextStatus]}"`}
                   </button>
                 )}
+                {canFinalize &&
+                  (isAdmin ? (
+                    <button className={styles.btnApprove} disabled={finalizing} onClick={handleFinalizeClick}>
+                      {finalizing ? "Preencha a entrega abaixo, junto ao modelo do veículo" : "Finalizar projeto"}
+                    </button>
+                  ) : (
+                    <button className={styles.btnApprove} type="button" disabled>
+                      Aguardando admin liberar retirada
+                    </button>
+                  ))}
                 {whatsAppLink ? (
                   <a className={styles.btnApprove} href={whatsAppLink} target="_blank" rel="noreferrer">
                     Avisar cliente (WhatsApp)
@@ -974,21 +951,6 @@ export default function OrderDetail({
                 </button>
               </form>
             </div>
-          )}
-
-          {canViewPrices && pendingApproval && pendingApproval.estimatedValue != null && (
-            <ApprovalCard
-              approval={pendingApproval}
-              canRespond={isCustomer}
-              canViewPrices={canViewPrices}
-              onRespond={(status, responseNote) => respondApproval(pendingApproval.id, status, responseNote)}
-              canForceResolve={
-                isStaff &&
-                !!pendingApproval.partId &&
-                order.parts.find((p) => p.id === pendingApproval.partId)?.status !== "DONE"
-              }
-              onForceResolve={pendingApproval.partId ? () => resolvePart(pendingApproval.partId!) : undefined}
-            />
           )}
 
           {isAdmin && pendingNeedsPrice && (

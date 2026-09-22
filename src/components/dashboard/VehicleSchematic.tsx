@@ -477,7 +477,7 @@ export default function VehicleSchematic({
             <div className={styles.approvalActions}>
               {active.status === "IN_PROGRESS" ? (
                 <button className={styles.btnApprove} disabled={resolving} onClick={resolve}>
-                  {resolving ? "Concluindo..." : "Problema concluído"}
+                  {resolving ? "Concluindo..." : "Marcar problema concluído"}
                 </button>
               ) : (
                 <button
