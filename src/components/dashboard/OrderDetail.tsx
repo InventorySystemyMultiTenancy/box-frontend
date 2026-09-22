@@ -712,71 +712,197 @@ export default function OrderDetail({
         </div>
       )}
 
-      {isStaff && canFinalize && (
-        <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
-          <h2>Finalização</h2>
-          {blockedForPickup ? (
-            <p>
-              Ainda há {unresolvedParts.length} problema{unresolvedParts.length > 1 ? "s" : ""} aguardando reparo antes de liberar o veículo.
-            </p>
-          ) : !hasResolvedProblem ? (
-            <p>Nenhum problema identificado e resolvido ainda — registre e conclua ao menos um para liberar o veículo.</p>
-          ) : (
-            <>
-              <p>Todos os problemas identificados foram resolvidos.</p>
-              {pendingApproval && (
-                <p className={styles.tlSub}>
-                  Há uma aprovação do cliente ainda pendente, mas isso não impede a liberação do veículo.
-                </p>
-              )}
-              {isAdmin ? (
-                <div className={styles.approvalActions}>
-                  <button className={styles.btnApprove} disabled={finalizing} onClick={() => setFinalizing(true)}>
-                    {finalizing ? "Preencha a entrega abaixo, junto ao modelo do veículo" : "Veículo pronto para retirada"}
-                  </button>
-                </div>
-              ) : (
-                <div className={styles.approvalActions}>
-                  <button className={styles.btnApprove} type="button" disabled>
-                    Aguardando admin liberar retirada
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {isStaff && (nextStatus || whatsAppLink) && (
-        <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
-          <h2>Avançar etapa</h2>
-          {nextStatus && (
-            <>
+      <div className={styles.columns} style={{ marginBottom: "1.6rem" }} id="vehicle-timeline">
+        {isStaff && canFinalize && (
+          <div className={`${styles.panel} ${styles.approval}`}>
+            <h2>Finalização</h2>
+            {blockedForPickup ? (
               <p>
-                Etapa atual: <strong>{STATUS_LABELS[order.status]}</strong>. Próxima etapa: <strong>{STATUS_LABELS[nextStatus]}</strong>.
+                Ainda há {unresolvedParts.length} problema{unresolvedParts.length > 1 ? "s" : ""} aguardando reparo antes de liberar o veículo.
               </p>
-              <label className={styles.fullField} style={{ display: "block", marginBottom: "0.8rem" }}>
-                Foto desta etapa (opcional)
-                <input type="file" accept="image/*" onChange={(e) => setAdvancePhoto(e.target.files?.[0] ?? null)} />
-                {advancePhoto && <span>{advancePhoto.name}</span>}
-              </label>
-            </>
-          )}
-          {advanceMessage && <div className={styles.formMessage}>{advanceMessage}</div>}
-          <div className={styles.approvalActions}>
-            {nextStatus && (
-              <button className={styles.btnApprove} disabled={advanceBusy} onClick={() => advanceStage(nextStatus)}>
-                {advanceBusy ? "Avançando..." : `Avançar para "${STATUS_LABELS[nextStatus]}"`}
-              </button>
-            )}
-            {whatsAppLink ? (
-              <a className={styles.btnApprove} href={whatsAppLink} target="_blank" rel="noreferrer">
-                Avisar cliente (WhatsApp)
-              </a>
+            ) : !hasResolvedProblem ? (
+              <p>Nenhum problema identificado e resolvido ainda — registre e conclua ao menos um para liberar o veículo.</p>
             ) : (
-              isStaff && <span className={styles.tlSub}>Cliente sem telefone cadastrado.</span>
+              <>
+                <p>Todos os problemas identificados foram resolvidos.</p>
+                {pendingApproval && (
+                  <p className={styles.tlSub}>
+                    Há uma aprovação do cliente ainda pendente, mas isso não impede a liberação do veículo.
+                  </p>
+                )}
+                {isAdmin ? (
+                  <div className={styles.approvalActions}>
+                    <button className={styles.btnApprove} disabled={finalizing} onClick={() => setFinalizing(true)}>
+                      {finalizing ? "Preencha a entrega abaixo, junto ao modelo do veículo" : "Veículo pronto para retirada"}
+                    </button>
+                  </div>
+                ) : (
+                  <div className={styles.approvalActions}>
+                    <button className={styles.btnApprove} type="button" disabled>
+                      Aguardando admin liberar retirada
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
+        )}
+
+        <div className={styles.panel}>
+          <h2>Timeline da manutenção</h2>
+          <Timeline events={order.timelineEvents} justArrivedId={justArrivedId} canViewPrices={canViewPrices} />
+        </div>
+      </div>
+
+      {(isStaff && (nextStatus || whatsAppLink || canRegisterProblems)) && (
+        <div className={styles.columns} style={{ marginBottom: "1.6rem" }}>
+          {(nextStatus || whatsAppLink) && (
+            <div className={`${styles.panel} ${styles.approval}`}>
+              <h2>Avançar etapa</h2>
+              {nextStatus && (
+                <>
+                  <p>
+                    Etapa atual: <strong>{STATUS_LABELS[order.status]}</strong>. Próxima etapa: <strong>{STATUS_LABELS[nextStatus]}</strong>.
+                  </p>
+                  <label className={styles.fullField} style={{ display: "block", marginBottom: "0.8rem" }}>
+                    Foto desta etapa (opcional)
+                    <input type="file" accept="image/*" onChange={(e) => setAdvancePhoto(e.target.files?.[0] ?? null)} />
+                    {advancePhoto && <span>{advancePhoto.name}</span>}
+                  </label>
+                </>
+              )}
+              {advanceMessage && <div className={styles.formMessage}>{advanceMessage}</div>}
+              <div className={styles.approvalActions}>
+                {nextStatus && (
+                  <button className={styles.btnApprove} disabled={advanceBusy} onClick={() => advanceStage(nextStatus)}>
+                    {advanceBusy ? "Avançando..." : `Avançar para "${STATUS_LABELS[nextStatus]}"`}
+                  </button>
+                )}
+                {whatsAppLink ? (
+                  <a className={styles.btnApprove} href={whatsAppLink} target="_blank" rel="noreferrer">
+                    Avisar cliente (WhatsApp)
+                  </a>
+                ) : (
+                  <span className={styles.tlSub}>Cliente sem telefone cadastrado.</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {canRegisterProblems && (
+            <div className={styles.panel}>
+              <h2>{isAdmin ? "Diagnóstico com preço" : "Novo problema diagnosticado"}</h2>
+              <form className={styles.formGrid} onSubmit={createProblem}>
+                <label>
+                  Componente
+                  <select
+                    value={problemForm.key}
+                    onChange={(e) => {
+                      const option = PART_OPTIONS.find((item) => item.key === e.target.value);
+                      setProblemForm((prev) => ({ ...prev, key: e.target.value, name: option?.label ?? prev.name }));
+                    }}
+                  >
+                    {PART_OPTIONS.map((part) => (
+                      <option key={part.key} value={part.key}>
+                        {part.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Nome exibido
+                  <input value={problemForm.name} onChange={(e) => setProblemForm((prev) => ({ ...prev, name: e.target.value }))} required />
+                </label>
+                {POSITION_REQUIRED_PARTS.has(problemForm.key) && (
+                  <>
+                    <label>
+                      Eixo
+                      <select value={problemForm.axle} onChange={(e) => setProblemForm((prev) => ({ ...prev, axle: e.target.value }))}>
+                        <option value="dianteiro">Dianteiro</option>
+                        <option value="traseiro">Traseiro</option>
+                      </select>
+                    </label>
+                    <label>
+                      Lado
+                      <select value={problemForm.side} onChange={(e) => setProblemForm((prev) => ({ ...prev, side: e.target.value }))}>
+                        <option value="esquerdo">Esquerdo</option>
+                        <option value="direito">Direito</option>
+                      </select>
+                    </label>
+                  </>
+                )}
+                <label className={styles.fullField}>
+                  Descrição do problema
+                  <textarea
+                    value={problemForm.description}
+                    onChange={(e) => setProblemForm((prev) => ({ ...prev, description: e.target.value }))}
+                    required
+                  />
+                </label>
+                <label>
+                  Desgaste (%)
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={problemForm.wearLevel}
+                    onChange={(e) => setProblemForm((prev) => ({ ...prev, wearLevel: e.target.value }))}
+                  />
+                </label>
+                {isAdmin && (
+                  <>
+                    <label>
+                      Mão de obra
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={problemForm.laborValue}
+                        onChange={(e) => setProblemForm((prev) => ({ ...prev, laborValue: e.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      Peça utilizada
+                      <select
+                        value={problemForm.inventoryPartId}
+                        onChange={(e) => setProblemForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}
+                      >
+                        <option value="">Nenhuma peça</option>
+                        {inventoryParts.map((part) => (
+                          <option key={part.id} value={part.id}>
+                            {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Quantidade
+                      <input
+                        type="number"
+                        min="1"
+                        value={problemForm.quantity}
+                        onChange={(e) => setProblemForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                      />
+                    </label>
+                  </>
+                )}
+                <label className={styles.fullField}>
+                  Imagens do problema
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => setProblemForm((prev) => ({ ...prev, files: Array.from(e.target.files ?? []) }))}
+                  />
+                  {problemForm.files.length > 0 && <span>{problemForm.files.length} imagem(ns) selecionada(s)</span>}
+                </label>
+                {problemMessage && <div className={styles.formMessage}>{problemMessage}</div>}
+                <button className={styles.actionButton} type="submit" disabled={problemBusy}>
+                  {problemBusy ? "Salvando..." : "Cadastrar problema"}
+                </button>
+              </form>
+            </div>
+          )}
         </div>
       )}
 
@@ -916,130 +1042,6 @@ export default function OrderDetail({
         )}
       </div>
 
-      {/* Timeline e cadastro de problemas — histórico e administração, abaixo do modelo. */}
-      <div className={styles.columns} id="vehicle-timeline">
-        <div className={styles.panel}>
-          <h2>Timeline da manutenção</h2>
-          <Timeline events={order.timelineEvents} justArrivedId={justArrivedId} canViewPrices={canViewPrices} />
-        </div>
-
-        <div>
-          {isStaff && canRegisterProblems && (
-            <div className={styles.panel}>
-              <h2>{isAdmin ? "Diagnóstico com preço" : "Novo problema diagnosticado"}</h2>
-              <form className={styles.formGrid} onSubmit={createProblem}>
-                <label>
-                  Componente
-                  <select
-                    value={problemForm.key}
-                    onChange={(e) => {
-                      const option = PART_OPTIONS.find((item) => item.key === e.target.value);
-                      setProblemForm((prev) => ({ ...prev, key: e.target.value, name: option?.label ?? prev.name }));
-                    }}
-                  >
-                    {PART_OPTIONS.map((part) => (
-                      <option key={part.key} value={part.key}>
-                        {part.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Nome exibido
-                  <input value={problemForm.name} onChange={(e) => setProblemForm((prev) => ({ ...prev, name: e.target.value }))} required />
-                </label>
-                {POSITION_REQUIRED_PARTS.has(problemForm.key) && (
-                  <>
-                    <label>
-                      Eixo
-                      <select value={problemForm.axle} onChange={(e) => setProblemForm((prev) => ({ ...prev, axle: e.target.value }))}>
-                        <option value="dianteiro">Dianteiro</option>
-                        <option value="traseiro">Traseiro</option>
-                      </select>
-                    </label>
-                    <label>
-                      Lado
-                      <select value={problemForm.side} onChange={(e) => setProblemForm((prev) => ({ ...prev, side: e.target.value }))}>
-                        <option value="esquerdo">Esquerdo</option>
-                        <option value="direito">Direito</option>
-                      </select>
-                    </label>
-                  </>
-                )}
-                <label className={styles.fullField}>
-                  Descrição do problema
-                  <textarea
-                    value={problemForm.description}
-                    onChange={(e) => setProblemForm((prev) => ({ ...prev, description: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label>
-                  Desgaste (%)
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={problemForm.wearLevel}
-                    onChange={(e) => setProblemForm((prev) => ({ ...prev, wearLevel: e.target.value }))}
-                  />
-                </label>
-                {isAdmin && (
-                  <>
-                    <label>
-                      Mão de obra
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={problemForm.laborValue}
-                        onChange={(e) => setProblemForm((prev) => ({ ...prev, laborValue: e.target.value }))}
-                      />
-                    </label>
-                    <label>
-                      Peça utilizada
-                      <select
-                        value={problemForm.inventoryPartId}
-                        onChange={(e) => setProblemForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}
-                      >
-                        <option value="">Nenhuma peça</option>
-                        {inventoryParts.map((part) => (
-                          <option key={part.id} value={part.id}>
-                            {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Quantidade
-                      <input
-                        type="number"
-                        min="1"
-                        value={problemForm.quantity}
-                        onChange={(e) => setProblemForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                      />
-                    </label>
-                  </>
-                )}
-                <label className={styles.fullField}>
-                  Imagens do problema
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => setProblemForm((prev) => ({ ...prev, files: Array.from(e.target.files ?? []) }))}
-                  />
-                  {problemForm.files.length > 0 && <span>{problemForm.files.length} imagem(ns) selecionada(s)</span>}
-                </label>
-                {problemMessage && <div className={styles.formMessage}>{problemMessage}</div>}
-                <button className={styles.actionButton} type="submit" disabled={problemBusy}>
-                  {problemBusy ? "Salvando..." : "Cadastrar problema"}
-                </button>
-              </form>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
