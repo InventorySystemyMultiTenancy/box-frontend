@@ -550,6 +550,25 @@
   .columns { grid-template-columns: 1fr; }
 }
 
+.masonry {
+  display: flex;
+  gap: 1.6rem;
+  align-items: flex-start;
+}
+.masonryCol {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  flex: 1;
+  min-width: 0;
+}
+.masonryCol:first-child {
+  flex: 1.1;
+}
+@media (max-width: 860px) {
+  .masonry { flex-direction: column; }
+}
+
 .panel {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -1221,4 +1240,14 @@
   margin-top: 1.6rem;
   padding-top: 1.6rem;
   border-top: 1px solid var(--border-strong);
+}
+
+.projectDetailView {
+  display: flex;
+  flex-direction: column;
+}
+
+.backToProjectsBtn {
+  align-self: flex-start;
+  margin-bottom: 1.2rem;
 }

@@ -712,51 +712,121 @@ export default function OrderDetail({
         </div>
       )}
 
-      <div className={styles.columns} style={{ marginBottom: "1.6rem" }} id="vehicle-timeline">
-        {isStaff && canFinalize && (
-          <div className={`${styles.panel} ${styles.approval}`}>
-            <h2>Finalização</h2>
-            {blockedForPickup ? (
-              <p>
-                Ainda há {unresolvedParts.length} problema{unresolvedParts.length > 1 ? "s" : ""} aguardando reparo antes de liberar o veículo.
-              </p>
-            ) : !hasResolvedProblem ? (
-              <p>Nenhum problema identificado e resolvido ainda — registre e conclua ao menos um para liberar o veículo.</p>
-            ) : (
-              <>
-                <p>Todos os problemas identificados foram resolvidos.</p>
-                {pendingApproval && (
-                  <p className={styles.tlSub}>
-                    Há uma aprovação do cliente ainda pendente, mas isso não impede a liberação do veículo.
-                  </p>
-                )}
+      <div className={styles.masonry} id="vehicle-timeline">
+        <div className={styles.masonryCol}>
+          {/* Modelo do veículo com acompanhamento dos problemas — em destaque, sempre no topo. */}
+          <div className={`${styles.panel} ${isReady ? styles.panelReady : ""}`}>
+            <h2>Modelo do veículo</h2>
+            {isReady && <div className={styles.readyBanner}>Veículo pronto e em ótimo estado — pode retirar!</div>}
+            {isCustomer && isReady && (
+              <div className={styles.approvalActions}>
+                <button className={styles.btnApprove} onClick={generateServicePdf}>
+                  Gerar PDF do serviço
+                </button>
+              </div>
+            )}
+            <VehicleSchematic
+              parts={order.parts}
+              approvals={order.approvals}
+              canRespond={user?.role === "CUSTOMER"}
+              canViewPrices={canViewPrices}
+              onRespondApproval={respondApproval}
+              canManageMaintenance={isStaff}
+              onStartPart={startPart}
+              onResolvePart={resolvePart}
+              canEditPrice={isAdmin}
+              inventoryParts={inventoryParts}
+              onPriceProblem={priceProblem}
+              onUpdateProblem={updateProblemDetails}
+            />
+            {isStaff && canFinalize && canOfferPickup && (
+              <div className={styles.approvalActions}>
                 {isAdmin ? (
-                  <div className={styles.approvalActions}>
-                    <button className={styles.btnApprove} disabled={finalizing} onClick={() => setFinalizing(true)}>
-                      {finalizing ? "Preencha a entrega abaixo, junto ao modelo do veículo" : "Veículo pronto para retirada"}
+                  !finalizing && (
+                    <button className={styles.btnApprove} onClick={() => setFinalizing(true)}>
+                      Veículo pronto para retirada
                     </button>
-                  </div>
+                  )
                 ) : (
-                  <div className={styles.approvalActions}>
-                    <button className={styles.btnApprove} type="button" disabled>
-                      Aguardando admin liberar retirada
-                    </button>
-                  </div>
+                  <button className={styles.btnApprove} type="button" disabled>
+                    Aguardando admin liberar retirada
+                  </button>
                 )}
-              </>
+              </div>
+            )}
+            {isAdmin && isStaff && canFinalize && canOfferPickup && finalizing && (
+              <div className={styles.panel}>
+                <h2>Confirmar entrega</h2>
+                <form className={styles.formGrid} onSubmit={finalizeOrder}>
+                  <label className={styles.fullField}>
+                    Descrição da entrega
+                    <textarea
+                      value={finalizeForm.description}
+                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, description: e.target.value }))}
+                    />
+                  </label>
+                  <label>
+                    Valor extra
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={finalizeForm.extraValue}
+                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, extraValue: e.target.value }))}
+                    />
+                  </label>
+                  <label className={styles.fullField}>
+                    Foto do veículo finalizado
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, photo: e.target.files?.[0] ?? null }))}
+                    />
+                  </label>
+                  <button className={styles.actionButton} type="submit" disabled={finalizeBusy}>
+                    {finalizeBusy ? "Finalizando..." : "Confirmar entrega"}
+                  </button>
+                </form>
+              </div>
             )}
           </div>
-        )}
 
-        <div className={styles.panel}>
-          <h2>Timeline da manutenção</h2>
-          <Timeline events={order.timelineEvents} justArrivedId={justArrivedId} canViewPrices={canViewPrices} />
-        </div>
-      </div>
+          {isStaff && canFinalize && (
+            <div className={`${styles.panel} ${styles.approval}`}>
+              <h2>Finalização</h2>
+              {blockedForPickup ? (
+                <p>
+                  Ainda há {unresolvedParts.length} problema{unresolvedParts.length > 1 ? "s" : ""} aguardando reparo antes de liberar o veículo.
+                </p>
+              ) : !hasResolvedProblem ? (
+                <p>Nenhum problema identificado e resolvido ainda — registre e conclua ao menos um para liberar o veículo.</p>
+              ) : (
+                <>
+                  <p>Todos os problemas identificados foram resolvidos.</p>
+                  {pendingApproval && (
+                    <p className={styles.tlSub}>
+                      Há uma aprovação do cliente ainda pendente, mas isso não impede a liberação do veículo.
+                    </p>
+                  )}
+                  {isAdmin ? (
+                    <div className={styles.approvalActions}>
+                      <button className={styles.btnApprove} disabled={finalizing} onClick={() => setFinalizing(true)}>
+                        {finalizing ? "Preencha a entrega abaixo, junto ao modelo do veículo" : "Veículo pronto para retirada"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className={styles.approvalActions}>
+                      <button className={styles.btnApprove} type="button" disabled>
+                        Aguardando admin liberar retirada
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
-      {(isStaff && (nextStatus || whatsAppLink || canRegisterProblems)) && (
-        <div className={styles.columns} style={{ marginBottom: "1.6rem" }}>
-          {(nextStatus || whatsAppLink) && (
+          {isStaff && (nextStatus || whatsAppLink) && (
             <div className={`${styles.panel} ${styles.approval}`}>
               <h2>Avançar etapa</h2>
               {nextStatus && (
@@ -788,8 +858,10 @@ export default function OrderDetail({
               </div>
             </div>
           )}
+        </div>
 
-          {canRegisterProblems && (
+        <div className={styles.masonryCol}>
+          {isStaff && canRegisterProblems && (
             <div className={styles.panel}>
               <h2>{isAdmin ? "Diagnóstico com preço" : "Novo problema diagnosticado"}</h2>
               <form className={styles.formGrid} onSubmit={createProblem}>
@@ -903,143 +975,69 @@ export default function OrderDetail({
               </form>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Modelo do veículo com acompanhamento dos problemas — em destaque, logo no topo. */}
-      <div style={{ marginBottom: "1.6rem" }}>
-        <div className={`${styles.panel} ${isReady ? styles.panelReady : ""}`}>
-          <h2>Modelo do veículo</h2>
-          {isReady && <div className={styles.readyBanner}>Veículo pronto e em ótimo estado — pode retirar!</div>}
-          {isCustomer && isReady && (
-            <div className={styles.approvalActions}>
-              <button className={styles.btnApprove} onClick={generateServicePdf}>
-                Gerar PDF do serviço
-              </button>
-            </div>
+          {canViewPrices && pendingApproval && pendingApproval.estimatedValue != null && (
+            <ApprovalCard
+              approval={pendingApproval}
+              canRespond={isCustomer}
+              canViewPrices={canViewPrices}
+              onRespond={(status, responseNote) => respondApproval(pendingApproval.id, status, responseNote)}
+              canForceResolve={
+                isStaff &&
+                !!pendingApproval.partId &&
+                order.parts.find((p) => p.id === pendingApproval.partId)?.status !== "DONE"
+              }
+              onForceResolve={pendingApproval.partId ? () => resolvePart(pendingApproval.partId!) : undefined}
+            />
           )}
-          <VehicleSchematic
-            parts={order.parts}
-            approvals={order.approvals}
-            canRespond={user?.role === "CUSTOMER"}
-            canViewPrices={canViewPrices}
-            onRespondApproval={respondApproval}
-            canManageMaintenance={isStaff}
-            onStartPart={startPart}
-            onResolvePart={resolvePart}
-            canEditPrice={isAdmin}
-            inventoryParts={inventoryParts}
-            onPriceProblem={priceProblem}
-            onUpdateProblem={updateProblemDetails}
-          />
-          {isStaff && canFinalize && canOfferPickup && (
-            <div className={styles.approvalActions}>
-              {isAdmin ? (
-                !finalizing && (
-                  <button className={styles.btnApprove} onClick={() => setFinalizing(true)}>
-                    Veículo pronto para retirada
-                  </button>
-                )
-              ) : (
-                <button className={styles.btnApprove} type="button" disabled>
-                  Aguardando admin liberar retirada
-                </button>
-              )}
-            </div>
-          )}
-          {isAdmin && isStaff && canFinalize && canOfferPickup && finalizing && (
+
+          {isAdmin && pendingNeedsPrice && (
             <div className={styles.panel}>
-              <h2>Confirmar entrega</h2>
-              <form className={styles.formGrid} onSubmit={finalizeOrder}>
-                <label className={styles.fullField}>
-                  Descrição da entrega
-                  <textarea
-                    value={finalizeForm.description}
-                    onChange={(e) => setFinalizeForm((prev) => ({ ...prev, description: e.target.value }))}
-                  />
-                </label>
+              <h2>Precificar problema</h2>
+              <form className={styles.formGrid} onSubmit={pricePendingProblem}>
                 <label>
-                  Valor extra
+                  Mão de obra
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    value={finalizeForm.extraValue}
-                    onChange={(e) => setFinalizeForm((prev) => ({ ...prev, extraValue: e.target.value }))}
+                    value={priceForm.laborValue}
+                    onChange={(e) => setPriceForm((prev) => ({ ...prev, laborValue: e.target.value }))}
+                    required
                   />
                 </label>
-                <label className={styles.fullField}>
-                  Foto do veículo finalizado
+                <label>
+                  Peça utilizada
+                  <select value={priceForm.inventoryPartId} onChange={(e) => setPriceForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}>
+                    <option value="">Nenhuma peça</option>
+                    {inventoryParts.map((part) => (
+                      <option key={part.id} value={part.id}>
+                        {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Quantidade
                   <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setFinalizeForm((prev) => ({ ...prev, photo: e.target.files?.[0] ?? null }))}
+                    type="number"
+                    min="1"
+                    value={priceForm.quantity}
+                    onChange={(e) => setPriceForm((prev) => ({ ...prev, quantity: e.target.value }))}
                   />
                 </label>
-                <button className={styles.actionButton} type="submit" disabled={finalizeBusy}>
-                  {finalizeBusy ? "Finalizando..." : "Confirmar entrega"}
+                <button className={styles.actionButton} type="submit">
+                  Enviar orçamento ao cliente
                 </button>
               </form>
             </div>
           )}
-        </div>
 
-        {canViewPrices && pendingApproval && pendingApproval.estimatedValue != null && (
-          <ApprovalCard
-            approval={pendingApproval}
-            canRespond={isCustomer}
-            canViewPrices={canViewPrices}
-            onRespond={(status, responseNote) => respondApproval(pendingApproval.id, status, responseNote)}
-            canForceResolve={
-              isStaff &&
-              !!pendingApproval.partId &&
-              order.parts.find((p) => p.id === pendingApproval.partId)?.status !== "DONE"
-            }
-            onForceResolve={pendingApproval.partId ? () => resolvePart(pendingApproval.partId!) : undefined}
-          />
-        )}
-
-        {isAdmin && pendingNeedsPrice && (
           <div className={styles.panel}>
-            <h2>Precificar problema</h2>
-            <form className={styles.formGrid} onSubmit={pricePendingProblem}>
-              <label>
-                Mão de obra
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={priceForm.laborValue}
-                  onChange={(e) => setPriceForm((prev) => ({ ...prev, laborValue: e.target.value }))}
-                  required
-                />
-              </label>
-              <label>
-                Peça utilizada
-                <select value={priceForm.inventoryPartId} onChange={(e) => setPriceForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}>
-                  <option value="">Nenhuma peça</option>
-                  {inventoryParts.map((part) => (
-                    <option key={part.id} value={part.id}>
-                      {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Quantidade
-                <input
-                  type="number"
-                  min="1"
-                  value={priceForm.quantity}
-                  onChange={(e) => setPriceForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                />
-              </label>
-              <button className={styles.actionButton} type="submit">
-                Enviar orçamento ao cliente
-              </button>
-            </form>
+            <h2>Timeline da manutenção</h2>
+            <Timeline events={order.timelineEvents} justArrivedId={justArrivedId} canViewPrices={canViewPrices} />
           </div>
-        )}
+        </div>
       </div>
 
     </div>

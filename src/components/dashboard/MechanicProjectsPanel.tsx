@@ -10,7 +10,7 @@ import OrderDetail from "@/components/dashboard/OrderDetail";
 import KanbanBoard from "@/components/dashboard/KanbanBoard";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import { Button } from "@/components/ui/button";
-import { Plus, ClipboardList, CheckCircle2, Clock, Wrench, Car } from "lucide-react";
+import { Plus, ClipboardList, CheckCircle2, Clock, Wrench, Car, ArrowLeft } from "lucide-react";
 import styles from "./dashboard.module.css";
 
 const DONE_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);
@@ -103,6 +103,24 @@ export default function MechanicProjectsPanel() {
     setSelectedOrderId(orderId);
   }
 
+  if (selectedOrderId) {
+    return (
+      <div className={`${styles.content} ${styles.projectDetailView}`}>
+        <Button
+          variant="outline"
+          size="lg"
+          className={styles.backToProjectsBtn}
+          onClick={() => setSelectedOrderId(null)}
+          aria-label="Voltar para Projetos em andamento"
+        >
+          <ArrowLeft className="size-5" />
+          Voltar
+        </Button>
+        <OrderDetail key={selectedOrderId} orderId={selectedOrderId} scrollToTimelineOnLoad onDeleted={handleOrderDeleted} />
+      </div>
+    );
+  }
+
   return (
     <div className={styles.content}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -173,12 +191,6 @@ export default function MechanicProjectsPanel() {
       )}
 
       {orders.length > 0 && <ProjectsSummary orders={orders} />}
-
-      {selectedOrderId && (
-        <div className={styles.detailWrap}>
-          <OrderDetail key={selectedOrderId} orderId={selectedOrderId} scrollToTimelineOnLoad onDeleted={handleOrderDeleted} />
-        </div>
-      )}
     </div>
   );
 }
