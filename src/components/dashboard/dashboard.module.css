@@ -1251,3 +1251,30 @@
   align-self: flex-start;
   margin-bottom: 1.2rem;
 }
+
+.panelHeadRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.panelHeadRow h2 { margin-bottom: 0; }
+
+.panelCloseBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.panelCloseBtn:hover {
+  background: var(--bg-panel);
+  color: var(--text);
+}

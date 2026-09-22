@@ -12,6 +12,7 @@ import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { X } from "lucide-react";
 import styles from "./dashboard.module.css";
 
 const PART_OPTIONS = [
@@ -758,7 +759,17 @@ export default function OrderDetail({
             />
             {isAdmin && isStaff && canFinalize && canOfferPickup && finalizing && (
               <div className={styles.panel}>
-                <h2>Confirmar entrega</h2>
+                <div className={styles.panelHeadRow}>
+                  <h2>Confirmar entrega</h2>
+                  <button
+                    type="button"
+                    className={styles.panelCloseBtn}
+                    aria-label="Fechar formulário de finalização"
+                    onClick={() => setFinalizing(false)}
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
                 <form className={styles.formGrid} onSubmit={finalizeOrder}>
                   <label className={styles.fullField}>
                     Descrição da entrega
