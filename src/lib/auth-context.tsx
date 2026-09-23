@@ -19,6 +19,9 @@ interface AuthContextValue {
   loading: boolean;
   permissions: Set<string>;
   hasPermission: (resource: string, action: string) => boolean;
+  // Vazio = sem restrição extra de abas (cai no role/hasPermission de sempre); quando o
+  // cargo do usuário define allowedTabs, só essas abas aparecem na navegação.
+  allowedTabs: string[];
   login: (email: string, password: string) => Promise<void>;
   registerCustomer: (payload: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => void;
@@ -36,15 +39,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(readStoredToken);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
+  const [allowedTabs, setAllowedTabs] = useState<string[]>([]);
   const [loading, setLoading] = useState(() => readStoredToken() !== null);
   const router = useRouter();
 
   useEffect(() => {
     if (!token) return;
-    Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [] }))])
-      .then(([{ user }, { permissions }]) => {
+    Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [], allowedTabs: [] }))])
+      .then(([{ user }, { permissions, allowedTabs }]) => {
         setUser(user as AuthUser);
         setPermissions(new Set(permissions));
+        setAllowedTabs(allowedTabs ?? []);
       })
       .catch(() => {
         window.localStorage.removeItem(STORAGE_KEY);
@@ -77,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setPermissions(new Set());
+    setAllowedTabs([]);
     router.push("/");
   }, [router]);
 
@@ -90,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, permissions, hasPermission, login, registerCustomer, logout, updateAvatar }}>
+    <AuthContext.Provider value={{ user, token, loading, permissions, hasPermission, allowedTabs, login, registerCustomer, logout, updateAvatar }}>
       {children}
     </AuthContext.Provider>
   );

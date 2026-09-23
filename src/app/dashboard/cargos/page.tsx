@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { Role, Permission } from "@/lib/types";
+import { TAB_KEYS, TAB_LABELS } from "@/lib/tab-keys";
 
 const RESOURCE_LABELS: Record<string, string> = {
   clients: "Clientes",
@@ -36,6 +37,8 @@ export default function CargosPage() {
   // usa o que veio do servidor. Evita sincronizar estado do servidor via effect.
   const [localChecked, setLocalChecked] = useState<Set<string> | null>(null);
   const [savingPermissions, setSavingPermissions] = useState(false);
+  const [localTabs, setLocalTabs] = useState<Set<string> | null>(null);
+  const [savingTabs, setSavingTabs] = useState(false);
 
   const { data: roles } = useQuery({
     queryKey: ["roles"],
@@ -59,6 +62,8 @@ export default function CargosPage() {
   const checked = localChecked ?? serverChecked;
 
   const selectedRole = useMemo(() => roles?.find((r) => r.id === selectedRoleId) ?? null, [roles, selectedRoleId]);
+  const serverTabs = useMemo(() => new Set(selectedRole?.allowedTabs ?? []), [selectedRole]);
+  const checkedTabs = localTabs ?? serverTabs;
 
   const grouped = useMemo(() => {
     const map = new Map<string, Permission[]>();
@@ -104,6 +109,28 @@ export default function CargosPage() {
     setLocalChecked(next);
   }
 
+  function toggleTab(key: string) {
+    const next = new Set(checkedTabs);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    setLocalTabs(next);
+  }
+
+  async function handleSaveTabs() {
+    if (!token || !selectedRoleId) return;
+    setSavingTabs(true);
+    try {
+      await api.updateRole(selectedRoleId, { allowedTabs: Array.from(checkedTabs) }, token);
+      toast.success("Abas visíveis atualizadas.");
+      setLocalTabs(null);
+      refetchRoles();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar as abas visíveis.");
+    } finally {
+      setSavingTabs(false);
+    }
+  }
+
   async function handleSavePermissions() {
     if (!token || !selectedRoleId) return;
     setSavingPermissions(true);
@@ -137,6 +164,7 @@ export default function CargosPage() {
               onClick={() => {
                 setSelectedRoleId(role.id);
                 setLocalChecked(null);
+                setLocalTabs(null);
               }}
               className={`flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm transition-colors ${
                 selectedRoleId === role.id ? "border-primary bg-accent" : "hover:bg-accent"
@@ -188,6 +216,26 @@ export default function CargosPage() {
                 <Button className="w-fit" onClick={handleSavePermissions} disabled={savingPermissions}>
                   {savingPermissions ? "Salvando..." : "Salvar permissões"}
                 </Button>
+
+                <div className="border-t pt-4">
+                  <p className="mb-1 text-sm font-medium">Abas visíveis</p>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    Deixe tudo desmarcado para não restringir (usa o perfil/permissões de sempre). Marcando alguma
+                    aba, quem tiver este cargo passa a ver <strong>só</strong> as abas marcadas — é assim que dá pra
+                    criar um cargo &quot;Motorista&quot; que só vê Caminhões, por exemplo.
+                  </p>
+                  <div className="flex flex-wrap gap-4">
+                    {TAB_KEYS.map((key) => (
+                      <label key={key} className="flex items-center gap-2 text-sm">
+                        <Checkbox checked={checkedTabs.has(key)} onCheckedChange={() => toggleTab(key)} />
+                        {TAB_LABELS[key]}
+                      </label>
+                    ))}
+                  </div>
+                  <Button className="mt-3 w-fit" variant="outline" onClick={handleSaveTabs} disabled={savingTabs}>
+                    {savingTabs ? "Salvando..." : "Salvar abas visíveis"}
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

@@ -32,6 +32,7 @@ import {
   Percent,
   Store,
   UserCog,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -47,16 +48,18 @@ import {
 import styles from "@/components/dashboard/dashboard.module.css";
 import "../dashboard.css";
 
+// key = identificador estável de cada aba, usado pelo Role.allowedTabs (ver aba Cargos)
+// pra restringir quais abas um cargo específico pode ver — independente do href/label.
 const STAFF_TABS = [
-  { href: "/dashboard", label: "Projetos" },
-  { href: "/dashboard/solicitacoes", label: "Solicitações" },
+  { href: "/dashboard", label: "Projetos", key: "projects" },
+  { href: "/dashboard/solicitacoes", label: "Solicitações", key: "requests" },
 ];
 
 const ADMIN_TABS = [
   ...STAFF_TABS,
-  { href: "/dashboard/usuarios", label: "Usuários" },
-  { href: "/dashboard/pecas", label: "Peças" },
-  { href: "/dashboard/financeiro", label: "Financeiro" },
+  { href: "/dashboard/usuarios", label: "Usuários", key: "users" },
+  { href: "/dashboard/pecas", label: "Peças", key: "parts" },
+  { href: "/dashboard/financeiro", label: "Financeiro", key: "finance" },
 ];
 
 const TAB_ICONS: Record<string, LucideIcon> = {
@@ -65,6 +68,7 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   "/dashboard/usuarios": Users,
   "/dashboard/pecas": Cog,
   "/dashboard/financeiro": Wallet,
+  "/dashboard/gastos": Receipt,
   "/dashboard/clientes": UserRound,
   "/dashboard/complementos": Layers,
   "/dashboard/alertas": Bell,
@@ -92,7 +96,7 @@ function mediaUrl(url: string) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const { user, token, loading, hasPermission, logout } = useAuth();
+  const { user, token, loading, hasPermission, allowedTabs, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const navRef = useRef<HTMLElement>(null);
@@ -115,23 +119,28 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
-  const tabs = [
+  const allTabs = [
     ...(user?.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
-    ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes" }] : []),
-    ...(isStaff ? [{ href: "/dashboard/complementos", label: "Complementos" }] : []),
-    ...(isStaff ? [{ href: "/dashboard/alertas", label: "Alertas" }] : []),
-    ...(isStaff ? [{ href: "/dashboard/caminhoes", label: "Caminhões" }] : []),
-    ...(hasPermission("insurance", "view") ? [{ href: "/dashboard/seguradoras", label: "Seguradoras" }] : []),
-    ...(hasPermission("suppliers", "view") ? [{ href: "/dashboard/fornecedores", label: "Fornecedores" }] : []),
-    ...(hasPermission("purchases", "view") ? [{ href: "/dashboard/compras", label: "Compras" }] : []),
-    ...(hasPermission("agenda", "view") ? [{ href: "/dashboard/agenda", label: "Agenda" }] : []),
-    ...(hasPermission("pdv", "view") ? [{ href: "/dashboard/pdv", label: "PDV" }] : []),
-    ...(hasPermission("warranties", "view") ? [{ href: "/dashboard/garantias", label: "Garantias" }] : []),
-    ...(hasPermission("reports", "view") ? [{ href: "/dashboard/relatorios", label: "Relatórios" }] : []),
-    ...(hasPermission("commissions", "view") ? [{ href: "/dashboard/comissoes", label: "Comissões" }] : []),
-    ...(hasPermission("stores", "view") ? [{ href: "/dashboard/lojas", label: "Lojas" }] : []),
-    ...(hasPermission("roles", "manage") ? [{ href: "/dashboard/cargos", label: "Cargos" }] : []),
+    ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes", key: "clients" }] : []),
+    ...(isStaff ? [{ href: "/dashboard/complementos", label: "Complementos", key: "addons" }] : []),
+    ...(isStaff ? [{ href: "/dashboard/gastos", label: "Gastos", key: "expenses" }] : []),
+    ...(isStaff ? [{ href: "/dashboard/alertas", label: "Alertas", key: "alerts" }] : []),
+    ...(isStaff ? [{ href: "/dashboard/caminhoes", label: "Caminhões", key: "trucks" }] : []),
+    ...(hasPermission("insurance", "view") ? [{ href: "/dashboard/seguradoras", label: "Seguradoras", key: "insurance" }] : []),
+    ...(hasPermission("suppliers", "view") ? [{ href: "/dashboard/fornecedores", label: "Fornecedores", key: "suppliers" }] : []),
+    ...(hasPermission("purchases", "view") ? [{ href: "/dashboard/compras", label: "Compras", key: "purchases" }] : []),
+    ...(hasPermission("agenda", "view") ? [{ href: "/dashboard/agenda", label: "Agenda", key: "agenda" }] : []),
+    ...(hasPermission("pdv", "view") ? [{ href: "/dashboard/pdv", label: "PDV", key: "pdv" }] : []),
+    ...(hasPermission("warranties", "view") ? [{ href: "/dashboard/garantias", label: "Garantias", key: "warranties" }] : []),
+    ...(hasPermission("reports", "view") ? [{ href: "/dashboard/relatorios", label: "Relatórios", key: "reports" }] : []),
+    ...(hasPermission("commissions", "view") ? [{ href: "/dashboard/comissoes", label: "Comissões", key: "commissions" }] : []),
+    ...(hasPermission("stores", "view") ? [{ href: "/dashboard/lojas", label: "Lojas", key: "stores" }] : []),
+    ...(hasPermission("roles", "manage") ? [{ href: "/dashboard/cargos", label: "Cargos", key: "roles" }] : []),
   ];
+  // allowedTabs vazio = sem restrição extra (comportamento de sempre). Quando o cargo
+  // do usuário define uma lista, só essas abas aparecem — é assim que um cargo
+  // "Motorista" com allowedTabs=["trucks"] passa a ver só Caminhões.
+  const tabs = allowedTabs.length > 0 ? allTabs.filter((tab) => allowedTabs.includes(tab.key)) : allTabs;
 
   function updateScrollState() {
     const el = navRef.current;

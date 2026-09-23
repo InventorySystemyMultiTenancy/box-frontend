@@ -11,7 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { AppointmentFormDialog } from "@/components/dashboard/agenda/AppointmentFormDialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Appointment, AppointmentStatus } from "@/lib/types";
+import type { Appointment, AppointmentStatus, AppointmentType } from "@/lib/types";
+
+const TYPE_LABELS: Record<AppointmentType, string> = {
+  SERVICE: "Serviço",
+  PICKUP: "Retirada",
+  DROPOFF: "Entrega",
+};
 
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   SCHEDULED: "Agendado",
@@ -57,7 +63,7 @@ export default function DayAgendaPanel() {
   const grouped = useMemo(() => {
     const map = new Map<string, Appointment[]>();
     for (const appt of appointments ?? []) {
-      const key = appt.bay?.name ?? "Sem box definido";
+      const key = appt.type !== "SERVICE" ? TYPE_LABELS[appt.type] : appt.bay?.name ?? "Sem box definido";
       const list = map.get(key) ?? [];
       list.push(appt);
       map.set(key, list);
@@ -122,7 +128,9 @@ export default function DayAgendaPanel() {
                       {new Date(appt.startAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — {appt.title}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {appt.client?.name ?? "Sem cliente"} · {appt.mechanic?.name ?? "Sem mecânico"} · {appt.estimatedDurationMin} min
+                      {appt.client?.name ?? "Sem cliente"} ·{" "}
+                      {appt.type !== "SERVICE" ? appt.driver?.name ?? "Sem motorista" : appt.mechanic?.name ?? "Sem mecânico"} ·{" "}
+                      {appt.estimatedDurationMin} min
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

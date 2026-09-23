@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { AccountPayable, AccountReceivable, CashFlow, DRE, FinancialEntry } from "@/lib/types";
+import { openPrintableReport, escapeHtml, formatCurrencyBRL } from "@/lib/printable-report";
 
 function firstDayOfMonth() {
   const d = new Date();
@@ -67,6 +68,54 @@ export default function CashFlowPanel() {
       ].sort((a, b) => b.date.localeCompare(a.date))
     : [];
 
+  function generatePdf() {
+    if (!cashFlow || !dre) return;
+    const rowsHtml = rows
+      .map((row) => {
+        const amount =
+          row.kind === "receivable"
+            ? row.record.receivedAmount ?? row.record.amount
+            : row.kind === "payable"
+              ? row.record.paidAmount ?? row.record.amount
+              : row.record.amount;
+        const isOut = row.kind === "payable" || (row.kind === "entry" && row.record.type === "EXPENSE");
+        return `
+          <tr>
+            <td>${new Date(row.date).toLocaleDateString("pt-BR")}</td>
+            <td>${KIND_LABELS[row.kind]}</td>
+            <td>${escapeHtml(row.record.description)}</td>
+            <td>${escapeHtml(row.record.category)}</td>
+            <td>${isOut ? "-" : "+"} ${formatCurrencyBRL(amount)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+    const revenueRows = dre.revenueByCategory.map((r) => `<tr><td>${escapeHtml(r.category)}</td><td>${formatCurrencyBRL(r.amount)}</td></tr>`).join("");
+    const expenseRows = dre.expensesByCategory.map((r) => `<tr><td>${escapeHtml(r.category)}</td><td>${formatCurrencyBRL(r.amount)}</td></tr>`).join("");
+    openPrintableReport(
+      "Fluxo de caixa",
+      `
+        <h1>Fluxo de caixa</h1>
+        <div class="muted">Período: ${new Date(from).toLocaleDateString("pt-BR")} a ${new Date(to).toLocaleDateString("pt-BR")} · Gerado em ${new Date().toLocaleString("pt-BR")}</div>
+        <div class="summary">
+          <div class="box"><strong>Saldo inicial</strong><br />${formatCurrencyBRL(cashFlow.initialBalance)}</div>
+          <div class="box"><strong>Entradas</strong><br />${formatCurrencyBRL(cashFlow.totalIn)}</div>
+          <div class="box"><strong>Saídas</strong><br />${formatCurrencyBRL(cashFlow.totalOut)}</div>
+          <div class="box"><strong>Saldo final</strong><br />${formatCurrencyBRL(cashFlow.finalBalance)}</div>
+        </div>
+        <h2>DRE simplificado</h2>
+        <table><thead><tr><th>Receita por categoria</th><th>Valor</th></tr></thead><tbody>${revenueRows || '<tr><td colspan="2">Sem receitas.</td></tr>'}</tbody></table>
+        <table><thead><tr><th>Despesa por categoria</th><th>Valor</th></tr></thead><tbody>${expenseRows || '<tr><td colspan="2">Sem despesas.</td></tr>'}</tbody></table>
+        <h2>Lançamentos do período</h2>
+        <table>
+          <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead>
+          <tbody>${rowsHtml || '<tr><td colspan="5">Nenhum lançamento no período.</td></tr>'}</tbody>
+        </table>
+        <div class="total">Resultado líquido: ${formatCurrencyBRL(dre.netResult)}</div>
+      `
+    );
+  }
+
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-end gap-3">
@@ -78,6 +127,9 @@ export default function CashFlowPanel() {
           <Label htmlFor="cf-to">Até</Label>
           <Input id="cf-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
+        <Button type="button" variant="outline" onClick={generatePdf} disabled={!cashFlow || !dre}>
+          Gerar PDF do período
+        </Button>
       </div>
 
       {cashFlow && (

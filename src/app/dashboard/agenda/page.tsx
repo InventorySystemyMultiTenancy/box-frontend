@@ -6,11 +6,13 @@ import { useAuth } from "@/lib/auth-context";
 import DayAgendaPanel from "@/components/dashboard/agenda/DayAgendaPanel";
 import BaysPanel from "@/components/dashboard/agenda/BaysPanel";
 import WorkloadPanel from "@/components/dashboard/agenda/WorkloadPanel";
+import AgendaReportPanel from "@/components/dashboard/agenda/AgendaReportPanel";
 
 const TABS = [
   { key: "day", label: "Agenda do dia" },
   { key: "workload", label: "Carga de trabalho" },
   { key: "bays", label: "Boxes/Elevadores" },
+  { key: "report", label: "Relatório" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -51,6 +53,7 @@ export default function AgendaPage() {
       {tab === "day" && <DayAgendaPanel />}
       {tab === "workload" && <WorkloadPanel />}
       {tab === "bays" && <BaysPanel />}
+      {tab === "report" && <AgendaReportPanel />}
     </main>
   );
 }

@@ -1,15 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { RecognizedTruckPanel, Truck } from "@/lib/types";
+import type { Appointment, RecognizedTruckPanel, Truck } from "@/lib/types";
 
 export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () => void }) {
   const { token } = useAuth();
@@ -20,12 +22,20 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
   const [startFuelLevel, setStartFuelLevel] = useState("");
   const [startCondition, setStartCondition] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  const [appointmentId, setAppointmentId] = useState("");
+
+  const { data: myPickups } = useQuery({
+    queryKey: ["my-pickups-today"],
+    queryFn: async () => (await api.myPickupsToday(token!)).appointments as Appointment[],
+    enabled: !!token && open,
+  });
 
   function reset() {
     setStartKm("");
     setStartFuelLevel("");
     setStartCondition("");
     setPhoto(null);
+    setAppointmentId("");
   }
 
   // Foto do painel é obrigatória — assim que escolhida, já manda pra IA ler o
@@ -61,7 +71,7 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
     try {
       await api.startTruckTrip(
         truck.id,
-        { startKm: Number(startKm), startFuelLevel, startCondition: startCondition || undefined, photo },
+        { startKm: Number(startKm), startFuelLevel, startCondition: startCondition || undefined, photo, appointmentId: appointmentId || undefined },
         token
       );
       toast.success(`Pilotagem do caminhão ${truck.plate} iniciada.`);
@@ -107,6 +117,22 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
               <Label htmlFor="start-condition">Estado do caminhão</Label>
               <Input id="start-condition" placeholder="Ex.: sem avarias visíveis" value={startCondition} onChange={(e) => setStartCondition(e.target.value)} />
             </div>
+            {myPickups && myPickups.length > 0 && (
+              <div className="col-span-2 grid gap-1.5">
+                <Label>Vincular a um agendamento de hoje (opcional)</Label>
+                <Select value={appointmentId || "NONE"} onValueChange={(v) => setAppointmentId(v === "NONE" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">—</SelectItem>
+                    {myPickups.map((appt) => (
+                      <SelectItem key={appt.id} value={appt.id}>
+                        {new Date(appt.startAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — {appt.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="submit" disabled={saving || reading}>

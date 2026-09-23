@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, API_URL } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
 import { Approval, InventoryPart, PART_STATUS_LABELS, SERVICE_ORDER_STATUSES, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
@@ -47,6 +47,10 @@ const SIDE_LABEL: Record<string, string> = {
  * veículo. Usado tanto na área do cliente quanto no projeto selecionado pelo mecânico. */
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function mediaUrl(url: string) {
+  return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
 }
 
 function escapeHtml(value: string) {
@@ -101,6 +105,7 @@ export default function OrderDetail({
   const [deleteCode, setDeleteCode] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [showDamagePhotos, setShowDamagePhotos] = useState(false);
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
@@ -736,6 +741,32 @@ export default function OrderDetail({
           <div className={`${styles.panel} ${isReady ? styles.panelReady : ""}`}>
             <h2>Modelo do veículo</h2>
             {isReady && <div className={styles.readyBanner}>Veículo pronto e em ótimo estado — pode retirar!</div>}
+            {(() => {
+              const damagePhotos = order.media.filter((m) => m.isDamagePhoto);
+              if (damagePhotos.length === 0) return null;
+              return (
+                <div style={{ marginBottom: "0.8rem" }}>
+                  <button
+                    type="button"
+                    className={styles.panelCloseBtn}
+                    style={{ width: "auto", padding: "0 0.6rem", fontSize: "0.78rem" }}
+                    onClick={() => setShowDamagePhotos((v) => !v)}
+                  >
+                    {showDamagePhotos ? "Ocultar" : "Ver"} fotos de chegada ({damagePhotos.length})
+                  </button>
+                  {showDamagePhotos && (
+                    <div className={styles.mediaGrid} style={{ marginTop: "0.6rem" }}>
+                      {damagePhotos.map((media) => (
+                        <a key={media.id} href={mediaUrl(media.url)} target="_blank" rel="noreferrer">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={mediaUrl(media.url)} alt={media.label ?? "Foto de avaria"} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {isCustomer && isReady && (
               <div className={styles.approvalActions}>
                 <button className={styles.btnApprove} onClick={generateServicePdf}>

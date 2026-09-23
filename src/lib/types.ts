@@ -16,6 +16,20 @@ export const SERVICE_ORDER_STATUSES = [
 ] as const;
 export type ServiceOrderStatus = (typeof SERVICE_ORDER_STATUSES)[number];
 
+// Sequência realmente usada hoje (Kanban e "Avançar etapa") — AWAITING_APPROVAL,
+// PARTS_REQUESTED, PARTS_RECEIVED e WASHING saíram do fluxo ativo a pedido do cliente.
+// SERVICE_ORDER_STATUSES continua completo (não remova chaves de STATUS_LABELS/STATUS_TONE).
+export const ACTIVE_SERVICE_ORDER_STATUSES = [
+  "SCHEDULED",
+  "RECEIVED",
+  "AWAITING_DIAGNOSIS",
+  "DIAGNOSIS_DONE",
+  "IN_PROGRESS",
+  "TESTING",
+  "FINISHED",
+  "READY_FOR_PICKUP",
+] as const;
+
 export const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   SCHEDULED: "Agendado — aguardando veículo",
   RECEIVED: "Veículo recebido",
@@ -94,6 +108,7 @@ export interface Media {
   type: "PHOTO" | "VIDEO" | "AUDIO" | "DOCUMENT";
   label?: string | null;
   isDeliveryPhoto?: boolean;
+  isDamagePhoto?: boolean;
   createdAt: string;
 }
 
@@ -196,11 +211,36 @@ export interface ServiceOrder {
 export const SERVICE_ORDER_PRIORITIES = ["LOW", "NORMAL", "HIGH", "URGENT"] as const;
 export type ServiceOrderPriority = (typeof SERVICE_ORDER_PRIORITIES)[number];
 
+// Nomenclatura pedida pelo cliente: Urgente > Comum > Estável > Fácil (do mais pro
+// menos urgente) — mapeada sobre o enum já existente (URGENT|NORMAL|HIGH|LOW).
 export const PRIORITY_LABELS: Record<ServiceOrderPriority, string> = {
-  LOW: "Baixa",
-  NORMAL: "Normal",
-  HIGH: "Alta",
   URGENT: "Urgente",
+  NORMAL: "Comum",
+  HIGH: "Estável",
+  LOW: "Fácil",
+};
+
+// Maior = mais urgente — usado para ordenar a Lista de projetos (urgentes em cima).
+export const PRIORITY_RANK: Record<ServiceOrderPriority, number> = {
+  URGENT: 3,
+  NORMAL: 2,
+  HIGH: 1,
+  LOW: 0,
+};
+
+// Uma cor por nível, pra identificação visual rápida na Lista de projetos.
+export const PRIORITY_BG: Record<ServiceOrderPriority, string> = {
+  URGENT: "#fee2e2",
+  NORMAL: "#dbeafe",
+  HIGH: "#dcfce7",
+  LOW: "#f1f5f9",
+};
+
+export const PRIORITY_BORDER: Record<ServiceOrderPriority, string> = {
+  URGENT: "#ef4444",
+  NORMAL: "#3b82f6",
+  HIGH: "#22c55e",
+  LOW: "#94a3b8",
 };
 
 export interface InsuranceCompany {
@@ -419,6 +459,7 @@ export interface FinancialEntry {
   category: string;
   description: string;
   amount: number;
+  createdBy?: { id: string; name: string } | null;
   occurredAt: string;
   createdAt: string;
 }
@@ -436,6 +477,7 @@ export interface Role {
   slug: string;
   description?: string | null;
   isSystem: boolean;
+  allowedTabs: string[];
   createdAt: string;
   _count?: { users: number };
 }
@@ -686,6 +728,7 @@ export interface Bay {
 }
 
 export type AppointmentStatus = "SCHEDULED" | "CONFIRMED" | "IN_PROGRESS" | "DONE" | "CANCELLED" | "NO_SHOW";
+export type AppointmentType = "SERVICE" | "PICKUP" | "DROPOFF";
 
 export interface Appointment {
   id: string;
@@ -700,6 +743,9 @@ export interface Appointment {
   mechanic?: { id: string; name: string } | null;
   bayId?: string | null;
   bay?: Bay | null;
+  type: AppointmentType;
+  driverId?: string | null;
+  driver?: { id: string; name: string } | null;
   startAt: string;
   estimatedDurationMin: number;
   status: AppointmentStatus;

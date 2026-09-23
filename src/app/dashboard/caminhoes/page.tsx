@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Search, Trash2, Truck as TruckIcon } from "lucide-react";
+import { Bell, Plus, Search, Trash2, Truck as TruckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,9 @@ import { TruckRefuelingsPanel } from "@/components/dashboard/trucks/TruckRefueli
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { matchesSearch } from "@/lib/utils";
-import type { Truck } from "@/lib/types";
+import type { Appointment, Truck } from "@/lib/types";
+
+const APPOINTMENT_TYPE_LABELS: Record<string, string> = { PICKUP: "retirar", DROPOFF: "entregar" };
 
 export default function CaminhoesPage() {
   const { user, token } = useAuth();
@@ -30,6 +32,15 @@ export default function CaminhoesPage() {
     queryKey: ["trucks"],
     queryFn: async () => (await api.trucks(token!)).trucks as Truck[],
     enabled: !!token,
+  });
+
+  // Agendamento de retirada/entrega pra hoje, atribuído a mim — não depende de
+  // permissão de agenda, então aparece mesmo pra um cargo que só vê essa aba.
+  const { data: myPickups } = useQuery({
+    queryKey: ["my-pickups-today"],
+    queryFn: async () => (await api.myPickupsToday(token!)).appointments as Appointment[],
+    enabled: !!token,
+    refetchInterval: 60_000,
   });
 
   const myTrucks = useMemo(() => (trucks ?? []).filter((t) => t.assignedEmployeeId === user?.id), [trucks, user?.id]);
@@ -113,6 +124,22 @@ export default function CaminhoesPage() {
           </div>
         </div>
       </div>
+
+      {myPickups && myPickups.length > 0 && (
+        <div className="mb-4 grid gap-2 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+          {myPickups.map((appt) => (
+            <div key={appt.id} className="flex items-center gap-2 text-sm text-amber-900 dark:text-amber-200">
+              <Bell className="size-4 shrink-0" />
+              <span>
+                Você tem uma {APPOINTMENT_TYPE_LABELS[appt.type] === "entregar" ? "entrega" : "retirada"} hoje às{" "}
+                {new Date(appt.startAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                {appt.client?.name ? ` — ${appt.client.name}` : ""}
+                {appt.vehicle ? ` (${appt.vehicle.brand} ${appt.vehicle.model})` : ""}: {appt.title}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {view === "movements" ? (
         <TruckMovementsPanel />

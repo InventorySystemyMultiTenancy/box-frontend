@@ -12,10 +12,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Client, RecognizedVehicleData, Vehicle } from "@/lib/types";
+import type { Client, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
+import { PRIORITY_LABELS, SERVICE_ORDER_PRIORITIES } from "@/lib/types";
 
 const EMPTY_NEW_CLIENT = { name: "", phone: "", email: "" };
 const EMPTY_NEW_VEHICLE = { brand: "", model: "", year: "", plate: "", mileage: "0" };
+const MAX_DAMAGE_PHOTOS = 7;
 
 export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactNode; onCreated: (orderId: string) => void }) {
   const { token } = useAuth();
@@ -34,6 +36,9 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   const [aiBusy, setAiBusy] = useState(false);
   const [aiResult, setAiResult] = useState<RecognizedVehicleData | null>(null);
   const [includeAiProblems, setIncludeAiProblems] = useState(true);
+
+  const [priority, setPriority] = useState<ServiceOrderPriority>("NORMAL");
+  const [damagePhotos, setDamagePhotos] = useState<File[]>([]);
 
   const { data: clients } = useQuery({
     queryKey: ["clients-with-login", clientSearch],
@@ -59,6 +64,8 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     setNewVehicle(EMPTY_NEW_VEHICLE);
     setAiResult(null);
     setIncludeAiProblems(true);
+    setPriority("NORMAL");
+    setDamagePhotos([]);
   }
 
   function handleOpenChange(next: boolean) {
@@ -144,8 +151,18 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
         vehicleId = (vehicle as Vehicle).id;
       }
 
-      const { order } = await api.createServiceOrder({ vehicleId }, token);
+      const { order } = await api.createServiceOrder({ vehicleId, priority }, token);
       const orderId = (order as { id: string }).id;
+
+      if (damagePhotos.length > 0) {
+        try {
+          await api.uploadDamagePhotos(orderId, damagePhotos, token);
+        } catch {
+          // Projeto já foi criado — não trava o fluxo se o upload das fotos falhar,
+          // staff pode reenviar depois (não há tela dedicada ainda, mas evita perder o projeto).
+          toast.error("Projeto criado, mas não foi possível enviar as fotos de avaria.");
+        }
+      }
 
       if (includeAiProblems && aiResult && aiResult.visibleProblems.length > 0) {
         for (const problem of aiResult.visibleProblems) {
@@ -299,6 +316,53 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                   />
                 </div>
               </>
+            )}
+          </section>
+
+          {/* Prioridade */}
+          <section className="grid gap-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridade</Label>
+            <Select value={priority} onValueChange={(v) => setPriority(v as ServiceOrderPriority)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {SERVICE_ORDER_PRIORITIES.map((p) => (
+                  <SelectItem key={p} value={p}>{PRIORITY_LABELS[p]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </section>
+
+          {/* Checklist de fotos de avaria pré-existente */}
+          <section className="grid gap-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Fotos de avarias já existentes (até {MAX_DAMAGE_PHOTOS})
+            </Label>
+            <Input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={damagePhotos.length >= MAX_DAMAGE_PHOTOS}
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                setDamagePhotos((prev) => [...prev, ...files].slice(0, MAX_DAMAGE_PHOTOS));
+                e.target.value = "";
+              }}
+            />
+            {damagePhotos.length > 0 && (
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {damagePhotos.map((file, i) => (
+                  <span key={i} className="flex items-center gap-1 rounded-md border px-2 py-1">
+                    {file.name}
+                    <button
+                      type="button"
+                      className="text-destructive"
+                      onClick={() => setDamagePhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
             )}
           </section>
         </div>

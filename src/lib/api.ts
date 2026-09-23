@@ -94,7 +94,8 @@ export const api = {
 
   team: () => request<{ team: { id: string; name: string; role: string; avatarUrl: string | null }[] }>("/api/team"),
 
-  serviceOrders: (token: string) => request<{ orders: unknown[] }>("/api/service-orders", {}, token),
+  serviceOrders: (token: string, params: { includeArchived?: boolean } = {}) =>
+    request<{ orders: unknown[] }>(`/api/service-orders${toQuery({ includeArchived: params.includeArchived ? "true" : undefined })}`, {}, token),
 
   serviceOrder: (id: string, token: string) => request<{ order: unknown }>(`/api/service-orders/${id}`, {}, token),
 
@@ -249,8 +250,10 @@ export const api = {
     );
   },
 
-  financeSummary: (token: string) =>
-    request<{ summary: unknown; entries: unknown[]; monthly: unknown[] }>("/api/finance/summary", {}, token),
+  financeSummary: (token: string, params: { from?: string; to?: string } = {}) =>
+    request<{ summary: unknown; entries: unknown[]; monthly: unknown[] }>(`/api/finance/summary${toQuery(params)}`, {}, token),
+
+  expenseCategories: (token: string) => request<{ categories: string[] }>("/api/finance/expense-categories", {}, token),
 
   createExpense: (payload: { category: string; description: string; amount: number; occurredAt?: string }, token: string) =>
     request<{ entry: unknown }>("/api/finance/expenses", { method: "POST", body: JSON.stringify(payload) }, token),
@@ -286,7 +289,7 @@ export const api = {
       token
     ),
 
-  mePermissions: (token: string) => request<{ permissions: string[] }>("/api/auth/me/permissions", {}, token),
+  mePermissions: (token: string) => request<{ permissions: string[]; allowedTabs: string[] }>("/api/auth/me/permissions", {}, token),
 
   clients: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) => {
     const search = new URLSearchParams();
@@ -316,6 +319,9 @@ export const api = {
 
   createRole: (payload: { name: string; description?: string }, token: string) =>
     request<{ role: unknown }>("/api/roles", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateRole: (id: string, payload: { name?: string; description?: string; allowedTabs?: string[] }, token: string) =>
+    request<{ role: unknown }>(`/api/roles/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
 
   deleteRole: (id: string, token: string) => request<void>(`/api/roles/${id}`, { method: "DELETE" }, token),
 
@@ -497,8 +503,12 @@ export const api = {
 
   archiveBay: (id: string, token: string) => request<void>(`/api/agenda/bays/${id}`, { method: "DELETE" }, token),
 
-  appointments: (token: string, params: { from?: string; to?: string; mechanicId?: string; bayId?: string; status?: string } = {}) =>
-    request<{ appointments: unknown[] }>(`/api/agenda/appointments${toQuery(params)}`, {}, token),
+  appointments: (
+    token: string,
+    params: { from?: string; to?: string; mechanicId?: string; driverId?: string; bayId?: string; status?: string; type?: string } = {}
+  ) => request<{ appointments: unknown[] }>(`/api/agenda/appointments${toQuery(params)}`, {}, token),
+
+  myPickupsToday: (token: string) => request<{ appointments: unknown[] }>("/api/agenda/appointments/my-pickups-today", {}, token),
 
   createAppointment: (payload: Record<string, unknown>, token: string) =>
     request<{ appointment: unknown }>("/api/agenda/appointments", { method: "POST", body: JSON.stringify(payload) }, token),
@@ -736,7 +746,7 @@ export const api = {
 
   startTruckTrip: (
     truckId: string,
-    payload: { startKm: number; startFuelLevel: string; startCondition?: string; photo?: File | null },
+    payload: { startKm: number; startFuelLevel: string; startCondition?: string; photo?: File | null; appointmentId?: string },
     token: string
   ) => {
     const form = new FormData();
@@ -744,6 +754,7 @@ export const api = {
     form.append("startFuelLevel", payload.startFuelLevel);
     if (payload.startCondition) form.append("startCondition", payload.startCondition);
     if (payload.photo) form.append("photo", payload.photo);
+    if (payload.appointmentId) form.append("appointmentId", payload.appointmentId);
     return request<{ trip: unknown }>(`/api/trucks/${truckId}/trips/start`, { method: "POST", body: form }, token);
   },
 
@@ -815,6 +826,12 @@ export const api = {
 
   createServiceOrder: (payload: Record<string, unknown>, token: string) =>
     request<{ order: unknown }>("/api/service-orders", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  uploadDamagePhotos: (orderId: string, photos: File[], token: string) => {
+    const form = new FormData();
+    photos.forEach((photo) => form.append("photos", photo));
+    return request<{ media: unknown[] }>(`/api/service-orders/${orderId}/damage-photos`, { method: "POST", body: form }, token);
+  },
 };
 
 interface Pagination {

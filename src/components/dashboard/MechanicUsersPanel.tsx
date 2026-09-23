@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Percent } from "lucide-react";
+import { Percent, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { User, Role } from "@/lib/types";
@@ -22,6 +22,7 @@ export default function MechanicUsersPanel() {
   });
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   function loadUsers() {
     if (!token) return;
@@ -90,7 +91,34 @@ export default function MechanicUsersPanel() {
           </label>
           <label>
             Senha
-            <input type="password" minLength={6} value={userForm.password} onChange={(e) => setUserForm((prev) => ({ ...prev, password: e.target.value }))} required />
+            <div style={{ position: "relative", display: "flex" }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                minLength={6}
+                value={userForm.password}
+                onChange={(e) => setUserForm((prev) => ({ ...prev, password: e.target.value }))}
+                required
+                style={{ paddingRight: "2.2rem", width: "100%" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                style={{
+                  position: "absolute",
+                  right: "0.4rem",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  color: "var(--text-muted)",
+                }}
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
           </label>
           <label>
             Telefone

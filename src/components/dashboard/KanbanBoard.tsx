@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  SERVICE_ORDER_STATUSES,
+  ACTIVE_SERVICE_ORDER_STATUSES,
   STATUS_LABELS,
   STATUS_TONE,
   PRIORITY_LABELS,
@@ -35,10 +35,11 @@ const TONE_CLASSES: Record<string, string> = {
   ok: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
 };
 
+// Mesma paleta usada na Lista de projetos (ver PRIORITY_BG/PRIORITY_BORDER em lib/types.ts).
 const PRIORITY_CLASSES: Record<string, string> = {
-  LOW: "bg-muted text-muted-foreground",
-  NORMAL: "bg-muted text-muted-foreground",
-  HIGH: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  LOW: "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300",
+  NORMAL: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
+  HIGH: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   URGENT: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
 };
 
@@ -167,6 +168,7 @@ interface DragState {
   startX: number;
   startY: number;
   dragging: boolean;
+  pointerType: string;
 }
 
 export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatusChanged }: KanbanBoardProps) {
@@ -179,12 +181,12 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
 
   const columns = useMemo(() => {
     const byStatus = new Map<ServiceOrderStatus, ServiceOrder[]>();
-    for (const status of SERVICE_ORDER_STATUSES) byStatus.set(status, []);
+    for (const status of ACTIVE_SERVICE_ORDER_STATUSES) byStatus.set(status, []);
     for (const order of orders) {
       const list = byStatus.get(order.status);
       if (list) list.push(order);
     }
-    return SERVICE_ORDER_STATUSES.map((status) => ({ status, orders: byStatus.get(status) ?? [] }));
+    return ACTIVE_SERVICE_ORDER_STATUSES.map((status) => ({ status, orders: byStatus.get(status) ?? [] }));
   }, [orders]);
 
   function statusAtPoint(x: number, y: number): ServiceOrderStatus | null {
@@ -219,7 +221,14 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
   // Drop nativo (que não funciona em telas de toque).
   function handlePointerDown(e: React.PointerEvent, orderId: string) {
     if (e.pointerType === "mouse" && e.button !== 0) return;
-    dragState.current = { pointerId: e.pointerId, orderId, startX: e.clientX, startY: e.clientY, dragging: false };
+    dragState.current = {
+      pointerId: e.pointerId,
+      orderId,
+      startX: e.clientX,
+      startY: e.clientY,
+      dragging: false,
+      pointerType: e.pointerType,
+    };
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -231,6 +240,9 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
   function handlePointerMove(e: React.PointerEvent) {
     const state = dragState.current;
     if (!state || state.pointerId !== e.pointerId) return;
+    // Arrastar só funciona com mouse — no toque, o dedo continua livre pra rolar a
+    // tela; o gesto vira só um toque simples (abre o projeto no pointerup).
+    if (state.pointerType !== "mouse") return;
 
     if (!state.dragging) {
       const dx = e.clientX - state.startX;
@@ -437,7 +449,6 @@ function OrderCard({ order, status, theme, selected, dragging, onPointerDown, on
           onSelect();
         }
       }}
-      style={{ touchAction: "none" }}
       className={`cursor-grab select-none rounded-md border bg-background p-2.5 text-left text-sm shadow-sm transition-opacity hover:border-primary/50 active:cursor-grabbing ${
         selected ? "border-primary ring-1 ring-primary" : ""
       } ${dragging ? "opacity-40" : ""}`}
