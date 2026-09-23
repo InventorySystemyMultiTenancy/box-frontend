@@ -13,7 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Client, Invoice, InvoiceStatus, InvoiceType } from "@/lib/types";
+import type { Client, Invoice, InvoiceStatus, InvoiceType, ServiceOrder, ServiceOrderStatus } from "@/lib/types";
+
+// "Em andamento" = mesma definição usada em MechanicProjectsPanel — qualquer OS que
+// ainda não chegou em FINISHED/READY_FOR_PICKUP.
+const DONE_ORDER_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);
 
 const TYPE_LABELS: Record<InvoiceType, string> = { NFE: "NF-e", NFSE: "NFS-e", NFCE: "NFC-e" };
 const STATUS_LABELS: Record<InvoiceStatus, string> = { DRAFT: "Rascunho", PENDING: "Pendente", ISSUED: "Emitida", CANCELLED: "Cancelada", ERROR: "Erro" };
@@ -25,20 +29,29 @@ const STATUS_VARIANTS: Record<InvoiceStatus, "default" | "secondary" | "outline"
   ERROR: "destructive",
 };
 
+const EMPTY_SEARCH = { clientName: "", number: "", orderCode: "", date: "" };
+
 export default function InvoicesPanel() {
   const { token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManage = hasPermission("invoices", "manage");
+  const [search, setSearch] = useState(EMPTY_SEARCH);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["invoices"],
-    queryFn: async () => (await api.invoices(token!, { pageSize: 50 })).items as Invoice[],
+    queryKey: ["invoices", search],
+    queryFn: async () => (await api.invoices(token!, { pageSize: 50, ...search })).items as Invoice[],
     enabled: !!token,
   });
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["invoices"] });
   }
+
+  function setSearchField<K extends keyof typeof search>(key: K, value: string) {
+    setSearch((s) => ({ ...s, [key]: value }));
+  }
+
+  const hasActiveSearch = Object.values(search).some((v) => v !== "");
 
   async function handleIssue(invoice: Invoice) {
     if (!token) return;
@@ -68,6 +81,42 @@ export default function InvoicesPanel() {
         {canManage && <InvoiceFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova nota fiscal</Button>} />}
       </div>
 
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid gap-1.5">
+          <Label htmlFor="search-client">Cliente</Label>
+          <Input
+            id="search-client"
+            placeholder="Nome do cliente"
+            value={search.clientName}
+            onChange={(e) => setSearchField("clientName", e.target.value)}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="search-number">Número da nota</Label>
+          <Input id="search-number" placeholder="Número" value={search.number} onChange={(e) => setSearchField("number", e.target.value)} />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="search-order">Projeto</Label>
+          <Input
+            id="search-order"
+            placeholder="Código da OS"
+            value={search.orderCode}
+            onChange={(e) => setSearchField("orderCode", e.target.value)}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="search-date">Data</Label>
+          <div className="flex gap-2">
+            <Input id="search-date" type="date" value={search.date} onChange={(e) => setSearchField("date", e.target.value)} />
+            {hasActiveSearch && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSearch(EMPTY_SEARCH)}>
+                Limpar
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
@@ -85,13 +134,20 @@ export default function InvoicesPanel() {
               <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             )}
             {!isLoading && (data ?? []).length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhuma nota fiscal.</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  {hasActiveSearch ? "Nenhuma nota encontrada com esse filtro." : "Nenhuma nota fiscal."}
+                </TableCell>
+              </TableRow>
             )}
             {(data ?? []).map((invoice) => (
               <TableRow key={invoice.id}>
                 <TableCell>{TYPE_LABELS[invoice.type]}</TableCell>
                 <TableCell className="text-muted-foreground">{invoice.number ? `${invoice.number}${invoice.series ? `/${invoice.series}` : ""}` : "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{invoice.client?.name || invoice.recipientName || "—"}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {invoice.client?.name || invoice.recipientName || "—"}
+                  {invoice.serviceOrder && <p className="text-xs">Projeto: {invoice.serviceOrder.code}</p>}
+                </TableCell>
                 <TableCell>R$ {invoice.totalAmount.toFixed(2)}</TableCell>
                 <TableCell>
                   <Badge variant={STATUS_VARIANTS[invoice.status]}>{STATUS_LABELS[invoice.status]}</Badge>
@@ -128,6 +184,7 @@ export default function InvoicesPanel() {
 const EMPTY_FORM = {
   type: "NFSE" as InvoiceType,
   clientId: "",
+  serviceOrderId: "",
   number: "",
   series: "",
   accessKey: "",
@@ -164,6 +221,15 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
   const { data: clients } = useQuery({
     queryKey: ["clients-all"],
     queryFn: async () => (await api.clients(token!, { pageSize: 100 })).items as Client[],
+    enabled: !!token && open,
+  });
+
+  const { data: openOrders } = useQuery({
+    queryKey: ["service-orders-open-for-invoice"],
+    queryFn: async () => {
+      const { orders } = await api.serviceOrders(token!);
+      return (orders as ServiceOrder[]).filter((o) => !DONE_ORDER_STATUSES.has(o.status));
+    },
     enabled: !!token && open,
   });
 
@@ -236,6 +302,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
         {
           type: form.type,
           clientId: form.clientId || undefined,
+          serviceOrderId: form.serviceOrderId || undefined,
           totalAmount: Number(form.totalAmount),
           description: form.description,
           number: form.number || undefined,
@@ -321,17 +388,33 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             </div>
           </div>
 
-          <div className="grid gap-1.5">
-            <Label>Cliente cadastrado</Label>
-            <Select value={form.clientId || "NONE"} onValueChange={(v) => set("clientId", v === "NONE" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">—</SelectItem>
-                {(clients ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label>Cliente cadastrado</Label>
+              <Select value={form.clientId || "NONE"} onValueChange={(v) => set("clientId", v === "NONE" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">—</SelectItem>
+                  {(clients ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Projeto em andamento (opcional)</Label>
+              <Select value={form.serviceOrderId || "NONE"} onValueChange={(v) => set("serviceOrderId", v === "NONE" ? "" : v)}>
+                <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">—</SelectItem>
+                  {(openOrders ?? []).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.code} — {o.vehicle.brand} {o.vehicle.model}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">

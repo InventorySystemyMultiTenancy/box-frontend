@@ -1,24 +1,46 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
-import type { CashFlow, DRE } from "@/lib/types";
+import { api, ApiError } from "@/lib/api";
+import type { AccountPayable, AccountReceivable, CashFlow, DRE, FinancialEntry } from "@/lib/types";
 
 function firstDayOfMonth() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 }
 
+function toDateInput(value?: string | null) {
+  return value ? value.slice(0, 10) : "";
+}
+
+type LedgerRow =
+  | { kind: "receivable"; date: string; record: AccountReceivable }
+  | { kind: "payable"; date: string; record: AccountPayable }
+  | { kind: "entry"; date: string; record: FinancialEntry };
+
+const KIND_LABELS: Record<LedgerRow["kind"], string> = {
+  receivable: "Recebido",
+  payable: "Pago",
+  entry: "Manual",
+};
+
 export default function CashFlowPanel() {
   const { token } = useAuth();
+  const queryClient = useQueryClient();
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [editingRow, setEditingRow] = useState<LedgerRow | null>(null);
 
   const { data: cashFlow } = useQuery({
     queryKey: ["cash-flow", from, to],
@@ -31,6 +53,19 @@ export default function CashFlowPanel() {
     queryFn: async () => (await api.dre(token!, { from, to })).dre as DRE,
     enabled: !!token,
   });
+
+  function refetch() {
+    queryClient.invalidateQueries({ queryKey: ["cash-flow"] });
+    queryClient.invalidateQueries({ queryKey: ["dre"] });
+  }
+
+  const rows: LedgerRow[] = cashFlow
+    ? [
+        ...cashFlow.receivables.map((record): LedgerRow => ({ kind: "receivable", date: record.receivedAt ?? record.dueDate, record })),
+        ...cashFlow.payables.map((record): LedgerRow => ({ kind: "payable", date: record.paidAt ?? record.dueDate, record })),
+        ...cashFlow.entries.map((record): LedgerRow => ({ kind: "entry", date: record.occurredAt, record })),
+      ].sort((a, b) => b.date.localeCompare(a.date))
+    : [];
 
   return (
     <div className="grid gap-6">
@@ -46,10 +81,11 @@ export default function CashFlowPanel() {
       </div>
 
       {cashFlow && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <StatCard label="Saldo inicial" value={cashFlow.initialBalance} />
           <StatCard label="Entradas" value={cashFlow.totalIn} tone="ok" />
           <StatCard label="Saídas" value={cashFlow.totalOut} tone="crit" />
+          <StatCard label="Custo de peças" value={cashFlow.partsCost} tone="crit" />
           <StatCard label="Saldo final" value={cashFlow.finalBalance} />
         </div>
       )}
@@ -113,6 +149,67 @@ export default function CashFlowPanel() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Lançamentos do período</CardTitle></CardHeader>
+        <CardContent>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Tudo aqui é editável — clique em <Pencil className="inline size-3" /> para corrigir valor, data, categoria ou descrição.
+          </p>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Descrição</TableHead>
+                <TableHead>Categoria</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead className="w-16" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 && (
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum lançamento no período.</TableCell></TableRow>
+              )}
+              {rows.map((row) => {
+                const isOut = row.kind === "payable" || (row.kind === "entry" && row.record.type === "EXPENSE");
+                const amount =
+                  row.kind === "receivable"
+                    ? row.record.receivedAmount ?? row.record.amount
+                    : row.kind === "payable"
+                      ? row.record.paidAmount ?? row.record.amount
+                      : row.record.amount;
+                const description = row.kind === "payable" ? `${row.record.description} (${row.record.payeeName})` : row.record.description;
+                return (
+                  <TableRow key={`${row.kind}-${row.record.id}`}>
+                    <TableCell>{new Date(row.date).toLocaleDateString("pt-BR")}</TableCell>
+                    <TableCell className="text-muted-foreground">{KIND_LABELS[row.kind]}</TableCell>
+                    <TableCell>{description}</TableCell>
+                    <TableCell className="text-muted-foreground">{row.record.category}</TableCell>
+                    <TableCell className={isOut ? "text-destructive" : "text-emerald-600"}>
+                      {isOut ? "-" : "+"} R$ {amount.toFixed(2)}
+                    </TableCell>
+                    <TableCell>
+                      <Button size="icon" variant="ghost" onClick={() => setEditingRow(row)}>
+                        <Pencil className="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <EditLedgerRowDialog
+        row={editingRow}
+        onOpenChange={(open) => !open && setEditingRow(null)}
+        onSaved={() => {
+          setEditingRow(null);
+          refetch();
+        }}
+      />
     </div>
   );
 }
@@ -125,5 +222,291 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone?:
         R$ {value.toFixed(2)}
       </p>
     </div>
+  );
+}
+
+function EditLedgerRowDialog({
+  row,
+  onOpenChange,
+  onSaved,
+}: {
+  row: LedgerRow | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const { token } = useAuth();
+  const [saving, setSaving] = useState(false);
+
+  if (!row) return null;
+
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Editar lançamento</DialogTitle>
+        </DialogHeader>
+        {row.kind === "receivable" && (
+          <ReceivableForm
+            record={row.record}
+            saving={saving}
+            onSubmit={async (payload) => {
+              if (!token) return;
+              setSaving(true);
+              try {
+                await api.updateReceivable(row.record.id, payload, token);
+                toast.success("Lançamento atualizado.");
+                onSaved();
+              } catch (err) {
+                toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar.");
+              } finally {
+                setSaving(false);
+              }
+            }}
+          />
+        )}
+        {row.kind === "payable" && (
+          <PayableForm
+            record={row.record}
+            saving={saving}
+            onSubmit={async (payload) => {
+              if (!token) return;
+              setSaving(true);
+              try {
+                await api.updatePayable(row.record.id, payload, token);
+                toast.success("Lançamento atualizado.");
+                onSaved();
+              } catch (err) {
+                toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar.");
+              } finally {
+                setSaving(false);
+              }
+            }}
+          />
+        )}
+        {row.kind === "entry" && (
+          <EntryForm
+            record={row.record}
+            saving={saving}
+            onSubmit={async (payload) => {
+              if (!token) return;
+              setSaving(true);
+              try {
+                await api.updateFinancialEntry(row.record.id, payload, token);
+                toast.success("Lançamento atualizado.");
+                onSaved();
+              } catch (err) {
+                toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar.");
+              } finally {
+                setSaving(false);
+              }
+            }}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReceivableForm({
+  record,
+  saving,
+  onSubmit,
+}: {
+  record: AccountReceivable;
+  saving: boolean;
+  onSubmit: (payload: Record<string, unknown>) => void;
+}) {
+  const [description, setDescription] = useState(record.description);
+  const [category, setCategory] = useState(record.category);
+  const [amount, setAmount] = useState(String(record.amount));
+  const [dueDate, setDueDate] = useState(toDateInput(record.dueDate));
+  const [receivedAmount, setReceivedAmount] = useState(record.receivedAmount != null ? String(record.receivedAmount) : "");
+  const [receivedAt, setReceivedAt] = useState(toDateInput(record.receivedAt));
+
+  return (
+    <form
+      className="grid gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({
+          description,
+          category,
+          amount: Number(amount),
+          dueDate: dueDate || undefined,
+          receivedAmount: receivedAmount ? Number(receivedAmount) : undefined,
+          receivedAt: receivedAt || undefined,
+        });
+      }}
+    >
+      <div className="grid gap-1.5">
+        <Label>Descrição</Label>
+        <Input value={description} onChange={(e) => setDescription(e.target.value)} required />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-1.5">
+          <Label>Categoria</Label>
+          <Input value={category} onChange={(e) => setCategory(e.target.value)} required />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Valor</Label>
+          <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-1.5">
+          <Label>Vencimento</Label>
+          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Data do recebimento</Label>
+          <Input type="date" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} />
+        </div>
+      </div>
+      <div className="grid gap-1.5">
+        <Label>Valor recebido</Label>
+        <Input type="number" min="0" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} />
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function PayableForm({
+  record,
+  saving,
+  onSubmit,
+}: {
+  record: AccountPayable;
+  saving: boolean;
+  onSubmit: (payload: Record<string, unknown>) => void;
+}) {
+  const [description, setDescription] = useState(record.description);
+  const [category, setCategory] = useState(record.category);
+  const [payeeName, setPayeeName] = useState(record.payeeName);
+  const [amount, setAmount] = useState(String(record.amount));
+  const [dueDate, setDueDate] = useState(toDateInput(record.dueDate));
+  const [paidAmount, setPaidAmount] = useState(record.paidAmount != null ? String(record.paidAmount) : "");
+  const [paidAt, setPaidAt] = useState(toDateInput(record.paidAt));
+
+  return (
+    <form
+      className="grid gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({
+          description,
+          category,
+          payeeName,
+          amount: Number(amount),
+          dueDate: dueDate || undefined,
+          paidAmount: paidAmount ? Number(paidAmount) : undefined,
+          paidAt: paidAt || undefined,
+        });
+      }}
+    >
+      <div className="grid gap-1.5">
+        <Label>Descrição</Label>
+        <Input value={description} onChange={(e) => setDescription(e.target.value)} required />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-1.5">
+          <Label>Categoria</Label>
+          <Input value={category} onChange={(e) => setCategory(e.target.value)} required />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Beneficiário</Label>
+          <Input value={payeeName} onChange={(e) => setPayeeName(e.target.value)} required />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-1.5">
+          <Label>Valor</Label>
+          <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Vencimento</Label>
+          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-1.5">
+          <Label>Valor pago</Label>
+          <Input type="number" min="0" step="0.01" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Data do pagamento</Label>
+          <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function EntryForm({
+  record,
+  saving,
+  onSubmit,
+}: {
+  record: FinancialEntry;
+  saving: boolean;
+  onSubmit: (payload: Record<string, unknown>) => void;
+}) {
+  const [type, setType] = useState(record.type);
+  const [description, setDescription] = useState(record.description);
+  const [category, setCategory] = useState(record.category);
+  const [amount, setAmount] = useState(String(record.amount));
+  const [occurredAt, setOccurredAt] = useState(toDateInput(record.occurredAt));
+
+  return (
+    <form
+      className="grid gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit({
+          type,
+          description,
+          category,
+          amount: Number(amount),
+          occurredAt: occurredAt ? new Date(occurredAt).toISOString() : undefined,
+        });
+      }}
+    >
+      <div className="grid gap-1.5">
+        <Label>Tipo</Label>
+        <Select value={type} onValueChange={(v) => setType(v as FinancialEntry["type"])}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="INCOME">Entrada</SelectItem>
+            <SelectItem value="EXPENSE">Saída</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid gap-1.5">
+        <Label>Descrição</Label>
+        <Input value={description} onChange={(e) => setDescription(e.target.value)} required />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="grid gap-1.5">
+          <Label>Categoria</Label>
+          <Input value={category} onChange={(e) => setCategory(e.target.value)} required />
+        </div>
+        <div className="grid gap-1.5">
+          <Label>Valor</Label>
+          <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+        </div>
+      </div>
+      <div className="grid gap-1.5">
+        <Label>Data</Label>
+        <Input type="date" value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} />
+      </div>
+      <DialogFooter>
+        <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar"}</Button>
+      </DialogFooter>
+    </form>
   );
 }

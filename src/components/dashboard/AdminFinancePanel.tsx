@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { FinancialEntry } from "@/lib/types";
+import { FinanceCostBreakdownChart, FinanceTrendChart, MonthlyPoint } from "@/components/dashboard/FinanceCharts";
 import styles from "./dashboard.module.css";
 
 interface Summary {
   income: number;
   expenses: number;
   partsCost: number;
+  paidPayables: number;
+  manualExpenses: number;
   profit: number;
   count: number;
 }
@@ -18,13 +21,15 @@ export default function AdminFinancePanel() {
   const { token } = useAuth();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [entries, setEntries] = useState<FinancialEntry[]>([]);
+  const [monthly, setMonthly] = useState<MonthlyPoint[]>([]);
   const [form, setForm] = useState({ category: "Despesa fixa", description: "", amount: "" });
 
   function load() {
     if (!token) return;
-    api.financeSummary(token).then(({ summary, entries }) => {
+    api.financeSummary(token).then(({ summary, entries, monthly }) => {
       setSummary(summary as Summary);
       setEntries(entries as FinancialEntry[]);
+      setMonthly((monthly as MonthlyPoint[]) ?? []);
     });
   }
 
@@ -68,6 +73,22 @@ export default function AdminFinancePanel() {
           <button className={styles.actionButton}>Registrar gasto</button>
         </form>
       </div>
+
+      {summary && (
+        <div className={styles.panel}>
+          <h2>Entradas x saídas (últimos 6 meses)</h2>
+          <FinanceTrendChart data={monthly} />
+        </div>
+      )}
+
+      {summary && (
+        <div className={styles.panel}>
+          <h2>Composição das saídas</h2>
+          <FinanceCostBreakdownChart
+            breakdown={{ partsCost: summary.partsCost, paidPayables: summary.paidPayables, manualExpenses: summary.manualExpenses }}
+          />
+        </div>
+      )}
 
       <div className={styles.ordersList}>
         {entries.map((entry) => (

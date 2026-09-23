@@ -562,6 +562,12 @@ export interface CashFlow {
   totalOut: number;
   finalBalance: number;
   timeline: CashFlowTimelinePoint[];
+  partsCost: number;
+  // Lançamentos brutos do período — cada um editável (ver api.updatePayable /
+  // updateReceivable / updateFinancialEntry).
+  receivables: AccountReceivable[];
+  payables: AccountPayable[];
+  entries: FinancialEntry[];
 }
 
 export interface DRE {
@@ -773,10 +779,11 @@ export interface Commission {
   id: string;
   mechanicId: string;
   mechanic: { id: string; name: string; commissionRate?: number | null };
-  approvalId: string;
-  approval: { id: string; title: string; estimatedValue?: number | null };
+  approvalId?: string | null;
+  approval?: { id: string; title: string; estimatedValue?: number | null; laborValue?: number | null } | null;
   serviceOrderId: string;
   serviceOrder: { id: string; code: string };
+  basisType: "APPROVAL_ESTIMATE" | "APPROVAL_LABOR" | "ORDER_TOTAL";
   baseAmount: number;
   rate: number;
   amount: number;

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { api, API_URL } from "@/lib/api";
-import { InventoryPart } from "@/lib/types";
+import { InventoryPart, Supplier } from "@/lib/types";
+import { PurchaseOrderFormDialog } from "@/components/dashboard/purchases/PurchaseOrderFormDialog";
+import { Button } from "@/components/ui/button";
 import styles from "./dashboard.module.css";
 
 function photoUrl(url?: string | null) {
@@ -14,8 +17,22 @@ function photoUrl(url?: string | null) {
 export default function AdminPartsPanel() {
   const { token } = useAuth();
   const [parts, setParts] = useState<InventoryPart[]>([]);
-  const [form, setForm] = useState({ name: "", sku: "", description: "", unitCost: "", stockQty: "", photo: null as File | null });
+  const [form, setForm] = useState({
+    name: "",
+    sku: "",
+    description: "",
+    unitCost: "",
+    stockQty: "",
+    preferredSupplierId: "",
+    photo: null as File | null,
+  });
   const [busy, setBusy] = useState(false);
+
+  const { data: suppliers } = useQuery({
+    queryKey: ["suppliers-all"],
+    queryFn: async () => (await api.suppliers(token!, { pageSize: 100 })).items as Supplier[],
+    enabled: !!token,
+  });
 
   function loadParts() {
     if (!token) return;
@@ -29,8 +46,8 @@ export default function AdminPartsPanel() {
     if (!token) return;
     setBusy(true);
     try {
-      await api.saveInventoryPart(form, token);
-      setForm({ name: "", sku: "", description: "", unitCost: "", stockQty: "", photo: null });
+      await api.saveInventoryPart({ ...form, preferredSupplierId: form.preferredSupplierId || undefined }, token);
+      setForm({ name: "", sku: "", description: "", unitCost: "", stockQty: "", preferredSupplierId: "", photo: null });
       loadParts();
     } finally {
       setBusy(false);
@@ -57,6 +74,20 @@ export default function AdminPartsPanel() {
           <label>
             Estoque
             <input type="number" min="0" value={form.stockQty} onChange={(e) => setForm((prev) => ({ ...prev, stockQty: e.target.value }))} required />
+          </label>
+          <label>
+            Fornecedor preferencial (opcional)
+            <select
+              value={form.preferredSupplierId}
+              onChange={(e) => setForm((prev) => ({ ...prev, preferredSupplierId: e.target.value }))}
+            >
+              <option value="">Nenhum</option>
+              {(suppliers ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label className={styles.fullField}>
             Descrição
@@ -85,6 +116,18 @@ export default function AdminPartsPanel() {
               <span>Estoque: {part.stockQty}</span>
               <span>Custo: R$ {part.unitCost.toFixed(2)}</span>
               {part.sku && <span>SKU: {part.sku}</span>}
+            </div>
+            <div className={styles.approvalActions} style={{ marginTop: "0.6rem" }}>
+              <PurchaseOrderFormDialog
+                onSaved={loadParts}
+                defaultSupplierId={part.preferredSupplierId ?? undefined}
+                defaultItems={[{ inventoryPartId: part.id, quantity: 1, unitCost: part.unitCost }]}
+                trigger={
+                  <Button size="sm" variant="outline">
+                    Comprar
+                  </Button>
+                }
+              />
             </div>
           </div>
         ))}

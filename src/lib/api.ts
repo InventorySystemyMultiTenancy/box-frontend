@@ -220,7 +220,17 @@ export const api = {
   inventoryParts: (token: string) => request<{ parts: unknown[] }>("/api/inventory-parts", {}, token),
 
   saveInventoryPart: (
-    payload: { id?: string; name: string; sku?: string; description?: string; unitCost: string; stockQty: string; active?: boolean; photo?: File | null },
+    payload: {
+      id?: string;
+      name: string;
+      sku?: string;
+      description?: string;
+      unitCost: string;
+      stockQty: string;
+      preferredSupplierId?: string;
+      active?: boolean;
+      photo?: File | null;
+    },
     token: string
   ) => {
     const form = new FormData();
@@ -229,6 +239,7 @@ export const api = {
     if (payload.description) form.append("description", payload.description);
     form.append("unitCost", payload.unitCost);
     form.append("stockQty", payload.stockQty);
+    if (payload.preferredSupplierId) form.append("preferredSupplierId", payload.preferredSupplierId);
     if (payload.active != null) form.append("active", String(payload.active));
     if (payload.photo) form.append("photo", payload.photo);
     return request<{ part: unknown }>(
@@ -238,10 +249,14 @@ export const api = {
     );
   },
 
-  financeSummary: (token: string) => request<{ summary: unknown; entries: unknown[] }>("/api/finance/summary", {}, token),
+  financeSummary: (token: string) =>
+    request<{ summary: unknown; entries: unknown[]; monthly: unknown[] }>("/api/finance/summary", {}, token),
 
   createExpense: (payload: { category: string; description: string; amount: number; occurredAt?: string }, token: string) =>
     request<{ entry: unknown }>("/api/finance/expenses", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  updateFinancialEntry: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ entry: unknown }>(`/api/finance/entries/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
 
   quoteRequests: (token: string, status?: string) =>
     request<{ requests: unknown[] }>(`/api/quote-requests${status ? `?status=${status}` : ""}`, {}, token),
@@ -352,6 +367,9 @@ export const api = {
   cancelPayable: (id: string, token: string) =>
     request<{ payable: unknown }>(`/api/finance/payables/${id}/cancel`, { method: "POST" }, token),
 
+  updatePayable: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ payable: unknown }>(`/api/finance/payables/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
   // Financeiro — contas a receber
   receivables: (token: string, params: { status?: string; category?: string; clientId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) =>
     request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/receivables${toQuery(params)}`, {}, token),
@@ -368,6 +386,9 @@ export const api = {
   cancelReceivable: (id: string, token: string) =>
     request<{ receivable: unknown }>(`/api/finance/receivables/${id}/cancel`, { method: "POST" }, token),
 
+  updateReceivable: (id: string, payload: Record<string, unknown>, token: string) =>
+    request<{ receivable: unknown }>(`/api/finance/receivables/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
   // Financeiro — fluxo de caixa e DRE
   cashFlow: (token: string, params: { from?: string; to?: string } = {}) =>
     request<{ cashFlow: unknown }>(`/api/finance/cash-flow${toQuery(params)}`, {}, token),
@@ -376,8 +397,19 @@ export const api = {
     request<{ dre: unknown }>(`/api/finance/dre${toQuery(params)}`, {}, token),
 
   // Fiscal — notas fiscais
-  invoices: (token: string, params: { status?: string; type?: string; page?: number; pageSize?: number } = {}) =>
-    request<{ items: unknown[]; pagination: Pagination }>(`/api/invoices${toQuery(params)}`, {}, token),
+  invoices: (
+    token: string,
+    params: {
+      status?: string;
+      type?: string;
+      clientName?: string;
+      number?: string;
+      orderCode?: string;
+      date?: string;
+      page?: number;
+      pageSize?: number;
+    } = {}
+  ) => request<{ items: unknown[]; pagination: Pagination }>(`/api/invoices${toQuery(params)}`, {}, token),
 
   createInvoice: (payload: Record<string, unknown>, token: string) =>
     request<{ invoice: unknown }>("/api/invoices", { method: "POST", body: JSON.stringify(payload) }, token),
@@ -519,6 +551,11 @@ export const api = {
 
   generateCommissions: (payload: { from: string; to: string }, token: string) =>
     request<{ created: unknown[] }>("/api/commissions/generate", { method: "POST", body: JSON.stringify(payload) }, token),
+
+  createManualCommission: (
+    payload: { mechanicId: string; serviceOrderId: string; rate: number; basisType: "APPROVAL_LABOR" | "ORDER_TOTAL"; approvalId?: string },
+    token: string
+  ) => request<{ commission: unknown }>("/api/commissions", { method: "POST", body: JSON.stringify(payload) }, token),
 
   payCommission: (id: string, payload: { bankAccountId?: string }, token: string) =>
     request<{ commission: unknown }>(`/api/commissions/${id}/pay`, { method: "POST", body: JSON.stringify(payload) }, token),
