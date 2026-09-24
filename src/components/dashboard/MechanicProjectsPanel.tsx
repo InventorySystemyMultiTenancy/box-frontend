@@ -10,8 +10,14 @@ import OrderDetail from "@/components/dashboard/OrderDetail";
 import KanbanBoard from "@/components/dashboard/KanbanBoard";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import { Button } from "@/components/ui/button";
-import { Plus, ClipboardList, CheckCircle2, AlertTriangle, Wrench, Car, ArrowLeft, Archive } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Plus, ClipboardList, CheckCircle2, AlertTriangle, Wrench, Car, ArrowLeft, Archive, Search } from "lucide-react";
+import { matchesSearch } from "@/lib/utils";
 import styles from "./dashboard.module.css";
+
+function orderSearchFields(order: ServiceOrder): (string | null | undefined)[] {
+  return [order.vehicle.brand, order.vehicle.model, order.vehicle.plate, order.vehicle.owner?.name, order.code];
+}
 
 const DONE_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);
 
@@ -63,6 +69,8 @@ export default function MechanicProjectsPanel() {
   const [showArchived, setShowArchived] = useState(false);
   const [archivedOrders, setArchivedOrders] = useState<ServiceOrder[] | null>(null);
   const [loadingArchived, setLoadingArchived] = useState(false);
+  const [listSearch, setListSearch] = useState("");
+  const [archivedSearch, setArchivedSearch] = useState("");
 
   useEffect(() => {
     if (!token) return;
@@ -113,6 +121,7 @@ export default function MechanicProjectsPanel() {
   function toggleArchived() {
     const next = !showArchived;
     setShowArchived(next);
+    setArchivedSearch("");
     if (next && token) {
       setLoadingArchived(true);
       api
@@ -126,6 +135,14 @@ export default function MechanicProjectsPanel() {
   }
 
   const sortedActiveOrders = useMemo(() => sortByPriority(orders), [orders]);
+  const filteredListOrders = useMemo(
+    () => sortedActiveOrders.filter((o) => matchesSearch(listSearch, orderSearchFields(o))),
+    [sortedActiveOrders, listSearch]
+  );
+  const filteredArchivedOrders = useMemo(
+    () => (archivedOrders ?? []).filter((o) => matchesSearch(archivedSearch, orderSearchFields(o))),
+    [archivedOrders, archivedSearch]
+  );
 
   if (selectedOrderId) {
     return (
@@ -158,13 +175,28 @@ export default function MechanicProjectsPanel() {
           </Button>
         </div>
 
+        {!loadingArchived && (archivedOrders?.length ?? 0) > 0 && (
+          <div className="relative mb-3 max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, placa ou cliente..."
+              className="pl-8"
+              value={archivedSearch}
+              onChange={(e) => setArchivedSearch(e.target.value)}
+            />
+          </div>
+        )}
+
         {loadingArchived && <p className={styles.tlSub}>Carregando...</p>}
         {!loadingArchived && (archivedOrders?.length ?? 0) === 0 && (
           <p className={styles.tlSub}>Nenhum projeto finalizado ou com baixa dada ainda.</p>
         )}
-        {!loadingArchived && archivedOrders && archivedOrders.length > 0 && (
+        {!loadingArchived && (archivedOrders?.length ?? 0) > 0 && filteredArchivedOrders.length === 0 && (
+          <p className={styles.tlSub}>Nenhum projeto encontrado para essa busca.</p>
+        )}
+        {!loadingArchived && filteredArchivedOrders.length > 0 && (
           <div className={styles.ordersList}>
-            {archivedOrders.map((order) => (
+            {filteredArchivedOrders.map((order) => (
               <button key={order.id} className={styles.orderRow} onClick={() => setSelectedOrderId(order.id)}>
                 <div className={styles.orderRowInfo}>
                   <strong>
@@ -235,8 +267,19 @@ export default function MechanicProjectsPanel() {
           onStatusChanged={handleStatusChanged}
         />
       ) : (
-        <div className={styles.ordersList}>
-          {sortedActiveOrders.map((order) => {
+        <>
+          <div className="relative mb-3 max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, placa ou cliente..."
+              className="pl-8"
+              value={listSearch}
+              onChange={(e) => setListSearch(e.target.value)}
+            />
+          </div>
+          {filteredListOrders.length === 0 && <p className={styles.tlSub}>Nenhum projeto encontrado para essa busca.</p>}
+          <div className={styles.ordersList}>
+          {filteredListOrders.map((order) => {
             const priority = order.priority ?? "NORMAL";
             return (
               <button
@@ -268,7 +311,8 @@ export default function MechanicProjectsPanel() {
               </button>
             );
           })}
-        </div>
+          </div>
+        </>
       )}
 
       {orders.length > 0 && <ProjectsSummary orders={orders} />}

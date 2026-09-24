@@ -258,6 +258,9 @@ export const api = {
   createExpense: (payload: { category: string; description: string; amount: number; occurredAt?: string }, token: string) =>
     request<{ entry: unknown }>("/api/finance/expenses", { method: "POST", body: JSON.stringify(payload) }, token),
 
+  myExpenses: (token: string, params: { from?: string; to?: string } = {}) =>
+    request<{ entries: unknown[]; total: number }>(`/api/finance/my-expenses${toQuery(params)}`, {}, token),
+
   updateFinancialEntry: (id: string, payload: Record<string, unknown>, token: string) =>
     request<{ entry: unknown }>(`/api/finance/entries/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
 
@@ -648,9 +651,6 @@ export const api = {
 
   removeEstimateItem: (id: string, itemId: string, token: string) =>
     request<{ estimate: unknown }>(`/api/estimates/${id}/items/${itemId}`, { method: "DELETE" }, token),
-
-  // Complementos de mão de obra pendentes
-  pendingSupplements: (token: string) => request<{ items: unknown[] }>("/api/supplements/pending", {}, token),
 
   // Vistorias
   inspections: (token: string, params: { status?: string; insuranceCompanyId?: string; inspectorId?: string; from?: string; to?: string } = {}) =>

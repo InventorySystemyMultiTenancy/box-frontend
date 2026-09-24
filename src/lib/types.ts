@@ -371,22 +371,6 @@ export interface Inspection {
   issues: InspectionIssue[];
 }
 
-export interface PendingSupplement {
-  id: string;
-  title: string;
-  description: string;
-  justification?: string | null;
-  extraHours?: number | null;
-  estimatedValue?: number | null;
-  createdAt: string;
-  daysWaiting: number;
-  overdue: boolean;
-  serviceOrder: { id: string; code: string; status: ServiceOrderStatus };
-  vehicle: { brand: string; model: string; plate?: string | null };
-  owner?: { id: string; name: string } | null;
-  insuranceCompany?: { id: string; tradeName: string } | null;
-}
-
 export interface TimeEntry {
   id: string;
   employeeId: string;

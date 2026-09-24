@@ -16,9 +16,24 @@ import { api, ApiError } from "@/lib/api";
 import type { Role, Permission } from "@/lib/types";
 import { TAB_KEYS, TAB_LABELS } from "@/lib/tab-keys";
 
+// Nome em pt-BR de cada recurso do catálogo de permissões — sem entrada aqui, a tela
+// mostraria a chave técnica em inglês (ex.: "invoices" em vez de "Notas fiscais").
 const RESOURCE_LABELS: Record<string, string> = {
+  agenda: "Agenda",
   clients: "Clientes",
+  commissions: "Comissões",
+  finance: "Financeiro",
+  insurance: "Seguradoras",
+  invoices: "Notas fiscais",
+  pdv: "PDV",
+  purchases: "Compras",
+  reports: "Relatórios",
   roles: "Cargos e permissões",
+  sectors: "Setores",
+  "services-catalog": "Catálogo de serviços",
+  stores: "Lojas",
+  suppliers: "Fornecedores",
+  warranties: "Garantias",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -65,14 +80,19 @@ export default function CargosPage() {
   const serverTabs = useMemo(() => new Set(selectedRole?.allowedTabs ?? []), [selectedRole]);
   const checkedTabs = localTabs ?? serverTabs;
 
-  const grouped = useMemo(() => {
+  // Ordenado pelo nome em pt-BR (não pela chave técnica) pra ficar previsível na tela
+  // — sem isso, "roles" (Cargos e permissões) apareceria depois de "reports", por
+  // exemplo, só porque a chave em inglês vem depois em ordem alfabética.
+  const groupedResources = useMemo(() => {
     const map = new Map<string, Permission[]>();
     for (const p of catalog ?? []) {
       const list = map.get(p.resource) ?? [];
       list.push(p);
       map.set(p.resource, list);
     }
-    return map;
+    return Array.from(map.entries())
+      .map(([resource, perms]) => ({ resource, label: RESOURCE_LABELS[resource] ?? resource, perms }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
   }, [catalog]);
 
   function refetchRoles() {
@@ -200,19 +220,21 @@ export default function CargosPage() {
             {!selectedRole && <p className="text-sm text-muted-foreground">Escolha um cargo à esquerda para configurar suas permissões.</p>}
             {selectedRole && (
               <div className="grid gap-4">
-                {Array.from(grouped.entries()).map(([resource, perms]) => (
-                  <div key={resource}>
-                    <p className="mb-2 text-sm font-medium">{RESOURCE_LABELS[resource] ?? resource}</p>
-                    <div className="flex flex-wrap gap-4">
-                      {perms.map((p) => (
-                        <label key={p.id} className="flex items-center gap-2 text-sm">
-                          <Checkbox checked={checked.has(p.id)} onCheckedChange={() => toggle(p.id)} />
-                          {ACTION_LABELS[p.action] ?? p.action}
-                        </label>
-                      ))}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {groupedResources.map(({ resource, label, perms }) => (
+                    <div key={resource} className="rounded-md border p-3">
+                      <p className="mb-2 text-sm font-medium">{label}</p>
+                      <div className="flex flex-col gap-1.5">
+                        {perms.map((p) => (
+                          <label key={p.id} className="flex items-center gap-2 text-sm">
+                            <Checkbox checked={checked.has(p.id)} onCheckedChange={() => toggle(p.id)} />
+                            {ACTION_LABELS[p.action] ?? p.action}
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
                 <Button className="w-fit" onClick={handleSavePermissions} disabled={savingPermissions}>
                   {savingPermissions ? "Salvando..." : "Salvar permissões"}
                 </Button>
@@ -224,7 +246,7 @@ export default function CargosPage() {
                     aba, quem tiver este cargo passa a ver <strong>só</strong> as abas marcadas — é assim que dá pra
                     criar um cargo &quot;Motorista&quot; que só vê Caminhões, por exemplo.
                   </p>
-                  <div className="flex flex-wrap gap-4">
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
                     {TAB_KEYS.map((key) => (
                       <label key={key} className="flex items-center gap-2 text-sm">
                         <Checkbox checked={checkedTabs.has(key)} onCheckedChange={() => toggleTab(key)} />

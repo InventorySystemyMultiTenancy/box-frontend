@@ -20,7 +20,6 @@ import {
   Wallet,
   Search,
   UserRound,
-  Layers,
   Truck,
   Shield,
   Package,
@@ -70,7 +69,6 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   "/dashboard/financeiro": Wallet,
   "/dashboard/gastos": Receipt,
   "/dashboard/clientes": UserRound,
-  "/dashboard/complementos": Layers,
   "/dashboard/alertas": Bell,
   "/dashboard/caminhoes": Truck,
   "/dashboard/seguradoras": Shield,
@@ -122,7 +120,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const allTabs = [
     ...(user?.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
     ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes", key: "clients" }] : []),
-    ...(isStaff ? [{ href: "/dashboard/complementos", label: "Complementos", key: "addons" }] : []),
     ...(isStaff ? [{ href: "/dashboard/gastos", label: "Gastos", key: "expenses" }] : []),
     ...(isStaff ? [{ href: "/dashboard/alertas", label: "Alertas", key: "alerts" }] : []),
     ...(isStaff ? [{ href: "/dashboard/caminhoes", label: "Caminhões", key: "trucks" }] : []),
