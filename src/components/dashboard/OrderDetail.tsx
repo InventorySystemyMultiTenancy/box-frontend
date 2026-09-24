@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError, API_URL } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
-import { Approval, InventoryPart, PART_STATUS_LABELS, SERVICE_ORDER_STATUSES, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
+import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, InventoryPart, PART_STATUS_LABELS, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
@@ -41,6 +41,7 @@ const AXLE_LABEL: Record<string, string> = {
 const SIDE_LABEL: Record<string, string> = {
   esquerdo: "lado esquerdo",
   direito: "lado direito",
+  ambos: "ambos os lados",
 };
 
 /** Painel completo de uma ordem de serviço — status, timeline, aprovação e esquema do
@@ -90,6 +91,10 @@ export default function OrderDetail({
   });
   const [priceForm, setPriceForm] = useState({ laborValue: "", inventoryPartId: "", quantity: "1" });
   const [inventoryParts, setInventoryParts] = useState<InventoryPart[]>([]);
+  const [newPartOpen, setNewPartOpen] = useState(false);
+  const [newPartForm, setNewPartForm] = useState({ name: "", unitCost: "", stockQty: "1" });
+  const [newPartBusy, setNewPartBusy] = useState(false);
+  const [newPartError, setNewPartError] = useState<string | null>(null);
   const [problemMessage, setProblemMessage] = useState<string | null>(null);
   const [problemBusy, setProblemBusy] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
@@ -232,10 +237,11 @@ export default function OrderDetail({
       setOrder((prev) => {
         if (!prev) return prev;
         const partExists = prev.parts.some((p) => p.id === part.id);
+        const nextOrderStatus: ServiceOrderStatus = isAdmin ? "IN_PROGRESS" : "DIAGNOSIS_DONE";
         return {
           ...prev,
-          status: "AWAITING_APPROVAL",
-          progress: 35,
+          status: nextOrderStatus,
+          progress: isAdmin ? 65 : 25,
           parts: partExists ? prev.parts.map((p) => (p.id === part.id ? part : p)) : [...prev.parts, part],
           approvals: prev.approvals.some((a) => a.id === approval.id) ? prev.approvals : [approval, ...prev.approvals],
           timelineEvents: prev.timelineEvents.some((t) => t.id === event.id) ? prev.timelineEvents : [...prev.timelineEvents, event],
@@ -248,6 +254,38 @@ export default function OrderDetail({
       setProblemMessage("Não foi possível cadastrar o problema.");
     } finally {
       setProblemBusy(false);
+    }
+  }
+
+  // Cadastra uma peça nova direto do formulário de problema, pra não obrigar o
+  // mecânico/admin a ir até a aba Peças e voltar — usada só quando a peça desejada
+  // ainda não existe no estoque.
+  async function createInventoryPart() {
+    if (!token) return;
+    if (!newPartForm.name.trim()) {
+      setNewPartError("Informe o nome da peça.");
+      return;
+    }
+    setNewPartBusy(true);
+    setNewPartError(null);
+    try {
+      const result = await api.saveInventoryPart(
+        {
+          name: newPartForm.name.trim(),
+          unitCost: newPartForm.unitCost || "0",
+          stockQty: newPartForm.stockQty || "0",
+        },
+        token
+      );
+      const part = result.part as InventoryPart;
+      setInventoryParts((prev) => [...prev, part]);
+      setProblemForm((prev) => ({ ...prev, inventoryPartId: part.id }));
+      setNewPartForm({ name: "", unitCost: "", stockQty: "1" });
+      setNewPartOpen(false);
+    } catch {
+      setNewPartError("Não foi possível cadastrar a peça.");
+    } finally {
+      setNewPartBusy(false);
     }
   }
 
@@ -606,11 +644,15 @@ export default function OrderDetail({
   const canFinalize = !["SCHEDULED", "READY_FOR_PICKUP"].includes(order.status);
   const pendingNeedsPrice = pendingApproval && pendingApproval.estimatedValue == null;
 
-  // Próxima etapa da sequência — para no FINISHED, já que ir para "pronto para
-  // retirada" exige o fluxo de finalização (peças concluídas), não um simples avanço.
-  const statusIndex = SERVICE_ORDER_STATUSES.indexOf(order.status);
+  // Próxima etapa da sequência — usa só as etapas ativas (sem AWAITING_APPROVAL/
+  // PARTS_REQUESTED/PARTS_RECEIVED/WASHING, retiradas do fluxo) e para no FINISHED,
+  // já que ir para "pronto para retirada" exige o fluxo de finalização (peças
+  // concluídas), não um simples avanço.
+  const activeStatusIndex = ACTIVE_SERVICE_ORDER_STATUSES.indexOf(order.status as (typeof ACTIVE_SERVICE_ORDER_STATUSES)[number]);
   const nextStatus: ServiceOrderStatus | null =
-    statusIndex >= 0 && statusIndex < SERVICE_ORDER_STATUSES.length - 2 ? SERVICE_ORDER_STATUSES[statusIndex + 1] : null;
+    activeStatusIndex >= 0 && activeStatusIndex < ACTIVE_SERVICE_ORDER_STATUSES.length - 2
+      ? ACTIVE_SERVICE_ORDER_STATUSES[activeStatusIndex + 1]
+      : null;
 
   const whatsAppLink =
     isStaff && order.vehicle.owner
@@ -918,6 +960,7 @@ export default function OrderDetail({
                       <select value={problemForm.side} onChange={(e) => setProblemForm((prev) => ({ ...prev, side: e.target.value }))}>
                         <option value="esquerdo">Esquerdo</option>
                         <option value="direito">Direito</option>
+                        <option value="ambos">Ambos os lados</option>
                       </select>
                     </label>
                   </>
@@ -966,6 +1009,55 @@ export default function OrderDetail({
                         ))}
                       </select>
                     </label>
+                    <button
+                      type="button"
+                      className={styles.linkButton}
+                      onClick={() => {
+                        setNewPartError(null);
+                        setNewPartOpen((prev) => !prev);
+                      }}
+                    >
+                      {newPartOpen ? "Cancelar peça nova" : "+ Peça não está na lista? Cadastrar nova"}
+                    </button>
+                    {newPartOpen && (
+                      <div className={styles.inlineSubform}>
+                        <label>
+                          Nome da peça
+                          <input
+                            value={newPartForm.name}
+                            onChange={(e) => setNewPartForm((prev) => ({ ...prev, name: e.target.value }))}
+                          />
+                        </label>
+                        <label>
+                          Custo unitário (R$)
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={newPartForm.unitCost}
+                            onChange={(e) => setNewPartForm((prev) => ({ ...prev, unitCost: e.target.value }))}
+                          />
+                        </label>
+                        <label>
+                          Estoque inicial
+                          <input
+                            type="number"
+                            min="0"
+                            value={newPartForm.stockQty}
+                            onChange={(e) => setNewPartForm((prev) => ({ ...prev, stockQty: e.target.value }))}
+                          />
+                        </label>
+                        {newPartError && <div className={styles.formMessage}>{newPartError}</div>}
+                        <button
+                          type="button"
+                          className={styles.actionButton}
+                          disabled={newPartBusy}
+                          onClick={createInventoryPart}
+                        >
+                          {newPartBusy ? "Salvando..." : "Salvar peça"}
+                        </button>
+                      </div>
+                    )}
                     <label>
                       Quantidade
                       <input

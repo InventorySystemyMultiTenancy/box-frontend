@@ -697,6 +697,42 @@
   opacity: 0.6;
 }
 
+.linkButton {
+  border: 0;
+  background: none;
+  color: var(--accent-blue);
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  justify-self: start;
+}
+
+.linkButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.inlineSubform {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  background: var(--bg-panel);
+  border-radius: 8px;
+  padding: 0.7rem;
+}
+
+.inlineSubform label {
+  grid-column: span 1;
+}
+
+@media (max-width: 560px) {
+  .inlineSubform { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 560px) {
   .formGrid { grid-template-columns: 1fr; }
 }
