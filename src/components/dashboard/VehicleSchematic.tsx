@@ -72,11 +72,13 @@ export default function VehicleSchematic({
   inventoryParts = [],
   onPriceProblem,
   onUpdateProblem,
+  onGeneratePdf,
 }: {
   parts: VehiclePart[];
   approvals?: Approval[];
   canRespond?: boolean;
   canViewPrices?: boolean;
+  onGeneratePdf?: () => void;
   onRespondApproval?: (approvalId: string, status: "APPROVED" | "REJECTED", responseNote?: string) => Promise<void>;
   canManageMaintenance?: boolean;
   onStartPart?: (partId: string) => Promise<void>;
@@ -491,6 +493,11 @@ export default function VehicleSchematic({
             </div>
           )}
         </div>
+      )}
+      {onGeneratePdf && (
+        <button type="button" className={styles.schematicPdfBtn} onClick={onGeneratePdf}>
+          Gerar PDF do projeto
+        </button>
       )}
     </div>
   );

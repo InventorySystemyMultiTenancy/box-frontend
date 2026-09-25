@@ -478,13 +478,12 @@ export default function OrderDetail({
     if (!order) return;
     if (!isAdmin && !(isCustomer && order.status === "READY_FOR_PICKUP")) return;
 
-    // Valor final = trabalho de fato concluído (peça com status DONE), não só o que o
-    // cliente aprovou formalmente — mão de obra entra no total igual às peças, já que
-    // o admin pode finalizar/dar baixa mesmo sem resposta do cliente a uma aprovação.
+    // O PDF reflete o projeto como ele está agora, não só o que já foi concluído — todo
+    // problema/valor/peça cadastrado entra assim que é registrado, sem esperar a baixa.
+    // "Serviços realizados" continua restrito ao que de fato já tem peça com status DONE;
+    // já a lista de valores e o total consideram todas as aprovações já lançadas.
     const completedParts = order.parts.filter((part) => part.status === "DONE");
-    const donePartIds = new Set(completedParts.map((part) => part.id));
-    const completedApprovals = order.approvals.filter((approval) => approval.partId && donePartIds.has(approval.partId));
-    const servicesTotal = completedApprovals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
+    const servicesTotal = order.approvals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
     const total = servicesTotal + (order.deliveryExtraValue ?? 0);
     const partsRows = order.parts
       .map(
@@ -497,14 +496,23 @@ export default function OrderDetail({
         `
       )
       .join("");
-    const rows = completedApprovals
+    const rows = order.approvals
       .map((approval) => {
+        const part = approval.partId ? order.parts.find((p) => p.id === approval.partId) : undefined;
+        const statusLabel = part
+          ? PART_STATUS_LABELS[part.status]
+          : approval.status === "APPROVED"
+            ? "Aprovado"
+            : approval.status === "REJECTED"
+              ? "Recusado"
+              : "Pendente";
         const parts = approval.partUsages?.length
           ? approval.partUsages.map((usage) => `${usage.quantity}x ${usage.inventoryPart.name}`).join(", ")
           : "Sem peça vinculada";
         return `
           <tr>
             <td>${escapeHtml(approval.description)}</td>
+            <td>${escapeHtml(statusLabel)}</td>
             <td>${escapeHtml(parts)}</td>
             <td>${formatCurrency(approval.laborValue ?? 0)}</td>
             <td>${formatCurrency(approval.partsValue ?? 0)}</td>
@@ -567,13 +575,14 @@ export default function OrderDetail({
             <thead>
               <tr>
                 <th>Problema / serviço</th>
+                <th>Status</th>
                 <th>Peças usadas</th>
                 <th>Mão de obra</th>
                 <th>Valor peças</th>
                 <th>Total</th>
               </tr>
             </thead>
-            <tbody>${rows || '<tr><td colspan="5">Nenhum valor de serviço concluído registrado.</td></tr>'}</tbody>
+            <tbody>${rows || '<tr><td colspan="6">Nenhum valor de serviço registrado.</td></tr>'}</tbody>
           </table>
           ${
             order.deliveryExtraValue
@@ -829,6 +838,7 @@ export default function OrderDetail({
               inventoryParts={inventoryParts}
               onPriceProblem={priceProblem}
               onUpdateProblem={updateProblemDetails}
+              onGeneratePdf={isAdmin ? generateServicePdf : undefined}
             />
             {isAdmin && isStaff && canFinalize && canOfferPickup && finalizing && (
               <div className={styles.panel}>
