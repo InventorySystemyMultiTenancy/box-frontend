@@ -1,0 +1,25 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  background: var(--bg);
+}
+
+.overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.overlay.fading {
+  opacity: 0;
+  transition: opacity 650ms ease;
+}
+
+.video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

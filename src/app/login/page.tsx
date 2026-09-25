@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
+import { playLoginIntro } from "@/components/LoginIntroOverlay";
 import styles from "./login.module.css";
 
 export default function LoginPage() {
@@ -26,6 +27,7 @@ export default function LoginPage() {
     try {
       if (mode === "login") {
         await login(email, password);
+        await playLoginIntro();
       } else {
         await registerCustomer({ name, email, password, phone: phone || undefined });
       }
