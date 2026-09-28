@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -99,9 +100,8 @@ export function UserFormDialog({ user, roles, trigger, onSaved }: UserFormDialog
             </div>
             <div className="col-span-2 grid gap-1.5">
               <Label htmlFor="user-password">Nova senha</Label>
-              <Input
+              <PasswordInput
                 id="user-password"
-                type="password"
                 minLength={6}
                 placeholder="Deixe em branco para manter a senha atual"
                 value={form.password}
