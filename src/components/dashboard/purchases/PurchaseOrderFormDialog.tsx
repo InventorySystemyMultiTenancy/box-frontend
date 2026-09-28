@@ -123,7 +123,7 @@ export function PurchaseOrderFormDialog({ trigger, onSaved, defaultSupplierId, d
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Novo pedido de compra</DialogTitle>
         </DialogHeader>

@@ -74,7 +74,7 @@ export function FinishTripDialog({ truck, trip, onSaved }: { truck: Truck; trip:
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">Finalizar pilotagem</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Devolver caminhão — {truck.plate}</DialogTitle>
         </DialogHeader>

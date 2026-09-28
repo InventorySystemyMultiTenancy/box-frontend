@@ -351,7 +351,7 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
       {/* Etapas com mais de duas OS abrem aqui a lista completa, em vez de lotar a
           coluna — tocar num item seleciona a OS e fecha a lista. */}
       <Dialog open={expandedStatus !== null} onOpenChange={(open) => !open && setExpandedStatus(null)}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-md">
+        <DialogContent className="sm:max-w-md">
           {expandedStatus && (
             <>
               <DialogHeader>

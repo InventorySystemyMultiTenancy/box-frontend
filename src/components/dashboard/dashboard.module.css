@@ -729,12 +729,22 @@
   grid-column: span 1;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   .inlineSubform { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 640px) {
   .formGrid { grid-template-columns: 1fr; }
+
+  /* Campos abaixo de 16px fazem o iOS Safari dar zoom automático ao focar —
+     e o zoom costuma "ficar preso" até o usuário afastar manualmente depois
+     de desfocar, exigindo pinch-zoom-out pra ver o formulário inteiro de novo. */
+  .formGrid input,
+  .formGrid select,
+  .formGrid textarea,
+  .rejectReason {
+    font-size: 16px;
+  }
 }
 
 .timeline {

@@ -198,7 +198,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Novo projeto</DialogTitle>
         </DialogHeader>

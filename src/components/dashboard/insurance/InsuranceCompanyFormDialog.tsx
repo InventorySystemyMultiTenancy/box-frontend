@@ -89,7 +89,7 @@ export function InsuranceCompanyFormDialog({ company, trigger, onSaved }: Insura
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{company ? "Editar seguradora" : "Nova seguradora"}</DialogTitle>
         </DialogHeader>

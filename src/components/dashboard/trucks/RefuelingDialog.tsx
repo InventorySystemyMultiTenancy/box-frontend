@@ -95,7 +95,7 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
           Abastecer
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Registrar abastecimento — {truck.plate}</DialogTitle>
         </DialogHeader>
