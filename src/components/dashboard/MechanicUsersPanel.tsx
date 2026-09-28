@@ -113,16 +113,18 @@ export default function MechanicUsersPanel() {
             <input value={userForm.phone} onChange={(e) => setUserForm((prev) => ({ ...prev, phone: e.target.value }))} />
           </label>
           <label className={styles.fullField}>
-            Perfil
-            <select value={userForm.role} onChange={(e) => setUserForm((prev) => ({ ...prev, role: e.target.value as User["role"] }))}>
-              <option value="CUSTOMER">Cliente</option>
-              <option value="MECHANIC">Mecânico</option>
-              <option value="ADMIN">Admin</option>
-            </select>
-          </label>
-          <label className={styles.fullField}>
             Cargo
-            <select value={userForm.roleId} onChange={(e) => setUserForm((prev) => ({ ...prev, roleId: e.target.value }))}>
+            <select
+              value={userForm.roleId}
+              onChange={(e) => {
+                const roleId = e.target.value;
+                const cargo = roles.find((r) => r.id === roleId);
+                // O cargo já define o perfil — evita escolher os dois separadamente e
+                // acabar com uma combinação sem sentido (ex.: Perfil Cliente + Cargo
+                // "Motorista"). Sem cargo, o perfil volta a ser escolhido manualmente.
+                setUserForm((prev) => ({ ...prev, roleId, role: cargo ? cargo.baseRole : prev.role }));
+              }}
+            >
               <option value="">Sem cargo</option>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
@@ -130,6 +132,18 @@ export default function MechanicUsersPanel() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className={styles.fullField}>
+            Perfil
+            {userForm.roleId ? (
+              <input value={ROLE_LABELS[userForm.role]} disabled title="Definido pelo cargo escolhido acima" />
+            ) : (
+              <select value={userForm.role} onChange={(e) => setUserForm((prev) => ({ ...prev, role: e.target.value as User["role"] }))}>
+                <option value="CUSTOMER">Cliente</option>
+                <option value="MECHANIC">Mecânico</option>
+                <option value="ADMIN">Admin</option>
+              </select>
+            )}
           </label>
           {userForm.role === "MECHANIC" && (
             <label>

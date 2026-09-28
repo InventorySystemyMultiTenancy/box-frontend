@@ -461,6 +461,7 @@ export interface Role {
   slug: string;
   description?: string | null;
   isSystem: boolean;
+  baseRole: "MECHANIC" | "ADMIN";
   allowedTabs: string[];
   createdAt: string;
   _count?: { users: number };

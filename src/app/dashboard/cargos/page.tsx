@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -99,10 +100,10 @@ export default function CargosPage() {
     queryClient.invalidateQueries({ queryKey: ["roles"] });
   }
 
-  async function handleCreateRole(name: string, description: string) {
+  async function handleCreateRole(name: string, description: string, baseRole: "MECHANIC" | "ADMIN") {
     if (!token) return;
     try {
-      await api.createRole({ name, description: description || undefined }, token);
+      await api.createRole({ name, description: description || undefined, baseRole }, token);
       toast.success("Cargo criado.");
       refetchRoles();
     } catch (err) {
@@ -192,6 +193,9 @@ export default function CargosPage() {
             >
               <span>
                 {role.name}
+                <Badge variant="outline" className="ml-2">
+                  {role.baseRole === "ADMIN" ? "Admin" : "Mecânico"}
+                </Badge>
                 {role.isSystem && (
                   <Badge variant="secondary" className="ml-2">
                     Sistema
@@ -267,21 +271,23 @@ export default function CargosPage() {
   );
 }
 
-function CreateRoleDialog({ onCreate }: { onCreate: (name: string, description: string) => Promise<void> }) {
+function CreateRoleDialog({ onCreate }: { onCreate: (name: string, description: string, baseRole: "MECHANIC" | "ADMIN") => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [baseRole, setBaseRole] = useState<"MECHANIC" | "ADMIN">("MECHANIC");
   const [saving, setSaving] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     setSaving(true);
-    await onCreate(name, description);
+    await onCreate(name, description, baseRole);
     setSaving(false);
     setOpen(false);
     setName("");
     setDescription("");
+    setBaseRole("MECHANIC");
   }
 
   return (
@@ -300,6 +306,21 @@ function CreateRoleDialog({ onCreate }: { onCreate: (name: string, description: 
           <div className="grid gap-1.5">
             <Label htmlFor="role-name">Nome</Label>
             <Input id="role-name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Financeiro" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="role-baseRole">Perfil</Label>
+            <Select value={baseRole} onValueChange={(v) => setBaseRole(v as "MECHANIC" | "ADMIN")}>
+              <SelectTrigger id="role-baseRole">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MECHANIC">Mecânico</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Quem tiver este cargo recebe automaticamente este perfil — não precisa escolher os dois na hora de criar o usuário.
+            </p>
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="role-description">Descrição</Label>

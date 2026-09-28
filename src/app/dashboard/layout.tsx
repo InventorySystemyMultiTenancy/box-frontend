@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -117,27 +117,56 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
-  const allTabs = [
-    ...(user?.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
-    ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes", key: "clients" }] : []),
-    ...(isStaff ? [{ href: "/dashboard/gastos", label: "Gastos", key: "expenses" }] : []),
-    ...(isStaff ? [{ href: "/dashboard/alertas", label: "Alertas", key: "alerts" }] : []),
-    ...(isStaff ? [{ href: "/dashboard/caminhoes", label: "Caminhões", key: "trucks" }] : []),
-    ...(hasPermission("insurance", "view") ? [{ href: "/dashboard/seguradoras", label: "Seguradoras", key: "insurance" }] : []),
-    ...(hasPermission("suppliers", "view") ? [{ href: "/dashboard/fornecedores", label: "Fornecedores", key: "suppliers" }] : []),
-    ...(hasPermission("purchases", "view") ? [{ href: "/dashboard/compras", label: "Compras", key: "purchases" }] : []),
-    ...(hasPermission("agenda", "view") ? [{ href: "/dashboard/agenda", label: "Agenda", key: "agenda" }] : []),
-    ...(hasPermission("pdv", "view") ? [{ href: "/dashboard/pdv", label: "PDV", key: "pdv" }] : []),
-    ...(hasPermission("warranties", "view") ? [{ href: "/dashboard/garantias", label: "Garantias", key: "warranties" }] : []),
-    ...(hasPermission("reports", "view") ? [{ href: "/dashboard/relatorios", label: "Relatórios", key: "reports" }] : []),
-    ...(hasPermission("commissions", "view") ? [{ href: "/dashboard/comissoes", label: "Comissões", key: "commissions" }] : []),
-    ...(hasPermission("stores", "view") ? [{ href: "/dashboard/lojas", label: "Lojas", key: "stores" }] : []),
-    ...(hasPermission("roles", "manage") ? [{ href: "/dashboard/cargos", label: "Cargos", key: "roles" }] : []),
-  ];
+  const allTabs = useMemo(
+    () => [
+      ...(user?.role === "ADMIN" ? ADMIN_TABS : STAFF_TABS),
+      ...(hasPermission("clients", "view") ? [{ href: "/dashboard/clientes", label: "Clientes", key: "clients" }] : []),
+      ...(isStaff ? [{ href: "/dashboard/gastos", label: "Gastos", key: "expenses" }] : []),
+      ...(isStaff ? [{ href: "/dashboard/alertas", label: "Alertas", key: "alerts" }] : []),
+      ...(isStaff ? [{ href: "/dashboard/caminhoes", label: "Caminhões", key: "trucks" }] : []),
+      ...(hasPermission("insurance", "view") ? [{ href: "/dashboard/seguradoras", label: "Seguradoras", key: "insurance" }] : []),
+      ...(hasPermission("suppliers", "view") ? [{ href: "/dashboard/fornecedores", label: "Fornecedores", key: "suppliers" }] : []),
+      ...(hasPermission("purchases", "view") ? [{ href: "/dashboard/compras", label: "Compras", key: "purchases" }] : []),
+      ...(hasPermission("agenda", "view") ? [{ href: "/dashboard/agenda", label: "Agenda", key: "agenda" }] : []),
+      ...(hasPermission("pdv", "view") ? [{ href: "/dashboard/pdv", label: "PDV", key: "pdv" }] : []),
+      ...(hasPermission("warranties", "view") ? [{ href: "/dashboard/garantias", label: "Garantias", key: "warranties" }] : []),
+      ...(hasPermission("reports", "view") ? [{ href: "/dashboard/relatorios", label: "Relatórios", key: "reports" }] : []),
+      ...(hasPermission("commissions", "view") ? [{ href: "/dashboard/comissoes", label: "Comissões", key: "commissions" }] : []),
+      ...(hasPermission("stores", "view") ? [{ href: "/dashboard/lojas", label: "Lojas", key: "stores" }] : []),
+      ...(hasPermission("roles", "manage") ? [{ href: "/dashboard/cargos", label: "Cargos", key: "roles" }] : []),
+    ],
+    [user?.role, isStaff, hasPermission]
+  );
   // allowedTabs vazio = sem restrição extra (comportamento de sempre). Quando o cargo
   // do usuário define uma lista, só essas abas aparecem — é assim que um cargo
   // "Motorista" com allowedTabs=["trucks"] passa a ver só Caminhões.
-  const tabs = allowedTabs.length > 0 ? allTabs.filter((tab) => allowedTabs.includes(tab.key)) : allTabs;
+  const tabs = useMemo(
+    () => (allowedTabs.length > 0 ? allTabs.filter((tab) => allowedTabs.includes(tab.key)) : allTabs),
+    [allTabs, allowedTabs]
+  );
+
+  // Abas pessoais/utilitárias — sempre acessíveis, independente do cargo restringir
+  // a navegação a uma única aba de trabalho.
+  const ALWAYS_ALLOWED_PATHS = ["/dashboard/perfil", "/dashboard/busca"];
+
+  function pathMatchesTab(path: string, href: string) {
+    if (href === "/dashboard") return path === "/dashboard";
+    return path === href || path.startsWith(`${href}/`);
+  }
+
+  // Um cargo com allowedTabs=["trucks"], por exemplo, só deve ver Caminhões — sem esse
+  // guard, a pessoa continuava caindo direto na aba Projetos (raiz /dashboard) ao
+  // entrar, já que aquela página não verificava allowedTabs, só a navegação escondia
+  // o link. Sem aba permitida nenhuma (allTabs vazio pro cargo), cai no Perfil.
+  const isOnAllowedTab =
+    allowedTabs.length === 0 ||
+    ALWAYS_ALLOWED_PATHS.includes(pathname) ||
+    tabs.some((tab) => pathMatchesTab(pathname, tab.href));
+
+  useEffect(() => {
+    if (loading || !user || isOnAllowedTab) return;
+    router.replace(tabs[0]?.href ?? "/dashboard/perfil");
+  }, [loading, user, isOnAllowedTab, tabs, router]);
 
   function updateScrollState() {
     const el = navRef.current;
@@ -195,7 +224,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     router.push(`/dashboard/busca?${params.toString()}`);
   }
 
-  if (loading || !user) {
+  if (loading || !user || !isOnAllowedTab) {
     return <div className={styles.empty}>Carregando painel...</div>;
   }
 

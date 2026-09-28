@@ -109,21 +109,21 @@ export function UserFormDialog({ user, roles, trigger, onSaved }: UserFormDialog
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="user-role">Perfil</Label>
-              <Select value={form.role} onValueChange={(v) => set("role", v as User["role"])}>
-                <SelectTrigger id="user-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CUSTOMER">Cliente</SelectItem>
-                  <SelectItem value="MECHANIC">Mecânico</SelectItem>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
               <Label htmlFor="user-roleId">Cargo</Label>
-              <Select value={form.roleId || "NONE"} onValueChange={(v) => set("roleId", v === "NONE" ? "" : v)}>
+              <Select
+                value={form.roleId || "NONE"}
+                onValueChange={(v) => {
+                  if (v === "NONE") {
+                    set("roleId", "");
+                    return;
+                  }
+                  // O cargo já define o perfil — evita escolher os dois separadamente e
+                  // acabar com uma combinação sem sentido (ex.: Perfil Cliente + Cargo
+                  // "Motorista").
+                  const cargo = roles.find((r) => r.id === v);
+                  setForm((f) => ({ ...f, roleId: v, role: cargo?.baseRole ?? f.role }));
+                }}
+              >
                 <SelectTrigger id="user-roleId">
                   <SelectValue placeholder="Sem cargo" />
                 </SelectTrigger>
@@ -136,6 +136,23 @@ export function UserFormDialog({ user, roles, trigger, onSaved }: UserFormDialog
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="user-role">Perfil</Label>
+              {form.roleId ? (
+                <Input id="user-role" disabled value={form.role === "ADMIN" ? "Admin" : "Mecânico"} title="Definido pelo cargo escolhido" />
+              ) : (
+                <Select value={form.role} onValueChange={(v) => set("role", v as User["role"])}>
+                  <SelectTrigger id="user-role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CUSTOMER">Cliente</SelectItem>
+                    <SelectItem value="MECHANIC">Mecânico</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             {form.role === "MECHANIC" && (
               <div className="grid gap-1.5">

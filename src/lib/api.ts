@@ -320,11 +320,14 @@ export const api = {
 
   roles: (token: string) => request<{ roles: unknown[] }>("/api/roles", {}, token),
 
-  createRole: (payload: { name: string; description?: string }, token: string) =>
+  createRole: (payload: { name: string; description?: string; baseRole: "MECHANIC" | "ADMIN" }, token: string) =>
     request<{ role: unknown }>("/api/roles", { method: "POST", body: JSON.stringify(payload) }, token),
 
-  updateRole: (id: string, payload: { name?: string; description?: string; allowedTabs?: string[] }, token: string) =>
-    request<{ role: unknown }>(`/api/roles/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+  updateRole: (
+    id: string,
+    payload: { name?: string; description?: string; baseRole?: "MECHANIC" | "ADMIN"; allowedTabs?: string[] },
+    token: string
+  ) => request<{ role: unknown }>(`/api/roles/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
 
   deleteRole: (id: string, token: string) => request<void>(`/api/roles/${id}`, { method: "DELETE" }, token),
 
