@@ -137,11 +137,12 @@ export function UserFormDialog({ user, roles, trigger, onSaved }: UserFormDialog
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="user-role">Perfil</Label>
-              {form.roleId ? (
-                <Input id="user-role" disabled value={form.role === "ADMIN" ? "Admin" : "Mecânico"} title="Definido pelo cargo escolhido" />
-              ) : (
+            {/* Sem cargo, pede o perfil manualmente. Com cargo, o próprio nome do cargo
+                (ex.: "Motorista") já identifica a pessoa — mostrar de novo o perfil-base
+                ("Mecânico") do lado só confundia. */}
+            {!form.roleId && (
+              <div className="grid gap-1.5">
+                <Label htmlFor="user-role">Perfil</Label>
                 <Select value={form.role} onValueChange={(v) => set("role", v as User["role"])}>
                   <SelectTrigger id="user-role">
                     <SelectValue />
@@ -152,8 +153,8 @@ export function UserFormDialog({ user, roles, trigger, onSaved }: UserFormDialog
                     <SelectItem value="ADMIN">Admin</SelectItem>
                   </SelectContent>
                 </Select>
-              )}
-            </div>
+              </div>
+            )}
             {form.role === "MECHANIC" && (
               <div className="grid gap-1.5">
                 <Label htmlFor="user-commission">Comissão (%)</Label>

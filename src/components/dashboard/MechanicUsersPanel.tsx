@@ -133,18 +133,20 @@ export default function MechanicUsersPanel() {
               ))}
             </select>
           </label>
-          <label className={styles.fullField}>
-            Perfil
-            {userForm.roleId ? (
-              <input value={ROLE_LABELS[userForm.role]} disabled title="Definido pelo cargo escolhido acima" />
-            ) : (
+          {/* Sem cargo escolhido, o cadastro é de um cliente/admin sem cargo — aí sim
+              pede pra escolher o perfil manualmente. Com cargo, o próprio nome do cargo
+              (ex.: "Motorista") já identifica a pessoa; não faz sentido mostrar de novo
+              "Mecânico" do lado, isso que confundia os clientes. */}
+          {!userForm.roleId && (
+            <label className={styles.fullField}>
+              Perfil
               <select value={userForm.role} onChange={(e) => setUserForm((prev) => ({ ...prev, role: e.target.value as User["role"] }))}>
                 <option value="CUSTOMER">Cliente</option>
                 <option value="MECHANIC">Mecânico</option>
                 <option value="ADMIN">Admin</option>
               </select>
-            )}
-          </label>
+            </label>
+          )}
           {userForm.role === "MECHANIC" && (
             <label>
               Comissão (%)
@@ -173,8 +175,7 @@ export default function MechanicUsersPanel() {
             <tr>
               <th>Nome</th>
               <th>Contato</th>
-              <th>Perfil</th>
-              <th>Cargo</th>
+              <th>Perfil / Cargo</th>
               <th>Comissão</th>
               <th>Ações</th>
             </tr>
@@ -189,8 +190,9 @@ export default function MechanicUsersPanel() {
                   <span>{user.email}</span>
                   {user.phone && <span> · {user.phone}</span>}
                 </td>
-                <td>{ROLE_LABELS[user.role]}</td>
-                <td>{roles.find((r) => r.id === user.roleId)?.name ?? "Sem cargo"}</td>
+                {/* Com cargo, mostra só o nome do cargo (ex.: "Motorista") — repetir o
+                    perfil-base ("Mecânico") do lado é o que confundia os clientes. */}
+                <td>{roles.find((r) => r.id === user.roleId)?.name ?? ROLE_LABELS[user.role]}</td>
                 <td>
                   {user.role === "MECHANIC" ? (
                     <div className={styles.commissionField}>
@@ -217,7 +219,7 @@ export default function MechanicUsersPanel() {
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={6} className={styles.usersTableEmpty}>
+                <td colSpan={5} className={styles.usersTableEmpty}>
                   Nenhum usuário cadastrado.
                 </td>
               </tr>
