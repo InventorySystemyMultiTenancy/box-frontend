@@ -5,6 +5,7 @@ import { Percent, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import { User, Role } from "@/lib/types";
+import { UserFormDialog } from "@/components/dashboard/users/UserFormDialog";
 import styles from "./dashboard.module.css";
 
 export default function MechanicUsersPanel() {
@@ -57,24 +58,11 @@ export default function MechanicUsersPanel() {
     }
   }
 
-  async function updateUser(user: User, role: User["role"]) {
-    if (!token) return;
-    const { user: updated } = await api.updateUser(user.id, { role }, token);
-    setUsers((prev) => prev.map((item) => (item.id === user.id ? (updated as User) : item)));
+  function handleUserSaved(updated: User) {
+    setUsers((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
   }
 
-  async function updateUserCargo(user: User, roleId: string) {
-    if (!token) return;
-    const { user: updated } = await api.updateUser(user.id, { roleId: roleId || null }, token);
-    setUsers((prev) => prev.map((item) => (item.id === user.id ? (updated as User) : item)));
-  }
-
-  async function updateUserCommission(user: User, commissionPercent: string) {
-    if (!token) return;
-    const commissionRate = commissionPercent ? Number(commissionPercent) / 100 : null;
-    const { user: updated } = await api.updateUser(user.id, { commissionRate }, token);
-    setUsers((prev) => prev.map((item) => (item.id === user.id ? (updated as User) : item)));
-  }
+  const ROLE_LABELS: Record<User["role"], string> = { CUSTOMER: "Cliente", MECHANIC: "Mecânico", ADMIN: "Admin" };
 
   return (
     <div className={styles.content}>
@@ -174,6 +162,7 @@ export default function MechanicUsersPanel() {
               <th>Perfil</th>
               <th>Cargo</th>
               <th>Comissão</th>
+              <th>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -186,47 +175,35 @@ export default function MechanicUsersPanel() {
                   <span>{user.email}</span>
                   {user.phone && <span> · {user.phone}</span>}
                 </td>
-                <td>
-                  <select value={user.role} onChange={(e) => updateUser(user, e.target.value as User["role"])}>
-                    <option value="CUSTOMER">Cliente</option>
-                    <option value="MECHANIC">Mecânico</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                </td>
-                <td>
-                  <select value={user.roleId ?? ""} onChange={(e) => updateUserCargo(user, e.target.value)}>
-                    <option value="">Sem cargo</option>
-                    {roles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
+                <td>{ROLE_LABELS[user.role]}</td>
+                <td>{roles.find((r) => r.id === user.roleId)?.name ?? "Sem cargo"}</td>
                 <td>
                   {user.role === "MECHANIC" ? (
                     <div className={styles.commissionField}>
                       <Percent size={13} className={styles.commissionIcon} />
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        defaultValue={user.commissionRate != null ? user.commissionRate * 100 : ""}
-                        onBlur={(e) => updateUserCommission(user, e.target.value)}
-                        placeholder="0.0"
-                        title="Percentual de comissão"
-                      />
+                      <span>{user.commissionRate != null ? `${(user.commissionRate * 100).toFixed(1)}%` : "—"}</span>
                     </div>
                   ) : (
                     <span>—</span>
                   )}
                 </td>
+                <td>
+                  <UserFormDialog
+                    user={user}
+                    roles={roles}
+                    onSaved={handleUserSaved}
+                    trigger={
+                      <button type="button" className={styles.linkButton}>
+                        Editar
+                      </button>
+                    }
+                  />
+                </td>
               </tr>
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={5} className={styles.usersTableEmpty}>
+                <td colSpan={6} className={styles.usersTableEmpty}>
                   Nenhum usuário cadastrado.
                 </td>
               </tr>
