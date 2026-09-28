@@ -3,14 +3,16 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhotoCaptureField } from "@/components/ui/photo-capture-field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
+import { compressImage } from "@/lib/image-compress";
+import { FUEL_LEVEL_OPTIONS } from "@/lib/truck-constants";
 import type { Appointment, RecognizedTruckPanel, Truck } from "@/lib/types";
 
 export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () => void }) {
@@ -41,11 +43,16 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
   // Foto do painel é obrigatória — assim que escolhida, já manda pra IA ler o
   // hodômetro (e o marcador de combustível, se der) e pré-preenche os campos.
   async function handlePhoto(file: File | null) {
-    setPhoto(file);
-    if (!file || !token) return;
+    if (!file) {
+      setPhoto(null);
+      return;
+    }
+    const compressed = await compressImage(file);
+    setPhoto(compressed);
+    if (!token) return;
     setReading(true);
     try {
-      const { recognized } = await api.recognizeTruckPanel(file, token);
+      const { recognized } = await api.recognizeTruckPanel(compressed, token);
       const data = recognized as RecognizedTruckPanel;
       if (data.km != null) setStartKm(String(data.km));
       if (data.fuelLevel) setStartFuelLevel(data.fuelLevel);
@@ -63,8 +70,17 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token || !startKm || !startFuelLevel.trim() || !photo) {
-      toast.error("A foto do painel do caminhão é obrigatória.");
+    if (!token) return;
+    if (!photo) {
+      toast.error("Tire a foto do painel antes de continuar.");
+      return;
+    }
+    if (!startKm) {
+      toast.error("Informe a km atual.");
+      return;
+    }
+    if (!startFuelLevel) {
+      toast.error("Selecione o nível de combustível.");
       return;
     }
     setSaving(true);
@@ -88,7 +104,7 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">Iniciar pilotagem</Button>
+        <Button size="lg" className="w-full sm:w-auto">Iniciar pilotagem</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -96,22 +112,39 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="col-span-2 grid gap-1.5">
-              <Label htmlFor="start-photo" className="flex items-center gap-1.5">
-                <Sparkles className="size-3.5 text-muted-foreground" />
-                Foto do painel do caminhão *
-              </Label>
-              <Input id="start-photo" type="file" accept="image/*" capture="environment" required onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)} />
-              {reading && <span className="text-xs text-muted-foreground">Lendo painel com IA...</span>}
-              {photo && !reading && <span className="text-xs text-muted-foreground">{photo.name}</span>}
-            </div>
+            <PhotoCaptureField
+              id="start-photo"
+              label="Foto do painel do caminhão *"
+              file={photo}
+              onChange={handlePhoto}
+              busy={reading}
+              busyLabel="Lendo painel com IA..."
+            />
             <div className="grid gap-1.5">
               <Label htmlFor="start-km">Km atual *</Label>
-              <Input id="start-km" type="number" min="0" required value={startKm} onChange={(e) => setStartKm(e.target.value)} />
+              <Input
+                id="start-km"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                value={startKm}
+                onChange={(e) => setStartKm(e.target.value)}
+              />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="start-fuel">Combustível *</Label>
-              <Input id="start-fuel" placeholder="Ex.: 3/4" required value={startFuelLevel} onChange={(e) => setStartFuelLevel(e.target.value)} />
+              <Select value={startFuelLevel} onValueChange={setStartFuelLevel}>
+                <SelectTrigger id="start-fuel">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {FUEL_LEVEL_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="col-span-2 grid gap-1.5">
               <Label htmlFor="start-condition">Estado do caminhão</Label>
@@ -135,7 +168,7 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
             )}
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={saving || reading}>
+            <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={saving || reading}>
               {saving ? "Iniciando..." : "Iniciar"}
             </Button>
           </DialogFooter>

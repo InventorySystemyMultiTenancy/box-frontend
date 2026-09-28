@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Fuel, Sparkles } from "lucide-react";
+import { Fuel } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhotoCaptureField } from "@/components/ui/photo-capture-field";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
+import { compressImage } from "@/lib/image-compress";
 import type { RecognizedFuelPump, Truck } from "@/lib/types";
 
 export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () => void }) {
@@ -35,11 +37,16 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
   // Foto da bomba é obrigatória — assim que escolhida, a IA já tenta ler valor
   // pago, litros e preço por litro do visor.
   async function handlePhoto(file: File | null) {
-    setPhoto(file);
-    if (!file || !token) return;
+    if (!file) {
+      setPhoto(null);
+      return;
+    }
+    const compressed = await compressImage(file);
+    setPhoto(compressed);
+    if (!token) return;
     setReading(true);
     try {
-      const { recognized } = await api.recognizeFuelPump(file, token);
+      const { recognized } = await api.recognizeFuelPump(compressed, token);
       const data = recognized as RecognizedFuelPump;
       if (data.amountPaid != null) setAmountPaid(String(data.amountPaid));
       if (data.liters != null) setLiters(String(data.liters));
@@ -58,8 +65,21 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token || !currentKm || !liters || !amountPaid || !photo) {
-      toast.error("A foto da bomba é obrigatória.");
+    if (!token) return;
+    if (!photo) {
+      toast.error("Tire a foto da bomba antes de continuar.");
+      return;
+    }
+    if (!currentKm) {
+      toast.error("Informe a km atual.");
+      return;
+    }
+    if (!liters) {
+      toast.error("Informe os litros abastecidos.");
+      return;
+    }
+    if (!amountPaid) {
+      toast.error("Informe o valor pago.");
       return;
     }
     setSaving(true);
@@ -90,7 +110,7 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
+        <Button size="lg" variant="outline" className="w-full sm:w-auto">
           <Fuel className="size-4" />
           Abastecer
         </Button>
@@ -101,37 +121,29 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="col-span-2 grid gap-1.5">
-              <Label htmlFor="refuel-photo" className="flex items-center gap-1.5">
-                <Sparkles className="size-3.5 text-muted-foreground" />
-                Foto da bomba de combustível *
-              </Label>
-              <Input
-                id="refuel-photo"
-                type="file"
-                accept="image/*"
-                capture="environment"
-                required
-                onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
-              />
-              {reading && <span className="text-xs text-muted-foreground">Lendo bomba com IA...</span>}
-              {photo && !reading && <span className="text-xs text-muted-foreground">{photo.name}</span>}
-            </div>
+            <PhotoCaptureField
+              id="refuel-photo"
+              label="Foto da bomba de combustível *"
+              file={photo}
+              onChange={handlePhoto}
+              busy={reading}
+              busyLabel="Lendo bomba com IA..."
+            />
             <div className="grid gap-1.5">
               <Label htmlFor="refuel-km">Km atual *</Label>
-              <Input id="refuel-km" type="number" min="0" required value={currentKm} onChange={(e) => setCurrentKm(e.target.value)} />
+              <Input id="refuel-km" type="number" inputMode="numeric" min="0" value={currentKm} onChange={(e) => setCurrentKm(e.target.value)} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="refuel-liters">Litros *</Label>
-              <Input id="refuel-liters" type="number" min="0" step="0.01" required value={liters} onChange={(e) => setLiters(e.target.value)} />
+              <Input id="refuel-liters" type="number" inputMode="decimal" min="0" step="0.01" value={liters} onChange={(e) => setLiters(e.target.value)} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="refuel-amount">Valor pago (R$) *</Label>
-              <Input id="refuel-amount" type="number" min="0" step="0.01" required value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
+              <Input id="refuel-amount" type="number" inputMode="decimal" min="0" step="0.01" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="refuel-price">Preço por litro (R$)</Label>
-              <Input id="refuel-price" type="number" min="0" step="0.01" value={pricePerLiter} onChange={(e) => setPricePerLiter(e.target.value)} />
+              <Input id="refuel-price" type="number" inputMode="decimal" min="0" step="0.01" value={pricePerLiter} onChange={(e) => setPricePerLiter(e.target.value)} />
             </div>
             <div className="col-span-2 grid gap-1.5">
               <Label htmlFor="refuel-notes">Observações</Label>
@@ -139,7 +151,7 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={saving || reading}>
+            <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={saving || reading}>
               {saving ? "Salvando..." : "Salvar abastecimento"}
             </Button>
           </DialogFooter>

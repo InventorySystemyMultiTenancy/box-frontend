@@ -201,18 +201,18 @@ export default function CaminhoesPage() {
                       {truck.notes && <span>{truck.notes}</span>}
                     </div>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                       {canOperate && !openTrip && <StartTripDialog truck={truck} onSaved={refetch} />}
                       {canOperate && openTrip && <RefuelingDialog truck={truck} onSaved={refetch} />}
                       {canOperate && openTrip && <FinishTripDialog truck={truck} trip={openTrip} onSaved={refetch} />}
                       {isAdmin && (
-                        <>
+                        <div className="flex flex-wrap items-center gap-2">
                           <TruckFormDialog truck={truck} onSaved={refetch} trigger={<Button size="sm" variant="ghost">Editar</Button>} />
                           <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleArchive(truck)}>
                             <Trash2 className="size-4" />
                             Excluir
                           </Button>
-                        </>
+                        </div>
                       )}
                     </div>
                   </CardContent>

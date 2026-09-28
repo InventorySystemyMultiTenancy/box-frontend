@@ -2,13 +2,16 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhotoCaptureField } from "@/components/ui/photo-capture-field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
+import { compressImage } from "@/lib/image-compress";
+import { FUEL_LEVEL_OPTIONS } from "@/lib/truck-constants";
 import type { RecognizedTruckPanel, Truck, TruckTrip } from "@/lib/types";
 
 export function FinishTripDialog({ truck, trip, onSaved }: { truck: Truck; trip: TruckTrip; onSaved: () => void }) {
@@ -25,11 +28,16 @@ export function FinishTripDialog({ truck, trip, onSaved }: { truck: Truck; trip:
   // A mesma foto de devolução (do painel do caminhão) já é lida pela IA pra
   // sugerir a km final — o motorista confere/ajusta antes de confirmar.
   async function handlePhoto(file: File | null) {
-    setPhoto(file);
-    if (!file || !token) return;
+    if (!file) {
+      setPhoto(null);
+      return;
+    }
+    const compressed = await compressImage(file);
+    setPhoto(compressed);
+    if (!token) return;
     setReading(true);
     try {
-      const { recognized } = await api.recognizeTruckPanel(file, token);
+      const { recognized } = await api.recognizeTruckPanel(compressed, token);
       const data = recognized as RecognizedTruckPanel;
       if (data.km != null) setEndKm(String(data.km));
       if (data.fuelLevel) setEndFuelLevel(data.fuelLevel);
@@ -47,8 +55,17 @@ export function FinishTripDialog({ truck, trip, onSaved }: { truck: Truck; trip:
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token || !endKm || !endFuelLevel.trim() || !photo) {
-      toast.error("A foto de devolução é obrigatória.");
+    if (!token) return;
+    if (!photo) {
+      toast.error("Tire a foto de devolução antes de continuar.");
+      return;
+    }
+    if (!endKm) {
+      toast.error("Informe a km na devolução.");
+      return;
+    }
+    if (!endFuelLevel) {
+      toast.error("Selecione o nível de combustível na devolução.");
       return;
     }
     setSaving(true);
@@ -72,7 +89,7 @@ export function FinishTripDialog({ truck, trip, onSaved }: { truck: Truck; trip:
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">Finalizar pilotagem</Button>
+        <Button size="lg" variant="outline" className="w-full sm:w-auto">Finalizar pilotagem</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -80,22 +97,39 @@ export function FinishTripDialog({ truck, trip, onSaved }: { truck: Truck; trip:
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="col-span-2 grid gap-1.5">
-              <Label htmlFor="end-photo" className="flex items-center gap-1.5">
-                <Sparkles className="size-3.5 text-muted-foreground" />
-                Foto da devolução (painel + veículos entregues) *
-              </Label>
-              <Input id="end-photo" type="file" accept="image/*" capture="environment" required onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)} />
-              {reading && <span className="text-xs text-muted-foreground">Lendo painel com IA...</span>}
-              {photo && !reading && <span className="text-xs text-muted-foreground">{photo.name}</span>}
-            </div>
+            <PhotoCaptureField
+              id="end-photo"
+              label="Foto da devolução (painel + veículos entregues) *"
+              file={photo}
+              onChange={handlePhoto}
+              busy={reading}
+              busyLabel="Lendo painel com IA..."
+            />
             <div className="grid gap-1.5">
               <Label htmlFor="end-km">Km na devolução *</Label>
-              <Input id="end-km" type="number" min={trip.startKm} required value={endKm} onChange={(e) => setEndKm(e.target.value)} />
+              <Input
+                id="end-km"
+                type="number"
+                inputMode="numeric"
+                min={trip.startKm}
+                value={endKm}
+                onChange={(e) => setEndKm(e.target.value)}
+              />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="end-fuel">Combustível na devolução *</Label>
-              <Input id="end-fuel" placeholder="Ex.: 1/2" required value={endFuelLevel} onChange={(e) => setEndFuelLevel(e.target.value)} />
+              <Select value={endFuelLevel} onValueChange={setEndFuelLevel}>
+                <SelectTrigger id="end-fuel">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {FUEL_LEVEL_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="col-span-2 grid gap-1.5">
               <Label htmlFor="end-condition">Estado do caminhão</Label>
@@ -107,7 +141,7 @@ export function FinishTripDialog({ truck, trip, onSaved }: { truck: Truck; trip:
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={saving || reading}>
+            <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={saving || reading}>
               {saving ? "Devolvendo..." : "Confirmar devolução"}
             </Button>
           </DialogFooter>
