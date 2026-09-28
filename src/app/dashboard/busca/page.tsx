@@ -59,20 +59,25 @@ export default function BuscaGlobalPage() {
       data.insuranceCompanies.length
     : 0;
 
-  // Só pergunta à IA depois que a busca "de verdade" (banco de dados) já rodou e
-  // confirmou 0 resultados, e só depois que a pessoa parou de digitar — evita
-  // chamar a IA a cada tecla enquanto o termo ainda está sendo escrito.
+  // "Como cadastrar cliente?", "como avançar etapa" etc. são perguntas de uso, não
+  // busca de registro — nesse caso vale perguntar à IA mesmo se a busca por texto
+  // (coincidência) tiver achado algo, já que a pessoa não está procurando um registro.
+  const isHowToQuestion = /^(como|onde|qual|quais|quando|quem|o que|pra que|para que|por que|porque)\b/i.test(q.trim()) || q.trim().endsWith("?");
+
+  // Só pergunta à IA depois que a busca "de verdade" (banco de dados) já rodou — e,
+  // se não parecer uma pergunta de uso, só quando ela confirma 0 resultados — e só
+  // depois que a pessoa parou de digitar, pra não chamar a IA a cada tecla.
+  // Não reseta assistQuery pra null quando a condição deixa de valer: as leituras
+  // abaixo (assist, assistLoading, assistFailed) só renderizam quando assistQuery
+  // ainda bate com o texto atual, então um valor "velho" aqui nunca aparece na tela.
   const [assistQuery, setAssistQuery] = useState<string | null>(null);
   useEffect(() => {
-    if (isFetching || q.trim().length < 2 || totalResults > 0) {
-      setAssistQuery(null);
-      return;
-    }
+    if (isFetching || q.trim().length < 2 || (totalResults > 0 && !isHowToQuestion)) return;
     const timer = setTimeout(() => setAssistQuery(q.trim()), 700);
     return () => clearTimeout(timer);
-  }, [q, isFetching, totalResults]);
+  }, [q, isFetching, totalResults, isHowToQuestion]);
 
-  const { data: assist, isFetching: assistLoading } = useQuery({
+  const { data: assist, isFetching: assistLoading, isError: assistFailed } = useQuery({
     queryKey: ["search-assist", assistQuery],
     queryFn: () => api.searchAssist(assistQuery!, token!),
     enabled: !!token && !!assistQuery,
@@ -85,12 +90,19 @@ export default function BuscaGlobalPage() {
         <h1 className="text-2xl font-bold text-foreground">Busca global</h1>
         <p className="text-sm text-muted-foreground">
           Busca em tudo: OS, orçamento, clientes, usuários, veículos, peças, fornecedores, caminhões e seguradoras.
+          Ou pergunte como fazer algo, ex.: &quot;como cadastrar cliente&quot;, &quot;como avançar etapa&quot;.
         </p>
       </div>
 
       <form onSubmit={(e) => e.preventDefault()} className="relative mb-6 max-w-md">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Buscar..." className="pl-8" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
+        <Input
+          placeholder='Buscar ou perguntar "como fazer..."'
+          className="pl-8"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          autoFocus
+        />
       </form>
 
       {q.trim().length < 2 && <p className="text-sm text-muted-foreground">Digite ao menos 2 caracteres.</p>}
@@ -264,9 +276,11 @@ export default function BuscaGlobalPage() {
             </section>
           )}
 
-          {q.trim().length >= 2 && totalResults === 0 && !isFetching && (
+          {q.trim().length >= 2 && !isFetching && (totalResults === 0 || isHowToQuestion) && (
             <div>
-              <p className="mb-3 text-sm text-muted-foreground">Nenhum resultado encontrado para &quot;{q.trim()}&quot;.</p>
+              {totalResults === 0 && (
+                <p className="mb-3 text-sm text-muted-foreground">Nenhum resultado encontrado para &quot;{q.trim()}&quot;.</p>
+              )}
 
               {assistLoading && (
                 <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/10 p-4 shadow-sm">
@@ -317,6 +331,12 @@ export default function BuscaGlobalPage() {
                     ))}
                   </div>
                 </div>
+              )}
+
+              {assistFailed && assistQuery === q.trim() && (
+                <p className="text-sm text-destructive">
+                  Não consegui gerar uma sugestão agora. Tente de novo em instantes.
+                </p>
               )}
             </div>
           )}

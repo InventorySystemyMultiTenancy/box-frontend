@@ -263,7 +263,8 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Buscar..."
+                placeholder='Buscar ou perguntar "como fazer..."'
+                title="Busque um registro ou pergunte, por exemplo: como cadastrar cliente, como avançar etapa, como emitir nota fiscal"
                 className={styles.headerSearchInput}
               />
             </form>
