@@ -187,7 +187,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   function submitHeaderSearch(e: React.FormEvent) {
     e.preventDefault();
     const q = searchQuery.trim();
-    router.push(q ? `/dashboard/busca?q=${encodeURIComponent(q)}` : "/dashboard/busca");
+    // Manda a aba atual junto (?from=) pra perguntas tipo "o que é essa aba?" funcionarem
+    // sem a pessoa precisar colar a URL — ver uso em busca/page.tsx.
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    params.set("from", pathname);
+    router.push(`/dashboard/busca?${params.toString()}`);
   }
 
   if (loading || !user) {

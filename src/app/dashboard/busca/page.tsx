@@ -29,6 +29,9 @@ export default function BuscaGlobalPage() {
   const searchParams = useSearchParams();
   // Preenche com o termo vindo da busca do header (?q=...), se houver.
   const [q, setQ] = useState(() => searchParams.get("q") ?? "");
+  // Aba em que a pessoa estava ao buscar (?from=) — dá contexto pra IA responder
+  // "o que é essa aba?" sem precisar que ela cole a URL manualmente.
+  const fromPath = searchParams.get("from");
 
   const { data, isFetching, isError } = useQuery({
     queryKey: ["global-search", q],
@@ -78,8 +81,8 @@ export default function BuscaGlobalPage() {
   }, [q, isFetching, totalResults, isHowToQuestion]);
 
   const { data: assist, isFetching: assistLoading, isError: assistFailed } = useQuery({
-    queryKey: ["search-assist", assistQuery],
-    queryFn: () => api.searchAssist(assistQuery!, token!),
+    queryKey: ["search-assist", assistQuery, fromPath],
+    queryFn: () => api.searchAssist(assistQuery!, token!, fromPath ?? undefined),
     enabled: !!token && !!assistQuery,
     retry: false,
   });

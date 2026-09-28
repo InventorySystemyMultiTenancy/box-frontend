@@ -717,13 +717,13 @@ export const api = {
       insuranceCompanies: unknown[];
     }>(`/api/search${toQuery({ q })}`, {}, token),
 
-  searchAssist: (q: string, token: string) =>
+  searchAssist: (q: string, token: string, currentPath?: string) =>
     request<{
       message: string;
       steps: string[] | null;
       suggestedQuery: string | null;
       actions: { path: string; label: string }[];
-    }>("/api/search/assist", { method: "POST", body: JSON.stringify({ q }) }, token),
+    }>("/api/search/assist", { method: "POST", body: JSON.stringify({ q, currentPath }) }, token),
 
   // Caminhões
   trucks: (token: string) => request<{ trucks: unknown[] }>("/api/trucks", {}, token),
