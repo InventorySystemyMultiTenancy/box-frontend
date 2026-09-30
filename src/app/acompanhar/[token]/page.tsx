@@ -96,7 +96,7 @@ export default function ShareLinkPage() {
 
       {/* Hero escuro (mesmo tom do header/sidebar) com o essencial em texto claro —
           o card branco abaixo é só pra progresso/etapa, que já tem cor própria. */}
-      <div className="px-4 pb-8 pt-5 sm:pt-8">
+      <div className="px-4 pb-12 pt-5 sm:pt-8">
         <div className="mx-auto w-full max-w-lg">
           <h1 className="text-xl font-bold leading-tight sm:text-2xl" style={{ color: "var(--shell-text)" }}>
             {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
@@ -113,7 +113,7 @@ export default function ShareLinkPage() {
         </div>
       </div>
 
-      <main className="mx-auto grid w-full max-w-lg gap-4 px-4 pb-10 sm:pb-14" style={{ marginTop: "-1.75rem" }}>
+      <main className="mx-auto grid w-full max-w-lg gap-4 px-4 pb-10 sm:pb-14" style={{ marginTop: "-1rem" }}>
         <div className={styles.progressCard} style={{ marginBottom: 0 }}>
           <StatusStrip current={order.status} />
 
