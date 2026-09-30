@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { api, ApiError, API_URL } from "@/lib/api";
 import type { Approval, ProblemPartUsage, PublicServiceOrder } from "@/lib/types";
+import { getSocket, joinOrderRoomByShareToken } from "@/lib/socket";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
@@ -34,29 +35,59 @@ function toDisplayApprovals(approvals: PublicServiceOrder["approvals"]): Approva
   }));
 }
 
+// Eventos já emitidos pelo backend (emitToOrder) pra sala order:<id> sempre que algo
+// muda — etapa avançada, peça concluída, preço lançado, foto nova. O link público
+// entra na mesma sala (ver join-order-public no socket), então só precisa escutar e
+// recarregar; nunca confia no conteúdo do evento em si, que vem no formato "cheio" (com
+// dados internos que esse link nunca deve mostrar).
+const LIVE_EVENTS = ["status:update", "timeline:new", "part:update", "approval:new", "approval:update", "service-order:archived", "media:new"];
+
 export default function ShareLinkPage() {
   const params = useParams<{ token: string }>();
   const [order, setOrder] = useState<PublicServiceOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  // Uma falha de rede passageira ao recarregar (evento em tempo real chegando) nunca
+  // deve derrubar uma tela que já está mostrando dados válidos — só a carga inicial
+  // pode virar tela de erro.
+  const hasLoadedRef = useRef(false);
+
+  const loadOrder = useCallback(
+    () =>
+      api
+        .publicShareOrder(params.token)
+        .then(({ order }) => {
+          hasLoadedRef.current = true;
+          setOrder(order as PublicServiceOrder);
+          setError(null);
+        })
+        .catch((err) => {
+          if (!hasLoadedRef.current) setError(err instanceof ApiError ? err.message : "Não foi possível abrir este link.");
+        }),
+    [params.token]
+  );
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .publicShareOrder(params.token)
-      .then(({ order }) => {
-        if (!cancelled) setOrder(order as PublicServiceOrder);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : "Não foi possível abrir este link.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    loadOrder().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     return () => {
       cancelled = true;
     };
-  }, [params.token]);
+  }, [loadOrder]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    joinOrderRoomByShareToken(params.token);
+
+    const refresh = () => loadOrder();
+    LIVE_EVENTS.forEach((event) => socket.on(event, refresh));
+
+    return () => {
+      LIVE_EVENTS.forEach((event) => socket.off(event, refresh));
+    };
+  }, [params.token, loadOrder]);
 
   if (loading) {
     return (

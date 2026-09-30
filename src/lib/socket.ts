@@ -17,6 +17,14 @@ export function joinOrderRoom(orderId: string, token: string) {
   s.emit("join-order", { orderId, token });
 }
 
+/** Mesma sala de eventos da ordem, só que pelo token do link público de
+ * acompanhamento (sem login) — usado em /acompanhar/[token]. */
+export function joinOrderRoomByShareToken(shareToken: string) {
+  const s = getSocket();
+  if (!s.connected) s.connect();
+  s.emit("join-order-public", { shareToken });
+}
+
 /** Sala pessoal do usuário — recebe atualizações da solicitação de orçamento
  * antes de existir uma ordem de serviço. */
 export function joinUserRoom(token: string) {
