@@ -34,8 +34,18 @@ export function openPrintableReport(title: string, bodyHtml: string) {
     </html>
   `);
   popup.document.close();
-  popup.focus();
-  popup.print();
+  // Espera a logo carregar antes de imprimir — chamar print() logo em seguida (sem
+  // esperar) tira a imagem do PDF na maioria das vezes, já que ela ainda não terminou
+  // de carregar. Timeout como rede de segurança caso o load nunca dispare.
+  let printed = false;
+  const doPrint = () => {
+    if (printed) return;
+    printed = true;
+    popup.focus();
+    popup.print();
+  };
+  popup.onload = doPrint;
+  setTimeout(doPrint, 1200);
 }
 
 export function escapeHtml(value: string) {
