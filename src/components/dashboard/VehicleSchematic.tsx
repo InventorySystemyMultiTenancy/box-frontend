@@ -375,21 +375,38 @@ export default function VehicleSchematic({
           )}
           {activeApproval && (
             <div className={styles.problemApproval}>
-              <div className={styles.problemApprovalHead}>
-                <strong>{activeApproval.title}</strong>
-                <span
-                  className={`${styles.badge} ${
-                    activeApproval.status === "APPROVED"
-                      ? styles["tone-ok"]
-                      : activeApproval.status === "REJECTED"
-                        ? styles["tone-crit"]
-                        : styles["tone-warn"]
-                  }`}
-                >
-                  <i className={styles.dot} />
-                  {activeApproval.status === "APPROVED" ? "Aprovado" : activeApproval.status === "REJECTED" ? "Reprovado" : "Pendente"}
-                </span>
-              </div>
+              {/* Problema já resolvido (peça DONE) mas a aprovação nunca chegou a ter uma
+                  resposta do cliente (ficou PENDING) — mecânico/admin podem concluir o
+                  reparo sem esperar aprovação (ver "Marcar problema concluído" abaixo).
+                  Mostrar "Pendente" aqui, embaixo de "Concluído", parecia contraditório —
+                  o rótulo reflete o que de fato aconteceu (resolvido, sem resposta do
+                  cliente) em vez do status bruto da aprovação. */}
+              {(() => {
+                const resolvedWithoutResponse = active.status === "DONE" && activeApproval.status === "PENDING";
+                const tone = resolvedWithoutResponse
+                  ? "tone-ok"
+                  : activeApproval.status === "APPROVED"
+                    ? "tone-ok"
+                    : activeApproval.status === "REJECTED"
+                      ? "tone-crit"
+                      : "tone-warn";
+                const label = resolvedWithoutResponse
+                  ? "Resolvido"
+                  : activeApproval.status === "APPROVED"
+                    ? "Aprovado"
+                    : activeApproval.status === "REJECTED"
+                      ? "Reprovado"
+                      : "Pendente";
+                return (
+                  <div className={styles.problemApprovalHead}>
+                    <strong>{activeApproval.title}</strong>
+                    <span className={`${styles.badge} ${styles[tone]}`}>
+                      <i className={styles.dot} />
+                      {label}
+                    </span>
+                  </div>
+                );
+              })()}
               <p>{activeApproval.description}</p>
               {activeApproval.partUsages && activeApproval.partUsages.length > 0 && (
                 <div className={styles.partUsageList}>
@@ -409,7 +426,7 @@ export default function VehicleSchematic({
                 </div>
               )}
               {activeApproval.responseNote && <p className={styles.responseNote}>{activeApproval.responseNote}</p>}
-              {canRespond && activeApproval.status === "PENDING" && activeApproval.estimatedValue != null && (
+              {canRespond && activeApproval.status === "PENDING" && activeApproval.estimatedValue != null && active.status !== "DONE" && (
                 <>
                   <textarea
                     className={styles.rejectReason}
