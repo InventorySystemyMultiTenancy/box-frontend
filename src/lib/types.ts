@@ -164,6 +164,61 @@ export interface Approval {
   partUsages?: ProblemPartUsage[];
 }
 
+// Retrato read-only devolvido por /api/public/share/:token (link de acompanhamento sem
+// login) — deliberadamente mais enxuto que ServiceOrder, sem nada operacional interno.
+export interface PublicServiceOrder {
+  code: string;
+  status: ServiceOrderStatus;
+  progress: number;
+  receivedAt: string;
+  completedAt?: string | null;
+  deliveryDescription?: string | null;
+  deliveryExtraValue?: number | null;
+  linkExpiresAt: string;
+  vehicle: {
+    brand: string;
+    model: string;
+    year: number;
+    plate?: string | null;
+    mileage: number;
+    ownerName?: string | null;
+  };
+  timelineEvents: {
+    id: string;
+    title: string;
+    description?: string | null;
+    occurredAt: string;
+    done: boolean;
+    media: Media[];
+  }[];
+  parts: {
+    id: string;
+    key: string;
+    name: string;
+    status: PartStatus;
+    note?: string | null;
+    warranty?: string | null;
+    updatedAt: string;
+    media: Media[];
+  }[];
+  approvals: {
+    id: string;
+    partId?: string | null;
+    title: string;
+    description: string;
+    status: "PENDING" | "APPROVED" | "REJECTED";
+    laborValue?: number | null;
+    partsValue?: number | null;
+    estimatedValue?: number | null;
+    note?: string | null;
+    responseNote?: string | null;
+    createdAt: string;
+    partUsages: { id: string; quantity: number; partName: string }[];
+    media: Media[];
+  }[];
+  media: Media[];
+}
+
 export interface ServiceOrder {
   id: string;
   code: string;

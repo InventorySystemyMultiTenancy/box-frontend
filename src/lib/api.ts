@@ -99,6 +99,21 @@ export const api = {
 
   serviceOrder: (id: string, token: string) => request<{ order: unknown }>(`/api/service-orders/${id}`, {}, token),
 
+  // Link público de acompanhamento (botão "Compartilhar" dentro do projeto) — deixa o
+  // cliente ver o andamento sem login, por até 30 dias.
+  getShareLink: (orderId: string, token: string) =>
+    request<{ link: { token: string; expiresAt: string } | null }>(`/api/service-orders/${orderId}/share-link`, {}, token),
+
+  createShareLink: (orderId: string, token: string) =>
+    request<{ link: { token: string; expiresAt: string } }>(`/api/service-orders/${orderId}/share-link`, { method: "POST" }, token),
+
+  revokeShareLink: (orderId: string, token: string) =>
+    request<void>(`/api/service-orders/${orderId}/share-link`, { method: "DELETE" }, token),
+
+  // Sem token de autenticação — a própria página pública em /acompanhar/[token] chama
+  // isso antes de qualquer login existir.
+  publicShareOrder: (shareToken: string) => request<{ order: unknown }>(`/api/public/share/${shareToken}`),
+
   respondApproval: (orderId: string, approvalId: string, status: "APPROVED" | "REJECTED", token: string, responseNote?: string) =>
     request(`/api/service-orders/${orderId}/approvals/${approvalId}`, {
       method: "PATCH",

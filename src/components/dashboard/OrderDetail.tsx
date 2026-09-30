@@ -9,6 +9,7 @@ import { buildWhatsAppLink } from "@/lib/whatsapp";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
+import { ShareLinkDialog } from "@/components/dashboard/ShareLinkDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -698,9 +699,12 @@ export default function OrderDetail({
             {order.code} · KM {order.vehicle.mileage.toLocaleString("pt-BR")}
           </div>
         </div>
-        <span className={styles.live}>
-          <i /> ATUALIZANDO AO VIVO
-        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          {isStaff && <ShareLinkDialog orderId={order.id} />}
+          <span className={styles.live}>
+            <i /> ATUALIZANDO AO VIVO
+          </span>
+        </div>
       </div>
 
       {isAdmin && (
