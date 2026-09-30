@@ -68,7 +68,7 @@ export default function LoginPage() {
         <div className={styles.brand}>
           <Image src="/reblindlogo.jpeg" alt="Reblind" width={124} height={124} className={styles.brandLogo} priority />
         </div>
-        <h1 className={styles.title}>{mode === "login" ? "Área do cliente" : "Criar conta de cliente"}</h1>
+        <h1 className={styles.title}>{mode === "login" ? "Fazer login" : "Criar conta de cliente"}</h1>
         <p className={styles.lede}>
           {mode === "login"
             ? "Acompanhe a manutenção do seu veículo em tempo real."
