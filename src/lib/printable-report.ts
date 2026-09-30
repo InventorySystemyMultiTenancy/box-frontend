@@ -14,6 +14,8 @@ export function openPrintableReport(title: string, bodyHtml: string) {
         <title>${title}</title>
         <style>
           body { font-family: Arial, sans-serif; color: #111; margin: 32px; }
+          .brand { margin-bottom: 18px; }
+          .brand img { height: 40px; }
           h1 { margin: 0 0 6px; font-size: 24px; }
           h2 { margin-top: 26px; font-size: 16px; }
           .muted { color: #555; font-size: 13px; }
@@ -26,6 +28,7 @@ export function openPrintableReport(title: string, bodyHtml: string) {
         </style>
       </head>
       <body>
+        <div class="brand"><img src="${window.location.origin}/reblind-logo-transparent.png" alt="Reblind" /></div>
         ${bodyHtml}
       </body>
     </html>

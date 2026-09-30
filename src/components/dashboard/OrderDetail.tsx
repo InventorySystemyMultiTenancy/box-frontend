@@ -257,11 +257,22 @@ export default function OrderDetail({
     }
   }
 
-  // Cadastra uma peça nova direto do formulário de problema, pra não obrigar o
-  // mecânico/admin a ir até a aba Peças e voltar — usada só quando a peça desejada
-  // ainda não existe no estoque.
+  // Só a chamada de API + atualização da lista local — compartilhada entre o formulário
+  // de "novo problema" abaixo e o schematic do veículo (VehicleSchematic.onCreatePart),
+  // que também deixa cadastrar peça nova direto de "adicionar peça"/"detalhes", sem
+  // precisar ir até a aba Peças e voltar.
+  async function createInventoryPartRequest(data: { name: string; unitCost: string; stockQty: string }): Promise<InventoryPart> {
+    if (!token) throw new Error("Não autenticado.");
+    const result = await api.saveInventoryPart(
+      { name: data.name.trim(), unitCost: data.unitCost || "0", stockQty: data.stockQty || "0" },
+      token
+    );
+    const part = result.part as InventoryPart;
+    setInventoryParts((prev) => [...prev, part]);
+    return part;
+  }
+
   async function createInventoryPart() {
-    if (!token) return;
     if (!newPartForm.name.trim()) {
       setNewPartError("Informe o nome da peça.");
       return;
@@ -269,16 +280,7 @@ export default function OrderDetail({
     setNewPartBusy(true);
     setNewPartError(null);
     try {
-      const result = await api.saveInventoryPart(
-        {
-          name: newPartForm.name.trim(),
-          unitCost: newPartForm.unitCost || "0",
-          stockQty: newPartForm.stockQty || "0",
-        },
-        token
-      );
-      const part = result.part as InventoryPart;
-      setInventoryParts((prev) => [...prev, part]);
+      const part = await createInventoryPartRequest(newPartForm);
       setProblemForm((prev) => ({ ...prev, inventoryPartId: part.id }));
       setNewPartForm({ name: "", unitCost: "", stockQty: "1" });
       setNewPartOpen(false);
@@ -535,6 +537,8 @@ export default function OrderDetail({
           <title>Relatório ${escapeHtml(order.code)}</title>
           <style>
             body { font-family: Arial, sans-serif; color: #111; margin: 32px; }
+            .brand { margin-bottom: 18px; }
+            .brand img { height: 40px; }
             h1 { margin: 0 0 6px; font-size: 24px; }
             h2 { margin-top: 26px; font-size: 16px; }
             .muted { color: #555; font-size: 13px; }
@@ -548,6 +552,7 @@ export default function OrderDetail({
           </style>
         </head>
         <body>
+          <div class="brand"><img src="${window.location.origin}/reblind-logo-transparent.png" alt="Reblind" /></div>
           <h1>Relatório do projeto</h1>
           <div class="muted">Gerado em ${printedAt} · Etapa atual: ${escapeHtml(STATUS_LABELS[order.status])}</div>
           <div class="summary">
@@ -838,6 +843,7 @@ export default function OrderDetail({
               inventoryParts={inventoryParts}
               onPriceProblem={priceProblem}
               onUpdateProblem={updateProblemDetails}
+              onCreatePart={isAdmin ? createInventoryPartRequest : undefined}
               onGeneratePdf={isAdmin ? generateServicePdf : undefined}
             />
             {isAdmin && isStaff && canFinalize && canOfferPickup && finalizing && (

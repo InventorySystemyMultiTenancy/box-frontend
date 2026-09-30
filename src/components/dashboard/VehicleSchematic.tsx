@@ -34,6 +34,80 @@ function normalize(text: string) {
     .toLowerCase();
 }
 
+// Mesmo padrão de "peça não está na lista? cadastrar nova" já usado no formulário de
+// novo problema (OrderDetail) — aqui reaproveitado pros dois formulários de peça deste
+// componente (precificar e detalhes), cada um com sua própria instância/estado.
+function NewPartInlineForm({
+  onCreatePart,
+  onCreated,
+}: {
+  onCreatePart: (data: { name: string; unitCost: string; stockQty: string }) => Promise<InventoryPart>;
+  onCreated: (part: InventoryPart) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [unitCost, setUnitCost] = useState("");
+  const [stockQty, setStockQty] = useState("1");
+
+  async function save() {
+    if (!name.trim()) {
+      setError("Informe o nome da peça.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const part = await onCreatePart({ name, unitCost, stockQty });
+      onCreated(part);
+      setName("");
+      setUnitCost("");
+      setStockQty("1");
+      setOpen(false);
+    } catch {
+      setError("Não foi possível cadastrar a peça.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className={styles.fullField}>
+      <button
+        type="button"
+        className={styles.linkButton}
+        onClick={() => {
+          setError(null);
+          setOpen((prev) => !prev);
+        }}
+      >
+        {open ? "Cancelar peça nova" : "+ Peça não está na lista? Cadastrar nova"}
+      </button>
+      {open && (
+        <div className={styles.inlineSubform}>
+          <label>
+            Nome da peça
+            <input value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label>
+            Custo unitário (R$)
+            <input type="number" min="0" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
+          </label>
+          <label>
+            Estoque inicial
+            <input type="number" min="0" value={stockQty} onChange={(e) => setStockQty(e.target.value)} />
+          </label>
+          {error && <div className={styles.formMessage}>{error}</div>}
+          <button type="button" className={styles.actionButton} disabled={busy} onClick={save}>
+            {busy ? "Salvando..." : "Salvar peça"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function positionForPart(part: VehiclePart) {
   const base = HOTSPOT_POSITIONS[part.key] ?? HOTSPOT_POSITIONS.carroceria;
   const text = normalize(`${part.name} ${part.note ?? ""}`);
@@ -72,6 +146,7 @@ export default function VehicleSchematic({
   inventoryParts = [],
   onPriceProblem,
   onUpdateProblem,
+  onCreatePart,
   onGeneratePdf,
 }: {
   parts: VehiclePart[];
@@ -85,6 +160,9 @@ export default function VehicleSchematic({
   onResolvePart?: (partId: string) => Promise<void>;
   canEditPrice?: boolean;
   inventoryParts?: InventoryPart[];
+  // Cadastra peça nova direto do schematic (botões "Adicionar peça"/"Detalhes") — sem
+  // isso, os botões "+ cadastrar nova" simplesmente não aparecem (ver uso abaixo).
+  onCreatePart?: (data: { name: string; unitCost: string; stockQty: string }) => Promise<InventoryPart>;
   onPriceProblem?: (
     approvalId: string,
     data: { laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
@@ -403,6 +481,12 @@ export default function VehicleSchematic({
                       <button type="button" className={styles.actionButton} onClick={() => addUsageRow(setPriceUsages)}>
                         Adicionar peça
                       </button>
+                      {onCreatePart && (
+                        <NewPartInlineForm
+                          onCreatePart={onCreatePart}
+                          onCreated={(part) => setPriceUsages((prev) => [...prev, { inventoryPartId: part.id, quantity: "1" }])}
+                        />
+                      )}
                       <button className={styles.actionButton} type="submit" disabled={pricingBusy}>
                         {pricingBusy ? "Salvando..." : "Salvar preço"}
                       </button>
@@ -456,6 +540,12 @@ export default function VehicleSchematic({
                       <button type="button" className={styles.actionButton} onClick={() => addUsageRow(setDetailUsages)}>
                         Adicionar peça
                       </button>
+                      {onCreatePart && (
+                        <NewPartInlineForm
+                          onCreatePart={onCreatePart}
+                          onCreated={(part) => setDetailUsages((prev) => [...prev, { inventoryPartId: part.id, quantity: "1" }])}
+                        />
+                      )}
                       <label className={styles.fullField}>
                         Fotos
                         <input
