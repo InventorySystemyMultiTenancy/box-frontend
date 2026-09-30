@@ -90,9 +90,15 @@
   overflow-y: auto;
   font-family: var(--font-display);
 }
-.navMobileMenu a {
+/* Os itens de navegação do menu mobile são <button>, não <a> (ver HeroSection.tsx) —
+   sem essa regra eles caem no botão nativo do navegador/SO, que em modo escuro do
+   sistema respeita "prefers-color-scheme" pro fundo (fica escuro) mas herda a cor do
+   texto daqui (clara), tornando ilegível: fundo e texto praticamente iguais. */
+.navMobileMenu a,
+.navMobileMenu button {
   font-size: 1.1rem;
   font-weight: 600;
+  font-family: inherit;
   color: rgba(255, 255, 255, 0.94);
   padding: 1rem 0.3rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -103,6 +109,7 @@
   text-align: left;
   cursor: pointer;
   width: 100%;
+  appearance: none;
 }
 .navMobileMenu .navCta {
   margin-top: 1.2rem;
@@ -146,35 +153,6 @@
 .heroContent {
   position: relative;
   padding-bottom: 1px;
-}
-.heroLive {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: #6fe0eb;
-  background: rgba(11, 13, 16, 0.45);
-  border: 1px solid rgba(53, 195, 209, 0.5);
-  padding: 0.3rem 0.7rem;
-  border-radius: 99px;
-  margin-bottom: 1.2rem;
-}
-.heroLive i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #35c3d1;
-  display: block;
-  animation: pulse 1.8s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .heroLive i { animation: none; }
 }
 .heroTitle {
   font-size: clamp(2.2rem, 5.2vw, 4rem);

@@ -88,9 +88,6 @@ export default function HeroSection({ children }: { children?: ReactNode }) {
       <HeroScrollVideo
         overlay={
           <section className={styles.heroOverlay}>
-            <span className={styles.heroLive}>
-              <i /> 3 VEÍCULOS EM MANUTENÇÃO AGORA
-            </span>
             <h1 className={styles.heroTitle}>Seu carro, acompanhado em tempo real.</h1>
             <p className={styles.heroLede}>
               Da chegada à retirada, cada etapa da manutenção vira um evento que você vê acontecer —
