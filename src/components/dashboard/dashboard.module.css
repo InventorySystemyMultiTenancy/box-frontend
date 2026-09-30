@@ -181,6 +181,24 @@
 .headerSearchBtn:hover {
   color: var(--shell-text);
 }
+.headerMicBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--shell-text-muted);
+  cursor: pointer;
+}
+.headerMicBtn:hover {
+  color: var(--shell-text);
+}
+.headerMicBtn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
 .headerSearchInput {
   width: 170px;
   border: 0;
@@ -311,6 +329,7 @@
   /* Busca encolhe pra só o ícone — toca e abre a página de busca pra digitar lá. */
   .headerSearch { width: 38px; padding: 0; justify-content: center; }
   .headerSearchInput { display: none; }
+  .headerMicBtn { display: none; }
 }
 
 .mobileNavOverlay {

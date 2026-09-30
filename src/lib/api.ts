@@ -720,13 +720,26 @@ export const api = {
       insuranceCompanies: unknown[];
     }>(`/api/search${toQuery({ q })}`, {}, token),
 
-  searchAssist: (q: string, token: string, currentPath?: string) =>
+  searchAssist: (
+    q: string,
+    token: string,
+    currentPath?: string,
+    history?: { role: "user" | "assistant"; content: string }[]
+  ) =>
     request<{
       message: string;
       steps: string[] | null;
       suggestedQuery: string | null;
       actions: { path: string; label: string }[];
-    }>("/api/search/assist", { method: "POST", body: JSON.stringify({ q, currentPath }) }, token),
+    }>("/api/search/assist", { method: "POST", body: JSON.stringify({ q, currentPath, history }) }, token),
+
+  // Botão de microfone da busca/chat de ajuda — grava um áudio curto no navegador e
+  // transcreve aqui antes de mandar como uma pergunta normal.
+  transcribeAudio: (audio: Blob, token: string) => {
+    const form = new FormData();
+    form.append("audio", audio, "gravacao.webm");
+    return request<{ text: string }>("/api/search/transcribe", { method: "POST", body: form }, token);
+  },
 
   // Caminhões
   trucks: (token: string) => request<{ trucks: unknown[] }>("/api/trucks", {}, token),

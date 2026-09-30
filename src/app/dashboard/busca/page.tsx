@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Sparkles } from "lucide-react";
+import { Search, Sparkles, Send } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { VoiceInputButton } from "@/components/ui/voice-input-button";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import {
@@ -23,6 +24,70 @@ import {
 } from "@/lib/types";
 
 const ROLE_LABELS: Record<string, string> = { CUSTOMER: "Cliente", MECHANIC: "Mecânico", ADMIN: "Admin" };
+
+interface AssistAction {
+  path: string;
+  label: string;
+}
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+  steps?: string[] | null;
+  actions?: AssistAction[];
+  suggestedQuery?: string | null;
+  failed?: boolean;
+}
+
+function AssistBubble({ msg, onSuggestedQuery }: { msg: ChatMessage; onSuggestedQuery: (q: string) => void }) {
+  if (msg.role === "user") {
+    return (
+      <div className="ml-auto max-w-[85%] rounded-lg rounded-br-sm bg-primary px-3.5 py-2.5 text-sm text-primary-foreground">
+        {msg.text}
+      </div>
+    );
+  }
+
+  if (msg.failed) {
+    return <p className="text-sm text-destructive">{msg.text}</p>;
+  }
+
+  return (
+    <div className="max-w-[92%] rounded-lg rounded-bl-sm border border-primary/30 bg-primary/5 p-4">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
+        <Sparkles className="size-3.5" /> {msg.steps ? "Tutorial da IA" : "Resposta da IA"}
+      </div>
+      <p className="mb-3 text-sm text-foreground">{msg.text}</p>
+      {msg.steps && (
+        <ol className="mb-3 list-decimal space-y-1.5 pl-5 text-sm text-foreground">
+          {msg.steps.map((step, i) => (
+            <li key={i}>{step}</li>
+          ))}
+        </ol>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {msg.suggestedQuery && (
+          <button
+            type="button"
+            onClick={() => onSuggestedQuery(msg.suggestedQuery!)}
+            className="rounded-md border border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+          >
+            Buscar por &quot;{msg.suggestedQuery}&quot;
+          </button>
+        )}
+        {msg.actions?.map((action) => (
+          <Link
+            key={action.path}
+            href={action.path}
+            className="rounded-md border border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+          >
+            Ir para {action.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function BuscaGlobalPage() {
   const { token } = useAuth();
@@ -67,25 +132,68 @@ export default function BuscaGlobalPage() {
   // (coincidência) tiver achado algo, já que a pessoa não está procurando um registro.
   const isHowToQuestion = /^(como|onde|qual|quais|quando|quem|o que|pra que|para que|por que|porque)\b/i.test(q.trim()) || q.trim().endsWith("?");
 
-  // Só pergunta à IA depois que a busca "de verdade" (banco de dados) já rodou — e,
-  // se não parecer uma pergunta de uso, só quando ela confirma 0 resultados — e só
-  // depois que a pessoa parou de digitar, pra não chamar a IA a cada tecla.
-  // Não reseta assistQuery pra null quando a condição deixa de valer: as leituras
-  // abaixo (assist, assistLoading, assistFailed) só renderizam quando assistQuery
-  // ainda bate com o texto atual, então um valor "velho" aqui nunca aparece na tela.
+  // Primeiro turno: mesmo mecanismo de antes (debounce + useQuery), só disparado
+  // enquanto a conversa ainda não começou — depois disso quem conduz é o chat abaixo.
   const [assistQuery, setAssistQuery] = useState<string | null>(null);
-  useEffect(() => {
-    if (isFetching || q.trim().length < 2 || (totalResults > 0 && !isHowToQuestion)) return;
-    const timer = setTimeout(() => setAssistQuery(q.trim()), 700);
-    return () => clearTimeout(timer);
-  }, [q, isFetching, totalResults, isHowToQuestion]);
 
-  const { data: assist, isFetching: assistLoading, isError: assistFailed } = useQuery({
+  const {
+    data: firstAssist,
+    isFetching: firstAssistLoading,
+    isError: firstAssistFailed,
+  } = useQuery({
     queryKey: ["search-assist", assistQuery, fromPath],
     queryFn: () => api.searchAssist(assistQuery!, token!, fromPath ?? undefined),
     enabled: !!token && !!assistQuery,
     retry: false,
   });
+
+  // Derivado (não guardado em state): true assim que a 1ª resposta da IA chega pra essa
+  // mesma pergunta — a partir daí o efeito abaixo para de repetir sozinho e quem passa a
+  // conduzir é o chat (envio manual pelo formulário de resposta).
+  const chatStarted = !!firstAssist && assistQuery === q.trim();
+
+  useEffect(() => {
+    if (chatStarted || isFetching || q.trim().length < 2 || (totalResults > 0 && !isHowToQuestion)) return;
+    const timer = setTimeout(() => setAssistQuery(q.trim()), 700);
+    return () => clearTimeout(timer);
+  }, [q, isFetching, totalResults, isHowToQuestion, chatStarted]);
+
+  // Chat continua a partir do 2º turno — mensagens trocadas depois da 1ª resposta da IA.
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [replyText, setReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+
+  async function sendReply(text: string) {
+    const trimmed = text.trim();
+    if (!trimmed || !token || sendingReply || !assistQuery || !firstAssist) return;
+    setReplyText("");
+    setChatMessages((prev) => [...prev, { role: "user", text: trimmed }]);
+    setSendingReply(true);
+    try {
+      const history = [
+        { role: "user" as const, content: assistQuery },
+        { role: "assistant" as const, content: firstAssist.message },
+        // Não repassa mensagens de erro genéricas como se a IA tivesse dito aquilo —
+        // confundiria os próximos turnos.
+        ...chatMessages.filter((m) => !m.failed).map((m) => ({ role: m.role, content: m.text })),
+      ];
+      const result = await api.searchAssist(trimmed, token, fromPath ?? undefined, history);
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: result.message, steps: result.steps, actions: result.actions, suggestedQuery: result.suggestedQuery },
+      ]);
+    } catch {
+      setChatMessages((prev) => [...prev, { role: "assistant", text: "Não consegui responder agora. Tente de novo em instantes.", failed: true }]);
+    } finally {
+      setSendingReply(false);
+    }
+  }
+
+  function handleSuggestedQuery(suggested: string) {
+    setChatMessages([]);
+    setAssistQuery(null);
+    setQ(suggested);
+  }
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -101,10 +209,21 @@ export default function BuscaGlobalPage() {
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder='Buscar ou perguntar "como fazer..."'
-          className="pl-8"
+          className="pr-9 pl-8"
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setChatMessages([]);
+            setQ(e.target.value);
+          }}
           autoFocus
+        />
+        <VoiceInputButton
+          onTranscribed={(text) => {
+            setChatMessages([]);
+            setQ(text);
+          }}
+          title="Perguntar por voz"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
         />
       </form>
 
@@ -280,13 +399,13 @@ export default function BuscaGlobalPage() {
           )}
 
           {q.trim().length >= 2 && !isFetching && (totalResults === 0 || isHowToQuestion) && (
-            <div>
+            <div className="grid gap-3">
               {totalResults === 0 && (
-                <p className="mb-3 text-sm text-muted-foreground">Nenhum resultado encontrado para &quot;{q.trim()}&quot;.</p>
+                <p className="text-sm text-muted-foreground">Nenhum resultado encontrado para &quot;{q.trim()}&quot;.</p>
               )}
 
-              {assistLoading && (
-                <div className="mb-3 flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/10 p-4 shadow-sm">
+              {firstAssistLoading && (
+                <div className="flex items-center gap-3 rounded-lg border border-primary/40 bg-primary/10 p-4 shadow-sm">
                   <span className="relative flex size-10 shrink-0 items-center justify-center">
                     <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/50" />
                     <span className="relative flex size-9 items-center justify-center rounded-full bg-primary">
@@ -300,43 +419,60 @@ export default function BuscaGlobalPage() {
                 </div>
               )}
 
-              {assist && assistQuery === q.trim() && (
-                <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-                  <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-primary">
-                    <Sparkles className="size-3.5" /> {assist.steps ? "Tutorial rápido da IA" : "Sugestão da IA"}
-                  </div>
-                  <p className="mb-3 text-sm text-foreground">{assist.message}</p>
-                  {assist.steps && (
-                    <ol className="mb-3 list-decimal space-y-1.5 pl-5 text-sm text-foreground">
-                      {assist.steps.map((step, i) => (
-                        <li key={i}>{step}</li>
-                      ))}
-                    </ol>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    {assist.suggestedQuery && (
+              {firstAssist && assistQuery === q.trim() && (
+                <>
+                  <AssistBubble
+                    msg={{
+                      role: "assistant",
+                      text: firstAssist.message,
+                      steps: firstAssist.steps,
+                      actions: firstAssist.actions,
+                      suggestedQuery: firstAssist.suggestedQuery,
+                    }}
+                    onSuggestedQuery={handleSuggestedQuery}
+                  />
+
+                  {chatMessages.map((msg, i) => (
+                    <AssistBubble key={i} msg={msg} onSuggestedQuery={handleSuggestedQuery} />
+                  ))}
+
+                  {sendingReply && <p className="text-xs text-muted-foreground">A IA está respondendo...</p>}
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      sendReply(replyText);
+                    }}
+                    className="relative mt-1"
+                  >
+                    <Input
+                      placeholder='Não era isso? Reformule ou responda, ex.: "me ajude com nota fiscal"'
+                      className="pr-16"
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      disabled={sendingReply}
+                    />
+                    <div className="absolute right-1.5 top-1/2 flex -translate-y-1/2 items-center gap-1">
+                      <VoiceInputButton
+                        onTranscribed={(text) => sendReply(text)}
+                        disabled={sendingReply}
+                        title="Responder por voz"
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+                      />
                       <button
-                        type="button"
-                        onClick={() => setQ(assist.suggestedQuery!)}
-                        className="rounded-md border border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
+                        type="submit"
+                        disabled={sendingReply || !replyText.trim()}
+                        aria-label="Enviar"
+                        className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
                       >
-                        Buscar por &quot;{assist.suggestedQuery}&quot;
+                        <Send className="size-4" />
                       </button>
-                    )}
-                    {assist.actions.map((action) => (
-                      <Link
-                        key={action.path}
-                        href={action.path}
-                        className="rounded-md border border-primary/40 bg-background px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/10"
-                      >
-                        Ir para {action.label}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  </form>
+                </>
               )}
 
-              {assistFailed && assistQuery === q.trim() && (
+              {firstAssistFailed && assistQuery === q.trim() && (
                 <p className="text-sm text-destructive">
                   Não consegui gerar uma sugestão agora. Tente de novo em instantes.
                 </p>

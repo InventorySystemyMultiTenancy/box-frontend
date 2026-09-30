@@ -38,6 +38,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, API_URL } from "@/lib/api";
 import { AppNotification } from "@/lib/types";
 import { Toaster } from "@/components/ui/sonner";
+import { VoiceInputButton } from "@/components/ui/voice-input-button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -213,15 +214,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     navRef.current?.scrollBy({ left: direction * 220, behavior: "smooth" });
   }
 
-  function submitHeaderSearch(e: React.FormEvent) {
-    e.preventDefault();
-    const q = searchQuery.trim();
+  function goToSearch(text: string) {
+    const q = text.trim();
     // Manda a aba atual junto (?from=) pra perguntas tipo "o que é essa aba?" funcionarem
     // sem a pessoa precisar colar a URL — ver uso em busca/page.tsx.
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     params.set("from", pathname);
     router.push(`/dashboard/busca?${params.toString()}`);
+  }
+
+  function submitHeaderSearch(e: React.FormEvent) {
+    e.preventDefault();
+    goToSearch(searchQuery);
   }
 
   if (loading || !user || !isOnAllowedTab) {
@@ -301,6 +306,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 title="Busque um registro ou pergunte, por exemplo: como cadastrar cliente, como avançar etapa, como emitir nota fiscal"
                 className={styles.headerSearchInput}
               />
+              <VoiceInputButton onTranscribed={goToSearch} title="Perguntar por voz" className={styles.headerMicBtn} />
             </form>
           )}
 
