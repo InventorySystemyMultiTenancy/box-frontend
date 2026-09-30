@@ -49,7 +49,7 @@ export default function HeroSection({ children }: { children?: ReactNode }) {
             </a>
           ))}
           <Link href="/login" className={styles.navCta}>
-            Área do cliente
+            Fazer login
           </Link>
         </div>
         <button
@@ -80,7 +80,7 @@ export default function HeroSection({ children }: { children?: ReactNode }) {
             </button>
           ))}
           <Link href="/login" className={styles.navCta} onClick={() => setMenuOpen(false)}>
-            Área do cliente
+            Fazer login
           </Link>
         </div>
       )}
