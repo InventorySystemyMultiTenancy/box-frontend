@@ -56,33 +56,41 @@ export default function ShareLinkPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-        <p className="text-sm text-muted-foreground">Carregando...</p>
-      </main>
+      <div className="flex min-h-screen items-center justify-center" style={{ background: "var(--shell-bg)" }}>
+        <p className="text-sm" style={{ color: "var(--shell-text-muted)" }}>
+          Carregando...
+        </p>
+      </div>
     );
   }
 
   if (error || !order) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
+      <div className="flex min-h-screen items-center justify-center px-4" style={{ background: "var(--shell-bg)" }}>
         <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center shadow-sm">
-          <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className="mx-auto mb-4 h-10 w-auto" priority />
+          <div className="mb-4 flex justify-center">
+            <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
+          </div>
           <p className="text-sm text-foreground">{error ?? "Link não encontrado."}</p>
         </div>
-      </main>
+      </div>
     );
   }
 
   const isReady = order.status === "READY_FOR_PICKUP";
 
   return (
-    <main className="min-h-screen bg-muted/30 px-4 py-6 sm:py-10">
-      <div className="mx-auto grid w-full max-w-lg gap-4">
-        <div className="flex items-center justify-between">
-          <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className="h-9 w-auto" priority />
-          <span className="text-right text-xs font-medium text-muted-foreground">Acompanhamento do projeto</span>
+    <div className="min-h-screen" style={{ background: "var(--shell-bg)" }}>
+      <div className={styles.topbar}>
+        <div className={styles.brand}>
+          <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
         </div>
+        <span className="ml-auto text-xs font-medium" style={{ color: "var(--shell-text-muted)" }}>
+          Acompanhamento do projeto
+        </span>
+      </div>
 
+      <main className="mx-auto grid w-full max-w-lg gap-4 px-4 py-6 sm:py-10">
         <div className="rounded-lg border bg-card p-4 shadow-sm">
           <div className="mb-1 text-sm text-muted-foreground">
             {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
@@ -138,11 +146,11 @@ export default function ShareLinkPage() {
           <Timeline events={order.timelineEvents} canViewPrices />
         </div>
 
-        <p className="pb-4 text-center text-xs text-muted-foreground">
+        <p className="pb-4 text-center text-xs" style={{ color: "var(--shell-text-muted)" }}>
           Link só de visualização — não dá pra fazer login nem alterar nada por aqui. Válido até{" "}
           {new Date(order.linkExpiresAt).toLocaleDateString("pt-BR")}.
         </p>
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }
