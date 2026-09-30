@@ -9,6 +9,10 @@ import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
 import styles from "@/components/dashboard/dashboard.module.css";
+// Tailwind + tokens shadcn (bg-card, text-muted-foreground, etc.) só são carregados
+// pelo layout do /dashboard normalmente — esta página fica fora dessa árvore de rotas
+// (link público, sem login), então precisa importar isso ela mesma.
+import "../../dashboard.css";
 
 function mediaUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
@@ -90,31 +94,39 @@ export default function ShareLinkPage() {
         </span>
       </div>
 
-      <main className="mx-auto grid w-full max-w-lg gap-4 px-4 py-6 sm:py-10">
-        <div className="rounded-lg border bg-card p-4 shadow-sm">
-          <div className="mb-1 text-sm text-muted-foreground">
+      {/* Hero escuro (mesmo tom do header/sidebar) com o essencial em texto claro —
+          o card branco abaixo é só pra progresso/etapa, que já tem cor própria. */}
+      <div className="px-4 pb-8 pt-5 sm:pt-8">
+        <div className="mx-auto w-full max-w-lg">
+          <h1 className="text-xl font-bold leading-tight sm:text-2xl" style={{ color: "var(--shell-text)" }}>
             {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
-            {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""}
-          </div>
-          <div className="mb-3 font-mono text-xs text-muted-foreground">
-            {order.code} · KM {order.vehicle.mileage.toLocaleString("pt-BR")}
-            {order.vehicle.ownerName ? ` · ${order.vehicle.ownerName}` : ""}
-          </div>
+          </h1>
+          <p className="mt-1.5 font-mono text-xs" style={{ color: "var(--shell-text-muted)" }}>
+            {order.code}
+            {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""} · KM {order.vehicle.mileage.toLocaleString("pt-BR")}
+          </p>
+          {order.vehicle.ownerName && (
+            <p className="mt-0.5 text-xs" style={{ color: "var(--shell-text-muted)" }}>
+              {order.vehicle.ownerName}
+            </p>
+          )}
+        </div>
+      </div>
 
+      <main className="mx-auto grid w-full max-w-lg gap-4 px-4 pb-10 sm:pb-14" style={{ marginTop: "-1.75rem" }}>
+        <div className={styles.progressCard} style={{ marginBottom: 0 }}>
           <StatusStrip current={order.status} />
 
-          <div className={styles.progressCard}>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${order.progress}%` }} />
-            </div>
-            <div className={styles.progressLabel}>
-              <span>Progresso geral</span>
-              <span>{order.progress}%</span>
-            </div>
+          <div className={styles.progressBar} style={{ marginTop: "1rem" }}>
+            <div className={styles.progressFill} style={{ width: `${order.progress}%` }} />
+          </div>
+          <div className={styles.progressLabel}>
+            <span>Progresso geral</span>
+            <span>{order.progress}%</span>
           </div>
 
           {isReady && (
-            <div className={styles.readyBanner} style={{ marginTop: "0.8rem" }}>
+            <div className={styles.readyBanner} style={{ marginTop: "0.8rem", marginBottom: 0 }}>
               Veículo pronto e em ótimo estado — pode retirar!
             </div>
           )}
