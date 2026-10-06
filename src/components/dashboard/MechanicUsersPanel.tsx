@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { Percent, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { User, Role } from "@/lib/types";
 import { UserFormDialog } from "@/components/dashboard/users/UserFormDialog";
 import styles from "./dashboard.module.css";
 
 export default function MechanicUsersPanel() {
-  const { token } = useAuth();
+  const { token, user: me } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [userForm, setUserForm] = useState({
@@ -59,7 +59,25 @@ export default function MechanicUsersPanel() {
   }
 
   function handleUserSaved(updated: User) {
-    setUsers((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+    setUsers((prev) => prev.map((item) => (item.id === updated.id ? { ...item, ...updated } : item)));
+  }
+
+  // Desativar não apaga: o histórico (eventos, comissões, viagens) continua com o nome da
+  // pessoa, só o acesso é cortado na hora — inclusive de quem já estava logado.
+  async function toggleActive(target: User) {
+    if (!token) return;
+    const deactivating = target.active !== false;
+    const question = deactivating
+      ? `Desativar ${target.name}? A pessoa perde o acesso ao sistema imediatamente (o histórico dela continua salvo).`
+      : `Reativar ${target.name}? A pessoa volta a conseguir entrar com a senha de antes.`;
+    if (!window.confirm(question)) return;
+    try {
+      await api.updateUser(target.id, { active: !deactivating }, token);
+      setUsers((prev) => prev.map((item) => (item.id === target.id ? { ...item, active: !deactivating } : item)));
+      setMessage(deactivating ? `${target.name} foi desativado.` : `${target.name} foi reativado.`);
+    } catch (err) {
+      setMessage(err instanceof ApiError ? err.message : "Não foi possível alterar o acesso.");
+    }
   }
 
   const ROLE_LABELS: Record<User["role"], string> = { CUSTOMER: "Cliente", MECHANIC: "Mecânico", ADMIN: "Admin" };
@@ -182,9 +200,14 @@ export default function MechanicUsersPanel() {
           </thead>
           <tbody>
             {users.map((user) => (
-              <tr key={user.id}>
+              <tr key={user.id} style={user.active === false ? { opacity: 0.55 } : undefined}>
                 <td>
                   <strong>{user.name}</strong>
+                  {user.active === false && (
+                    <span className={`${styles.badge} ${styles["tone-crit"]}`} style={{ marginLeft: "0.4rem" }}>
+                      Desativado
+                    </span>
+                  )}
                 </td>
                 <td>
                   <span>{user.email}</span>
@@ -214,6 +237,16 @@ export default function MechanicUsersPanel() {
                       </button>
                     }
                   />
+                  {user.id !== me?.id && (
+                    <button
+                      type="button"
+                      className={styles.linkButton}
+                      style={{ marginLeft: "0.6rem", color: user.active === false ? "var(--success)" : "var(--critical)" }}
+                      onClick={() => toggleActive(user)}
+                    >
+                      {user.active === false ? "Reativar" : "Desativar"}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

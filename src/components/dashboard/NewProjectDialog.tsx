@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { Client, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
@@ -39,6 +40,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
 
   const [priority, setPriority] = useState<ServiceOrderPriority>("NORMAL");
   const [damagePhotos, setDamagePhotos] = useState<File[]>([]);
+  const checkinSignatureRef = useRef<SignaturePadHandle>(null);
 
   const { data: clients } = useQuery({
     queryKey: ["clients-with-login", clientSearch],
@@ -161,6 +163,15 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
           // Projeto já foi criado — não trava o fluxo se o upload das fotos falhar,
           // staff pode reenviar depois (não há tela dedicada ainda, mas evita perder o projeto).
           toast.error("Projeto criado, mas não foi possível enviar as fotos de avaria.");
+        }
+      }
+
+      const signature = await checkinSignatureRef.current?.toBlob();
+      if (signature) {
+        try {
+          await api.uploadSignature(orderId, "CHECKIN", signature, token);
+        } catch {
+          toast.error("Projeto criado, mas não foi possível salvar a assinatura do cliente.");
         }
       }
 
@@ -364,6 +375,12 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                 ))}
               </div>
             )}
+          </section>
+
+          {/* Assinatura do cliente no laudo de entrada — confirma o estado em que o carro
+              chegou (avarias acima). Opcional: o cliente pode não estar presente. */}
+          <section className="grid gap-2">
+            <SignaturePad ref={checkinSignatureRef} label="Assinatura do cliente na entrada (opcional)" />
           </section>
         </div>
 

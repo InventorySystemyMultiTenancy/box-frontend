@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil } from "lucide-react";
+import { FileSpreadsheet, Pencil } from "lucide-react";
+import { ExportColumn, exportCsv } from "@/lib/export";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,6 +69,28 @@ export default function CashFlowPanel() {
       ].sort((a, b) => b.date.localeCompare(a.date))
     : [];
 
+  // Colunas da planilha de lançamentos — mesmo sinal (+/-) e valor efetivo do PDF abaixo.
+  const ledgerColumns: ExportColumn<LedgerRow>[] = [
+    { header: "Data", value: (row) => row.date, type: "date" },
+    { header: "Tipo", value: (row) => KIND_LABELS[row.kind] },
+    { header: "Descrição", value: (row) => row.record.description },
+    { header: "Categoria", value: (row) => row.record.category },
+    {
+      header: "Valor",
+      type: "money",
+      value: (row) => {
+        const amount =
+          row.kind === "receivable"
+            ? row.record.receivedAmount ?? row.record.amount
+            : row.kind === "payable"
+              ? row.record.paidAmount ?? row.record.amount
+              : row.record.amount;
+        const isOut = row.kind === "payable" || (row.kind === "entry" && row.record.type === "EXPENSE");
+        return isOut ? -amount : amount;
+      },
+    },
+  ];
+
   function generatePdf() {
     if (!cashFlow || !dre) return;
     const rowsHtml = rows
@@ -129,6 +152,16 @@ export default function CashFlowPanel() {
         </div>
         <Button type="button" variant="outline" onClick={generatePdf} disabled={!cashFlow || !dre}>
           Gerar PDF do período
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={rows.length === 0}
+          title="Baixar os lançamentos do período (abre no Excel)"
+          onClick={() => exportCsv(`fluxo-de-caixa-${from}-a-${to}`, ledgerColumns, rows)}
+        >
+          <FileSpreadsheet className="size-4" />
+          Excel
         </Button>
       </div>
 

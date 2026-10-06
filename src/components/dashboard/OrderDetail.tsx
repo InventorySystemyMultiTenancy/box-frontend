@@ -4,8 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError, API_URL } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
-import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, InventoryPart, PART_STATUS_LABELS, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
+import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, BankAccount, InventoryPart, PART_STATUS_LABELS, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { statusUpdateMessage } from "@/lib/whatsapp-messages";
+import { PAID_ON_THE_SPOT, PAYMENT_METHODS } from "@/lib/payment-methods";
+import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
+import { toast } from "sonner";
 import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
@@ -55,6 +59,24 @@ function mediaUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
 }
 
+function todayInputValue() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function emptyFinalizeForm() {
+  return {
+    description: "",
+    extraValue: "",
+    photo: null as File | null,
+    paymentMethod: "PIX",
+    installments: "1",
+    firstDueDate: todayInputValue(),
+    receivedNow: true,
+    bankAccountId: "",
+  };
+}
+
 function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -93,14 +115,22 @@ export default function OrderDetail({
   const [priceForm, setPriceForm] = useState({ laborValue: "", inventoryPartId: "", quantity: "1" });
   const [inventoryParts, setInventoryParts] = useState<InventoryPart[]>([]);
   const [newPartOpen, setNewPartOpen] = useState(false);
-  const [newPartForm, setNewPartForm] = useState({ name: "", unitCost: "", stockQty: "1" });
+  const [newPartForm, setNewPartForm] = useState({ name: "", unitCost: "" });
   const [newPartBusy, setNewPartBusy] = useState(false);
   const [newPartError, setNewPartError] = useState<string | null>(null);
   const [problemMessage, setProblemMessage] = useState<string | null>(null);
   const [problemBusy, setProblemBusy] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
-  const [finalizeForm, setFinalizeForm] = useState({ description: "", extraValue: "", photo: null as File | null });
+  const [finalizeForm, setFinalizeForm] = useState(emptyFinalizeForm);
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const deliverySignatureRef = useRef<SignaturePadHandle>(null);
+  // Link usado na mensagem de WhatsApp: o público de acompanhamento (sem login) quando a
+  // OS tem um ativo; senão o painel do cliente.
+  const [shareToken, setShareToken] = useState<string | null>(null);
+  // Acabou de avançar etapa/entregar — destaca o "Avisar cliente" pra não esquecer.
+  const [notifyPrompt, setNotifyPrompt] = useState(false);
   const [advancePhoto, setAdvancePhoto] = useState<File | null>(null);
   const [advanceBusy, setAdvanceBusy] = useState(false);
   const [advanceMessage, setAdvanceMessage] = useState<string | null>(null);
@@ -130,6 +160,19 @@ export default function OrderDetail({
     if (!token || !isStaff) return;
     api.inventoryParts(token).then(({ parts }) => setInventoryParts(parts as InventoryPart[]));
   }, [token, isStaff]);
+
+  useEffect(() => {
+    if (!token || !isAdmin) return;
+    api.bankAccounts(token).then(({ accounts }) => setBankAccounts(accounts as BankAccount[])).catch(() => {});
+  }, [token, isAdmin]);
+
+  useEffect(() => {
+    if (!token || !isStaff) return;
+    api
+      .getShareLink(orderId, token)
+      .then(({ link }) => setShareToken(link?.token ?? null))
+      .catch(() => {});
+  }, [token, isStaff, orderId]);
 
   // Ao escolher um carro (mecânico/admin selecionando no Kanban/lista), rola até a
   // timeline dele — só uma vez por carro escolhido, não a cada atualização em tempo real.
@@ -262,12 +305,9 @@ export default function OrderDetail({
   // de "novo problema" abaixo e o schematic do veículo (VehicleSchematic.onCreatePart),
   // que também deixa cadastrar peça nova direto de "adicionar peça"/"detalhes", sem
   // precisar ir até a aba Peças e voltar.
-  async function createInventoryPartRequest(data: { name: string; unitCost: string; stockQty: string }): Promise<InventoryPart> {
+  async function createInventoryPartRequest(data: { name: string; unitCost: string }): Promise<InventoryPart> {
     if (!token) throw new Error("Não autenticado.");
-    const result = await api.saveInventoryPart(
-      { name: data.name.trim(), unitCost: data.unitCost || "0", stockQty: data.stockQty || "0" },
-      token
-    );
+    const result = await api.saveInventoryPart({ name: data.name.trim(), unitCost: data.unitCost || "0" }, token);
     const part = result.part as InventoryPart;
     setInventoryParts((prev) => [...prev, part]);
     return part;
@@ -283,7 +323,7 @@ export default function OrderDetail({
     try {
       const part = await createInventoryPartRequest(newPartForm);
       setProblemForm((prev) => ({ ...prev, inventoryPartId: part.id }));
-      setNewPartForm({ name: "", unitCost: "", stockQty: "1" });
+      setNewPartForm({ name: "", unitCost: "" });
       setNewPartOpen(false);
     } catch {
       setNewPartError("Não foi possível cadastrar a peça.");
@@ -320,6 +360,7 @@ export default function OrderDetail({
       });
       if (event) setJustArrivedId(event.id);
       setAdvancePhoto(null);
+      setNotifyPrompt(true);
     } catch {
       setAdvanceMessage("Não foi possível avançar a etapa.");
     } finally {
@@ -347,7 +388,13 @@ export default function OrderDetail({
 
   async function resolvePart(partId: string) {
     if (!token || !order) return;
-    const result = await api.resolvePart(order.id, partId, token);
+    let result;
+    try {
+      result = await api.resolvePart(order.id, partId, token);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível marcar o problema como resolvido.");
+      return;
+    }
     const part = result.part as VehiclePart;
     const event = result.event as TimelineEvent;
     setOrder((prev) => {
@@ -384,15 +431,31 @@ export default function OrderDetail({
     e.preventDefault();
     if (!token || !order) return;
     setFinalizeBusy(true);
+    setFinalizeError(null);
     try {
+      const signature = await deliverySignatureRef.current?.toBlob();
       const result = await api.finalizeOrder(
         order.id,
-        { description: finalizeForm.description || undefined, extraValue: finalizeForm.extraValue || undefined, photo: finalizeForm.photo },
+        {
+          description: finalizeForm.description || undefined,
+          extraValue: finalizeForm.extraValue || undefined,
+          photo: finalizeForm.photo,
+          signature,
+          paymentMethod: finalizeForm.paymentMethod || undefined,
+          installments: Number(finalizeForm.installments) || 1,
+          firstDueDate: finalizeForm.firstDueDate ? new Date(`${finalizeForm.firstDueDate}T12:00:00`).toISOString() : undefined,
+          receivedNow: finalizeForm.receivedNow,
+          bankAccountId: finalizeForm.bankAccountId || undefined,
+        },
         token
       );
       setOrder(result.order as ServiceOrder);
       setFinalizing(false);
-      setFinalizeForm({ description: "", extraValue: "", photo: null });
+      setFinalizeForm(emptyFinalizeForm());
+      setNotifyPrompt(true);
+      toast.success("Entrega confirmada — a cobrança foi lançada em Financeiro > Contas a receber.");
+    } catch (err) {
+      setFinalizeError(err instanceof ApiError ? err.message : "Não foi possível confirmar a entrega.");
     } finally {
       setFinalizeBusy(false);
     }
@@ -679,13 +742,18 @@ export default function OrderDetail({
       ? ACTIVE_SERVICE_ORDER_STATUSES[activeStatusIndex + 1]
       : null;
 
-  const whatsAppLink =
-    isStaff && order.vehicle.owner
-      ? buildWhatsAppLink(
-          order.vehicle.owner.phone,
-          `Olá, ${order.vehicle.owner.name}! Seu ${order.vehicle.brand} ${order.vehicle.model} (OS ${order.code}) está na etapa: "${STATUS_LABELS[order.status]}". Acompanhe pelo sistema: ${typeof window !== "undefined" ? window.location.origin : ""}/dashboard`
-        )
-      : null;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const trackingUrl = shareToken ? `${origin}/acompanhar/${shareToken}` : `${origin}/dashboard`;
+  const whatsAppLink = isStaff && order.vehicle.owner ? buildWhatsAppLink(order.vehicle.owner.phone, statusUpdateMessage(order, trackingUrl)) : null;
+
+  // Prévia da cobrança na entrega — mesma regra do backend (orderBillingTotal): problemas
+  // com o componente concluído, exceto os reprovados, + valor extra; sem nenhum, o estimado.
+  const doneWork = order.approvals
+    .filter((a) => a.status !== "REJECTED" && order.parts.find((p) => p.id === a.partId)?.status === "DONE")
+    .reduce((sum, a) => sum + (a.estimatedValue ?? 0), 0);
+  const billingPreview = (doneWork || order.estimatedMin || 0) + (Number(finalizeForm.extraValue) || 0);
+  const installmentsCount = Math.max(1, Number(finalizeForm.installments) || 1);
+  const signatures = order.media.filter((m) => m.signatureKind);
 
   return (
     <div>
@@ -837,6 +905,22 @@ export default function OrderDetail({
                 </div>
               );
             })()}
+            {signatures.length > 0 && (
+              <div style={{ marginBottom: "0.8rem" }}>
+                <div className={styles.tlSub} style={{ marginBottom: "0.4rem" }}>
+                  Assinaturas do cliente
+                </div>
+                <div className={styles.mediaGrid}>
+                  {signatures.map((media) => (
+                    <a key={media.id} href={mediaUrl(media.url)} target="_blank" rel="noreferrer" title={media.label ?? "Assinatura"}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={mediaUrl(media.url)} alt={media.label ?? "Assinatura"} style={{ background: "#fff", objectFit: "contain" }} />
+                      <span className={styles.tlSub}>{media.signatureKind === "CHECKIN" ? "Entrada" : "Retirada"}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
             {isCustomer && isReady && (
               <div className={styles.approvalActions}>
                 <button className={styles.btnApprove} onClick={generateServicePdf}>
@@ -899,6 +983,74 @@ export default function OrderDetail({
                       onChange={(e) => setFinalizeForm((prev) => ({ ...prev, photo: e.target.files?.[0] ?? null }))}
                     />
                   </label>
+
+                  {/* Cobrança — vira conta a receber (Financeiro). A receita só entra no
+                      resumo/fluxo de caixa quando for de fato recebida. */}
+                  <div className={styles.fullField} style={{ fontWeight: 600, marginTop: "0.4rem" }}>
+                    Cobrança: {formatCurrency(billingPreview)}
+                    {installmentsCount > 1 && ` em ${installmentsCount}x de ${formatCurrency(billingPreview / installmentsCount)}`}
+                  </div>
+                  <label>
+                    Forma de pagamento
+                    <select
+                      value={finalizeForm.paymentMethod}
+                      onChange={(e) =>
+                        setFinalizeForm((prev) => ({ ...prev, paymentMethod: e.target.value, receivedNow: PAID_ON_THE_SPOT.has(e.target.value) }))
+                      }
+                    >
+                      {PAYMENT_METHODS.map((method) => (
+                        <option key={method} value={method}>
+                          {method}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Parcelas
+                    <select value={finalizeForm.installments} onChange={(e) => setFinalizeForm((prev) => ({ ...prev, installments: e.target.value }))}>
+                      {Array.from({ length: 12 }, (_, i) => String(i + 1)).map((n) => (
+                        <option key={n} value={n}>
+                          {n === "1" ? "À vista" : `${n}x`}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {installmentsCount > 1 ? "Vencimento da 1ª parcela" : "Vencimento"}
+                    <input
+                      type="date"
+                      value={finalizeForm.firstDueDate}
+                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, firstDueDate: e.target.value }))}
+                    />
+                  </label>
+                  {bankAccounts.length > 0 && (
+                    <label>
+                      Conta de destino
+                      <select value={finalizeForm.bankAccountId} onChange={(e) => setFinalizeForm((prev) => ({ ...prev, bankAccountId: e.target.value }))}>
+                        <option value="">Não informar</option>
+                        {bankAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <label className={styles.fullField} style={{ flexDirection: "row", alignItems: "center", gap: "0.5rem", display: "flex" }}>
+                    <input
+                      type="checkbox"
+                      checked={finalizeForm.receivedNow}
+                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, receivedNow: e.target.checked }))}
+                      style={{ width: "auto" }}
+                    />
+                    {installmentsCount > 1 ? "Cliente já pagou a 1ª parcela agora" : "Cliente já pagou agora, na retirada"}
+                  </label>
+
+                  <div className={styles.fullField}>
+                    <SignaturePad ref={deliverySignatureRef} label="Assinatura do cliente na retirada (opcional)" />
+                  </div>
+
+                  {finalizeError && <div className={`${styles.formMessage} ${styles.fullField}`}>{finalizeError}</div>}
                   <button className={styles.actionButton} type="submit" disabled={finalizeBusy}>
                     {finalizeBusy ? "Finalizando..." : "Confirmar entrega"}
                   </button>
@@ -923,6 +1075,11 @@ export default function OrderDetail({
                 </>
               )}
               {advanceMessage && <div className={styles.formMessage}>{advanceMessage}</div>}
+              {notifyPrompt && whatsAppLink && (
+                <div className={styles.readyBanner} style={{ marginBottom: "0.8rem" }}>
+                  Etapa atualizada para &quot;{STATUS_LABELS[order.status]}&quot;. Avise o cliente pelo WhatsApp — a mensagem já vai pronta.
+                </div>
+              )}
               <div className={styles.approvalActions}>
                 {nextStatus && (
                   <button className={styles.btnApprove} disabled={advanceBusy} onClick={() => advanceStage(nextStatus)}>
@@ -940,7 +1097,7 @@ export default function OrderDetail({
                     </button>
                   ))}
                 {whatsAppLink ? (
-                  <a className={styles.btnApprove} href={whatsAppLink} target="_blank" rel="noreferrer">
+                  <a className={styles.btnApprove} href={whatsAppLink} target="_blank" rel="noreferrer" onClick={() => setNotifyPrompt(false)}>
                     Avisar cliente (WhatsApp)
                   </a>
                 ) : (
@@ -1032,9 +1189,9 @@ export default function OrderDetail({
                         onChange={(e) => setProblemForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}
                       >
                         <option value="">Nenhuma peça</option>
-                        {inventoryParts.map((part) => (
+                        {inventoryParts.filter((part) => part.active).map((part) => (
                           <option key={part.id} value={part.id}>
-                            {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
+                            {part.name} · R$ {part.unitCost.toFixed(2)}
                           </option>
                         ))}
                       </select>
@@ -1059,22 +1216,13 @@ export default function OrderDetail({
                           />
                         </label>
                         <label>
-                          Custo unitário (R$)
+                          Preço (R$)
                           <input
                             type="number"
                             min="0"
                             step="0.01"
                             value={newPartForm.unitCost}
                             onChange={(e) => setNewPartForm((prev) => ({ ...prev, unitCost: e.target.value }))}
-                          />
-                        </label>
-                        <label>
-                          Estoque inicial
-                          <input
-                            type="number"
-                            min="0"
-                            value={newPartForm.stockQty}
-                            onChange={(e) => setNewPartForm((prev) => ({ ...prev, stockQty: e.target.value }))}
                           />
                         </label>
                         {newPartError && <div className={styles.formMessage}>{newPartError}</div>}
@@ -1136,9 +1284,9 @@ export default function OrderDetail({
                   Peça utilizada
                   <select value={priceForm.inventoryPartId} onChange={(e) => setPriceForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}>
                     <option value="">Nenhuma peça</option>
-                    {inventoryParts.map((part) => (
+                    {inventoryParts.filter((part) => part.active).map((part) => (
                       <option key={part.id} value={part.id}>
-                        {part.name} · estoque {part.stockQty} · R$ {part.unitCost.toFixed(2)}
+                        {part.name} · R$ {part.unitCost.toFixed(2)}
                       </option>
                     ))}
                   </select>

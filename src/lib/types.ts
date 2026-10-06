@@ -89,6 +89,8 @@ export interface User {
   phone?: string | null;
   commissionRate?: number | null;
   avatarUrl?: string | null;
+  // false = desativado (ex-funcionário): não consegue mais entrar.
+  active?: boolean;
 }
 
 export interface Vehicle {
@@ -109,6 +111,8 @@ export interface Media {
   label?: string | null;
   isDeliveryPhoto?: boolean;
   isDamagePhoto?: boolean;
+  // Assinatura do cliente desenhada na tela: CHECKIN (entrada) | DELIVERY (retirada).
+  signatureKind?: "CHECKIN" | "DELIVERY" | null;
   createdAt: string;
 }
 
@@ -473,10 +477,8 @@ export interface InventoryPart {
   name: string;
   sku?: string | null;
   description?: string | null;
+  // Preço da peça (cobrado nos projetos e sugerido no PDV). Não há controle de estoque.
   unitCost: number;
-  stockQty: number;
-  minStockQty: number;
-  reorderQty: number;
   preferredSupplierId?: string | null;
   photoUrl?: string | null;
   active: boolean;
@@ -752,10 +754,6 @@ export interface PurchaseOrder {
   items: PurchaseOrderItem[];
 }
 
-export interface ReplenishmentSuggestion extends InventoryPart {
-  suggestedQty: number;
-  preferredSupplier?: Supplier | null;
-}
 
 // Agenda
 export type BayType = "BAY" | "LIFT";
@@ -837,8 +835,12 @@ export interface DashboardReport {
   approvalStats: { approved: number; rejected: number; total: number; rate: number };
   quoteStats: { accepted: number; declined: number; total: number; rate: number };
   mechanicProductivity: { mechanicId: string; mechanicName: string; completedParts: number }[];
-  turnover: { cogs: number; inventoryValue: number; turnoverRatio: number };
-  lowStock: number;
+  // Peças usadas em projetos no período (substitui os antigos giro de estoque / ponto mínimo).
+  partsUsage: {
+    totalValue: number;
+    totalQuantity: number;
+    topParts: { partId: string; name: string; quantity: number; value: number }[];
+  };
 }
 
 // Histórico de veículo

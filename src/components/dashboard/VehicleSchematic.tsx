@@ -41,7 +41,7 @@ function NewPartInlineForm({
   onCreatePart,
   onCreated,
 }: {
-  onCreatePart: (data: { name: string; unitCost: string; stockQty: string }) => Promise<InventoryPart>;
+  onCreatePart: (data: { name: string; unitCost: string }) => Promise<InventoryPart>;
   onCreated: (part: InventoryPart) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -49,7 +49,6 @@ function NewPartInlineForm({
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [unitCost, setUnitCost] = useState("");
-  const [stockQty, setStockQty] = useState("1");
 
   async function save() {
     if (!name.trim()) {
@@ -59,11 +58,10 @@ function NewPartInlineForm({
     setBusy(true);
     setError(null);
     try {
-      const part = await onCreatePart({ name, unitCost, stockQty });
+      const part = await onCreatePart({ name, unitCost });
       onCreated(part);
       setName("");
       setUnitCost("");
-      setStockQty("1");
       setOpen(false);
     } catch {
       setError("Não foi possível cadastrar a peça.");
@@ -91,12 +89,8 @@ function NewPartInlineForm({
             <input value={name} onChange={(e) => setName(e.target.value)} />
           </label>
           <label>
-            Custo unitário (R$)
+            Preço (R$)
             <input type="number" min="0" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
-          </label>
-          <label>
-            Estoque inicial
-            <input type="number" min="0" value={stockQty} onChange={(e) => setStockQty(e.target.value)} />
           </label>
           {error && <div className={styles.formMessage}>{error}</div>}
           <button type="button" className={styles.actionButton} disabled={busy} onClick={save}>
@@ -162,7 +156,7 @@ export default function VehicleSchematic({
   inventoryParts?: InventoryPart[];
   // Cadastra peça nova direto do schematic (botões "Adicionar peça"/"Detalhes") — sem
   // isso, os botões "+ cadastrar nova" simplesmente não aparecem (ver uso abaixo).
-  onCreatePart?: (data: { name: string; unitCost: string; stockQty: string }) => Promise<InventoryPart>;
+  onCreatePart?: (data: { name: string; unitCost: string }) => Promise<InventoryPart>;
   onPriceProblem?: (
     approvalId: string,
     data: { laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
@@ -473,9 +467,9 @@ export default function VehicleSchematic({
                               onChange={(e) => updateUsageRow(setPriceUsages, index, "inventoryPartId", e.target.value)}
                             >
                               <option value="">Nenhuma peça</option>
-                              {inventoryParts.map((part) => (
+                              {inventoryParts.filter((part) => part.active).map((part) => (
                                 <option key={part.id} value={part.id}>
-                                  {part.name} · estoque {part.stockQty}
+                                  {part.name}
                                   {part.unitCost != null ? ` · R$ ${part.unitCost.toFixed(2)}` : ""}
                                 </option>
                               ))}
@@ -533,9 +527,9 @@ export default function VehicleSchematic({
                               onChange={(e) => updateUsageRow(setDetailUsages, index, "inventoryPartId", e.target.value)}
                             >
                               <option value="">Selecione</option>
-                              {inventoryParts.map((part) => (
+                              {inventoryParts.filter((part) => part.active).map((part) => (
                                 <option key={part.id} value={part.id}>
-                                  {part.name} · estoque {part.stockQty}
+                                  {part.name}
                                 </option>
                               ))}
                             </select>

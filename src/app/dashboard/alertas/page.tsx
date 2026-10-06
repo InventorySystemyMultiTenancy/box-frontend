@@ -3,23 +3,24 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Car, Wallet, Package, Calendar, type LucideIcon } from "lucide-react";
+import { Check, Car, Wallet, Calendar, MessageCircle, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { AppNotification } from "@/lib/types";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { revisionReminderMessage, warrantyReminderMessage } from "@/lib/whatsapp-messages";
+import type { AppNotification, ExpiringWarrantyPart, RevisionAlert } from "@/lib/types";
 
 const TYPE_LABELS: Record<string, string> = {
   STALE_STATUS: "OS parada",
   SUPPLEMENT_PENDING: "Complemento pendente",
-  LOW_STOCK: "Estoque baixo",
   INSPECTION_TODAY: "Vistoria hoje",
   DELIVERY_TOMORROW: "Entrega amanhã",
   PAYABLE_OVERDUE: "Conta vencida",
 };
 
-type AlertCategory = "VEICULOS" | "FINANCEIRO" | "ESTOQUE" | "AGENDA";
+type AlertCategory = "VEICULOS" | "FINANCEIRO" | "AGENDA" | "CLIENTES";
 
 // Cada tipo de notificação cai numa categoria — se um novo NOTIFICATION_TYPE for
 // criado no backend e não for mapeado aqui, cai em "VEICULOS" (categoria coringa)
@@ -29,7 +30,6 @@ const TYPE_CATEGORY: Record<string, AlertCategory> = {
   DELIVERY_TOMORROW: "VEICULOS",
   SUPPLEMENT_PENDING: "FINANCEIRO",
   PAYABLE_OVERDUE: "FINANCEIRO",
-  LOW_STOCK: "ESTOQUE",
   INSPECTION_TODAY: "AGENDA",
 };
 
@@ -58,13 +58,6 @@ const CATEGORY_THEME: Record<AlertCategory, CategoryTheme> = {
     iconWrap: "bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-300",
     badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   },
-  ESTOQUE: {
-    label: "Estoque",
-    icon: Package,
-    border: "border-t-orange-500",
-    iconWrap: "bg-orange-100 text-orange-600 dark:bg-orange-950 dark:text-orange-300",
-    badge: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-  },
   AGENDA: {
     label: "Agenda",
     icon: Calendar,
@@ -72,9 +65,16 @@ const CATEGORY_THEME: Record<AlertCategory, CategoryTheme> = {
     iconWrap: "bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-300",
     badge: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
   },
+  CLIENTES: {
+    label: "Lembretes p/ clientes",
+    icon: MessageCircle,
+    border: "border-t-green-600",
+    iconWrap: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+    badge: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300",
+  },
 };
 
-const CATEGORY_ORDER: AlertCategory[] = ["VEICULOS", "FINANCEIRO", "ESTOQUE", "AGENDA"];
+const CATEGORY_ORDER: AlertCategory[] = ["VEICULOS", "FINANCEIRO", "AGENDA", "CLIENTES"];
 
 function categoryOf(type: string): AlertCategory {
   return TYPE_CATEGORY[type] ?? "VEICULOS";
@@ -111,13 +111,53 @@ export default function AlertasPage() {
     }
   }
 
-  const visibleNotifications = selectedCategory ? grouped.get(selectedCategory) ?? [] : [];
+  // Lembretes proativos (revisão preventiva atrasada e garantia vencendo nos próximos 30
+  // dias) — envio manual pelo WhatsApp com a mensagem já pronta. Sem permissão para algum
+  // dos dois relatórios, a lista correspondente só fica vazia.
+  const { data: reminders } = useQuery({
+    queryKey: ["customer-reminders"],
+    queryFn: async () => {
+      const [revisions, warranties] = await Promise.all([
+        api.revisionAlerts(token!).then((r) => r.alerts as RevisionAlert[]).catch(() => [] as RevisionAlert[]),
+        api.expiringWarranties(token!, 30).then((r) => r.parts as ExpiringWarrantyPart[]).catch(() => [] as ExpiringWarrantyPart[]),
+      ]);
+      return [
+        ...warranties.map((part) => {
+          const vehicle = part.serviceOrder.vehicle;
+          const vehicleName = `${vehicle.brand} ${vehicle.model}`;
+          const expiresAt = new Date(part.warrantyExpiresAt!);
+          return {
+            id: `w-${part.id}`,
+            kind: "Garantia",
+            text: `Garantia de ${part.name} — ${vehicleName}${vehicle.plate ? ` (${vehicle.plate})` : ""}, ${vehicle.owner.name}: ${
+              expiresAt.getTime() < Date.now() ? "venceu" : "vence"
+            } em ${expiresAt.toLocaleDateString("pt-BR")}.`,
+            link: buildWhatsAppLink(vehicle.owner.phone, warrantyReminderMessage(vehicle.owner.name, vehicleName, part.name, expiresAt)),
+          };
+        }),
+        ...revisions.map((alert) => {
+          const vehicleName = `${alert.vehicle.brand} ${alert.vehicle.model}`;
+          return {
+            id: `r-${alert.vehicle.id}`,
+            kind: "Revisão",
+            text: `${vehicleName}${alert.vehicle.plate ? ` (${alert.vehicle.plate})` : ""}, ${alert.owner.name}: ${alert.monthsSinceLastService} meses sem revisão.`,
+            link: buildWhatsAppLink(alert.owner.phone, revisionReminderMessage(alert.owner.name, vehicleName, alert.monthsSinceLastService)),
+          };
+        }),
+      ];
+    },
+    enabled: !!token,
+  });
+
+  const visibleNotifications = selectedCategory && selectedCategory !== "CLIENTES" ? grouped.get(selectedCategory) ?? [] : [];
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Central de alertas</h1>
-        <p className="text-sm text-muted-foreground">OS paradas, complementos pendentes, estoque baixo, vistorias e entregas próximas.</p>
+        <p className="text-sm text-muted-foreground">
+          OS paradas, contas vencidas, vistorias, entregas próximas e lembretes para enviar aos clientes. Atualizado automaticamente de hora em hora.
+        </p>
       </div>
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
@@ -127,7 +167,7 @@ export default function AlertasPage() {
           {CATEGORY_ORDER.map((category) => {
             const theme = CATEGORY_THEME[category];
             const Icon = theme.icon;
-            const count = grouped.get(category)?.length ?? 0;
+            const count = category === "CLIENTES" ? reminders?.length ?? 0 : grouped.get(category)?.length ?? 0;
             const active = selectedCategory === category;
             return (
               <button
@@ -155,7 +195,35 @@ export default function AlertasPage() {
         </p>
       )}
 
-      {selectedCategory && (
+      {selectedCategory === "CLIENTES" && (
+        <div className="grid gap-3">
+          {(reminders ?? []).length === 0 && (
+            <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
+              Nenhum cliente com revisão atrasada ou garantia vencendo nos próximos 30 dias.
+            </p>
+          )}
+          {(reminders ?? []).map((r) => (
+            <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">{r.kind}</Badge>
+                <span className="text-sm">{r.text}</span>
+              </div>
+              {r.link ? (
+                <Button size="sm" variant="outline" asChild>
+                  <a href={r.link} target="_blank" rel="noreferrer">
+                    <MessageCircle className="size-4" />
+                    Enviar lembrete
+                  </a>
+                </Button>
+              ) : (
+                <span className="text-xs text-muted-foreground">Sem telefone cadastrado</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {selectedCategory && selectedCategory !== "CLIENTES" && (
         <div className="grid gap-3">
           {visibleNotifications.length === 0 && (
             <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">

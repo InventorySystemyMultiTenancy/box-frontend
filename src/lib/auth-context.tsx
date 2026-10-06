@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, AUTH_EXPIRED_EVENT } from "@/lib/api";
 
 interface AuthUser {
   id: string;
@@ -57,6 +57,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .finally(() => setLoading(false));
   }, [token]);
+
+  // Qualquer chamada da API que receba 401 com sessão aberta (token vencido ou conta
+  // desativada pelo admin) encerra a sessão e leva pro login, com o motivo na URL.
+  useEffect(() => {
+    function onExpired() {
+      if (!window.localStorage.getItem(STORAGE_KEY)) return;
+      window.localStorage.removeItem(STORAGE_KEY);
+      setToken(null);
+      setUser(null);
+      setPermissions(new Set());
+      setAllowedTabs([]);
+      router.replace("/login?sessao=expirada");
+    }
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
+  }, [router]);
 
   const hasPermission = useCallback(
     (resource: string, action: string) => permissions.has(`${resource}.${action}`),

@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
 import { playLoginIntro } from "@/components/LoginIntroOverlay";
 import styles from "./login.module.css";
 
-export default function LoginPage() {
+// useSearchParams exige um Suspense acima dele para a página poder ser pré-renderizada.
+export default function LoginPageWrapper() {
+  return (
+    <Suspense>
+      <LoginPage />
+    </Suspense>
+  );
+}
+
+function LoginPage() {
   const { login, registerCustomer } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -21,6 +30,9 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Chegou aqui porque a sessão caiu no meio do uso (ver AUTH_EXPIRED_EVENT em lib/api.ts).
+  const searchParams = useSearchParams();
+  const notice = searchParams.get("sessao") === "expirada" ? "Sua sessão expirou ou a conta foi desativada. Entre novamente." : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -123,11 +135,18 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {notice && !error && <div className={styles.notice}>{notice}</div>}
         {error && <div className={styles.error}>{error}</div>}
 
         <button className={styles.submit} type="submit" disabled={loading}>
           {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
         </button>
+
+        {mode === "login" && (
+          <Link href="/esqueci-senha" className={styles.forgotLink}>
+            Esqueci minha senha
+          </Link>
+        )}
       </form>
     </div>
   );

@@ -19,10 +19,17 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // Token vencido/conta desativada no meio do uso: avisa o AuthProvider, que limpa a
+    // sessão e manda pro login (em vez de cada tela só começar a dar erro).
+    if (res.status === 401 && token && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: data.error }));
+    }
     throw new ApiError(data.error || "Não foi possível completar a solicitação.", res.status);
   }
   return data as T;
 }
+
+export const AUTH_EXPIRED_EVENT = "box:auth-expired";
 
 export const api = {
   login: (email: string, password: string) =>
@@ -70,6 +77,7 @@ export const api = {
       role?: "CUSTOMER" | "MECHANIC" | "ADMIN";
       roleId?: string | null;
       commissionRate?: number | null;
+      active?: boolean;
     },
     token: string
   ) =>
@@ -78,6 +86,15 @@ export const api = {
       { method: "PATCH", body: JSON.stringify(payload) },
       token
     ),
+
+  changeMyPassword: (payload: { currentPassword: string; newPassword: string }, token: string) =>
+    request<{ ok: true }>("/api/auth/me/password", { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  forgotPassword: (email: string) =>
+    request<{ ok: true }>("/api/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+
+  resetPassword: (resetToken: string, password: string) =>
+    request<{ ok: true }>("/api/auth/reset-password", { method: "POST", body: JSON.stringify({ token: resetToken, password }) }),
 
   me: (token: string) =>
     request<{ user: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } }>("/api/auth/me", {}, token),
@@ -96,6 +113,19 @@ export const api = {
 
   serviceOrders: (token: string, params: { includeArchived?: boolean } = {}) =>
     request<{ orders: unknown[] }>(`/api/service-orders${toQuery({ includeArchived: params.includeArchived ? "true" : undefined })}`, {}, token),
+
+  // Concluídos/com baixa — paginado e com busca no servidor (aba "Concluídos" e histórico do cliente).
+  serviceOrderHistory: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ orders: unknown[]; pagination: Pagination }>(`/api/service-orders${toQuery({ scope: "history", ...params })}`, {}, token),
+
+  uploadSignature: (orderId: string, kind: "CHECKIN" | "DELIVERY", signature: Blob, token: string) => {
+    const form = new FormData();
+    form.append("kind", kind);
+    form.append("signature", signature, "assinatura.png");
+    return request<{ media: unknown }>(`/api/service-orders/${orderId}/signature`, { method: "POST", body: form }, token);
+  },
+
+  homeKpis: (token: string) => request<{ kpis: unknown }>("/api/reports/kpis", {}, token),
 
   serviceOrder: (id: string, token: string) => request<{ order: unknown }>(`/api/service-orders/${id}`, {}, token),
 
@@ -186,13 +216,30 @@ export const api = {
 
   finalizeOrder: (
     orderId: string,
-    payload: { description?: string; extraValue?: string; photo?: File | null },
+    payload: {
+      description?: string;
+      extraValue?: string;
+      photo?: File | null;
+      signature?: Blob | null;
+      // Cobrança gerada na entrega (vira conta a receber).
+      paymentMethod?: string;
+      installments?: number;
+      firstDueDate?: string;
+      receivedNow?: boolean;
+      bankAccountId?: string;
+    },
     token: string
   ) => {
     const form = new FormData();
     if (payload.description) form.append("description", payload.description);
     if (payload.extraValue) form.append("extraValue", payload.extraValue);
     if (payload.photo) form.append("photo", payload.photo);
+    if (payload.signature) form.append("signature", payload.signature, "assinatura.png");
+    if (payload.paymentMethod) form.append("paymentMethod", payload.paymentMethod);
+    if (payload.installments) form.append("installments", String(payload.installments));
+    if (payload.firstDueDate) form.append("firstDueDate", payload.firstDueDate);
+    if (payload.receivedNow !== undefined) form.append("receivedNow", payload.receivedNow ? "true" : "false");
+    if (payload.bankAccountId) form.append("bankAccountId", payload.bankAccountId);
 
     return request<{ order: unknown }>(
       `/api/service-orders/${orderId}/finalize`,
@@ -242,7 +289,6 @@ export const api = {
       sku?: string;
       description?: string;
       unitCost: string;
-      stockQty: string;
       preferredSupplierId?: string;
       active?: boolean;
       photo?: File | null;
@@ -254,7 +300,6 @@ export const api = {
     if (payload.sku) form.append("sku", payload.sku);
     if (payload.description) form.append("description", payload.description);
     form.append("unitCost", payload.unitCost);
-    form.append("stockQty", payload.stockQty);
     if (payload.preferredSupplierId) form.append("preferredSupplierId", payload.preferredSupplierId);
     if (payload.active != null) form.append("active", String(payload.active));
     if (payload.photo) form.append("photo", payload.photo);
@@ -506,12 +551,6 @@ export const api = {
 
   cancelPurchaseOrder: (id: string, token: string) =>
     request<{ order: unknown }>(`/api/purchase-orders/${id}/cancel`, { method: "POST" }, token),
-
-  replenishmentSuggestions: (token: string) =>
-    request<{ suggestions: unknown[] }>("/api/purchase-orders/replenishment-suggestions", {}, token),
-
-  createPurchaseOrdersFromSuggestions: (token: string) =>
-    request<{ created: unknown[]; skippedWithoutSupplier: unknown[] }>("/api/purchase-orders/from-suggestions", { method: "POST" }, token),
 
   // Agenda
   bays: (token: string) => request<{ bays: unknown[] }>("/api/agenda/bays", {}, token),

@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ExportButtons } from "@/components/ui/export-buttons";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -77,7 +78,23 @@ export default function InvoicesPanel() {
 
   return (
     <div className="grid gap-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <ExportButtons
+          title="Notas fiscais"
+          filename="notas-fiscais"
+          rows={data ?? []}
+          columns={[
+            { header: "Tipo", value: (i) => TYPE_LABELS[i.type] },
+            { header: "Número", value: (i) => i.number },
+            { header: "Série", value: (i) => i.series },
+            { header: "Emissão", value: (i) => i.issueDate, type: "date" },
+            { header: "Emitente", value: (i) => i.issuerName },
+            { header: "Destinatário", value: (i) => i.recipientName ?? i.client?.name },
+            { header: "Status", value: (i) => STATUS_LABELS[i.status] },
+            { header: "Pagamento", value: (i) => i.paymentMethod },
+            { header: "Valor", value: (i) => i.totalAmount, type: "money" },
+          ]}
+        />
         {canManage && <InvoiceFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova nota fiscal</Button>} />}
       </div>
 

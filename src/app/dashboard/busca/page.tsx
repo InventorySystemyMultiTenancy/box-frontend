@@ -351,7 +351,7 @@ export default function BuscaGlobalPage() {
                       <strong>{p.name}</strong>
                       {p.sku && <span className="font-mono text-xs text-muted-foreground"> · {p.sku}</span>}
                     </span>
-                    <Badge variant="outline">{p.stockQty} em estoque</Badge>
+                    {p.unitCost != null && <Badge variant="outline">R$ {Number(p.unitCost).toFixed(2)}</Badge>}
                   </Link>
                 ))}
               </div>

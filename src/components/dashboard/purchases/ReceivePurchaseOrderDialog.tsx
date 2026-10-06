@@ -43,7 +43,7 @@ export function ReceivePurchaseOrderDialog({ order, trigger, onSaved }: ReceiveP
     setSaving(true);
     try {
       await api.receivePurchaseOrder(order.id, { items: payloadItems }, token);
-      toast.success("Recebimento registrado — estoque atualizado.");
+      toast.success("Recebimento registrado.");
       setOpen(false);
       onSaved();
     } catch (err) {

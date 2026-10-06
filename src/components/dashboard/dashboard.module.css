@@ -1363,3 +1363,48 @@
   background: var(--bg-panel);
   color: var(--text);
 }
+
+/* Painel do cliente — alternar entre carros em serviço e abrir o histórico. */
+.customerToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.historyRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem 0.5rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  text-align: left;
+  font-size: 0.88rem;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.historyRow:last-child {
+  border-bottom: 0;
+}
+
+.historyRow:hover {
+  background: var(--bg);
+}
+
+.historyRow span {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .historyRow {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+}

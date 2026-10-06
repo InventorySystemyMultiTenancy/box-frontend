@@ -182,6 +182,37 @@
   border-radius: 8px;
 }
 
+.notice {
+  margin-top: 1rem;
+  font-size: 0.84rem;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+}
+
+.success {
+  margin-top: 1rem;
+  font-size: 0.84rem;
+  color: var(--success);
+  background: var(--success-soft);
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+}
+
+.forgotLink {
+  display: block;
+  margin-top: 0.9rem;
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.forgotLink:hover {
+  color: var(--accent-blue);
+}
+
 .hint {
   margin-top: 1.6rem;
   padding-top: 1.2rem;

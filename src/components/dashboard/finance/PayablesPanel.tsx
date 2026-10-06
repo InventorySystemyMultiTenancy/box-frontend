@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ExportButtons } from "@/components/ui/export-buttons";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -116,7 +117,25 @@ export default function PayablesPanel() {
             />
           </div>
         </div>
-        {canManage && <PayableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a pagar</Button>} />}
+        <div className="flex flex-wrap items-center gap-2">
+          <ExportButtons
+            title="Contas a pagar"
+            filename="contas-a-pagar"
+            subtitle={[status && `Status: ${STATUS_LABELS[status as PayableStatus]}.`, month && `Vencimento em ${month.split("-").reverse().join("/")}.`].filter(Boolean).join(" ") || undefined}
+            rows={data ?? []}
+            columns={[
+              { header: "Descrição", value: (p) => (p.installmentTotal && p.installmentTotal > 1 ? `${p.description} (${p.installmentNumber}/${p.installmentTotal})` : p.description) },
+              { header: "Fornecedor/Beneficiário", value: (p) => p.payeeName },
+              { header: "Categoria", value: (p) => p.category },
+              { header: "Vencimento", value: (p) => p.dueDate, type: "date" },
+              { header: "Status", value: (p) => STATUS_LABELS[p.status as PayableStatus] ?? p.status },
+              { header: "Forma", value: (p) => p.paymentMethod },
+              { header: "Valor", value: (p) => p.amount, type: "money" },
+              { header: "Pago", value: (p) => p.paidAmount, type: "money" },
+            ]}
+          />
+          {canManage && <PayableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a pagar</Button>} />}
+        </div>
       </div>
 
       <div className="min-w-0 rounded-lg border bg-card">

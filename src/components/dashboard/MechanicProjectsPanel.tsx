@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
@@ -9,6 +9,7 @@ import { PRIORITY_BG, PRIORITY_BORDER, PRIORITY_LABELS, PRIORITY_RANK, STATUS_LA
 import OrderDetail from "@/components/dashboard/OrderDetail";
 import KanbanBoard from "@/components/dashboard/KanbanBoard";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
+import { HomeKpis } from "@/components/dashboard/HomeKpis";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, ClipboardList, CheckCircle2, AlertTriangle, Wrench, Car, ArrowLeft, Archive, Search } from "lucide-react";
@@ -20,6 +21,7 @@ function orderSearchFields(order: ServiceOrder): (string | null | undefined)[] {
 }
 
 const DONE_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);
+const ARCHIVED_PAGE_SIZE = 30;
 
 function sortByPriority(orders: ServiceOrder[]) {
   return [...orders].sort((a, b) => PRIORITY_RANK[b.priority ?? "NORMAL"] - PRIORITY_RANK[a.priority ?? "NORMAL"]);
@@ -71,6 +73,8 @@ export default function MechanicProjectsPanel() {
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [listSearch, setListSearch] = useState("");
   const [archivedSearch, setArchivedSearch] = useState("");
+  const [archivedPage, setArchivedPage] = useState(1);
+  const [archivedTotal, setArchivedTotal] = useState(0);
 
   useEffect(() => {
     if (!token) return;
@@ -119,30 +123,42 @@ export default function MechanicProjectsPanel() {
   }
 
   function toggleArchived() {
-    const next = !showArchived;
-    setShowArchived(next);
+    setShowArchived((v) => !v);
     setArchivedSearch("");
-    if (next && token) {
+    setArchivedOrders(null);
+  }
+
+  // Finalizados/com baixa: busca e paginação no servidor (o histórico só cresce — carregar
+  // tudo de uma vez deixava a tela lenta). Página 1 ao abrir ou mudar a busca; "Carregar
+  // mais" acrescenta a próxima.
+  const loadArchived = useCallback(
+    (page: number) => {
+      if (!token) return;
       setLoadingArchived(true);
       api
-        .serviceOrders(token, { includeArchived: true })
-        .then(({ orders: all }) => {
-          const list = (all as ServiceOrder[]).filter((o) => o.archivedAt || DONE_STATUSES.has(o.status));
-          setArchivedOrders(list);
+        .serviceOrderHistory(token, { q: archivedSearch.trim() || undefined, page, pageSize: ARCHIVED_PAGE_SIZE })
+        .then(({ orders: items, pagination }) => {
+          setArchivedOrders((prev) => (page === 1 || !prev ? (items as ServiceOrder[]) : [...prev, ...(items as ServiceOrder[])]));
+          setArchivedPage(pagination.page);
+          setArchivedTotal(pagination.total);
         })
         .finally(() => setLoadingArchived(false));
-    }
-  }
+    },
+    [token, archivedSearch]
+  );
+
+  useEffect(() => {
+    if (!showArchived) return;
+    const timer = setTimeout(() => loadArchived(1), 300);
+    return () => clearTimeout(timer);
+  }, [showArchived, loadArchived]);
 
   const sortedActiveOrders = useMemo(() => sortByPriority(orders), [orders]);
   const filteredListOrders = useMemo(
     () => sortedActiveOrders.filter((o) => matchesSearch(listSearch, orderSearchFields(o))),
     [sortedActiveOrders, listSearch]
   );
-  const filteredArchivedOrders = useMemo(
-    () => (archivedOrders ?? []).filter((o) => matchesSearch(archivedSearch, orderSearchFields(o))),
-    [archivedOrders, archivedSearch]
-  );
+  const filteredArchivedOrders = archivedOrders ?? [];
 
   if (selectedOrderId) {
     return (
@@ -175,26 +191,26 @@ export default function MechanicProjectsPanel() {
           </Button>
         </div>
 
-        {!loadingArchived && (archivedOrders?.length ?? 0) > 0 && (
-          <div className="relative mb-3 max-w-sm">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, placa ou cliente..."
-              className="pl-8"
-              value={archivedSearch}
-              onChange={(e) => setArchivedSearch(e.target.value)}
-            />
-          </div>
-        )}
+        <div className="relative mb-3 max-w-sm">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por código, placa, carro ou cliente..."
+            className="pl-8"
+            value={archivedSearch}
+            onChange={(e) => setArchivedSearch(e.target.value)}
+          />
+        </div>
 
-        {loadingArchived && <p className={styles.tlSub}>Carregando...</p>}
-        {!loadingArchived && (archivedOrders?.length ?? 0) === 0 && (
-          <p className={styles.tlSub}>Nenhum projeto finalizado ou com baixa dada ainda.</p>
+        {archivedOrders === null && <p className={styles.tlSub}>Carregando...</p>}
+        {archivedOrders !== null && archivedOrders.length === 0 && (
+          <p className={styles.tlSub}>{archivedSearch.trim() ? "Nenhum projeto encontrado para essa busca." : "Nenhum projeto finalizado ou com baixa dada ainda."}</p>
         )}
-        {!loadingArchived && (archivedOrders?.length ?? 0) > 0 && filteredArchivedOrders.length === 0 && (
-          <p className={styles.tlSub}>Nenhum projeto encontrado para essa busca.</p>
+        {archivedOrders !== null && archivedOrders.length > 0 && (
+          <p className={styles.tlSub} style={{ marginBottom: "0.5rem" }}>
+            Mostrando {archivedOrders.length} de {archivedTotal}
+          </p>
         )}
-        {!loadingArchived && filteredArchivedOrders.length > 0 && (
+        {filteredArchivedOrders.length > 0 && (
           <div className={styles.ordersList}>
             {filteredArchivedOrders.map((order) => (
               <button key={order.id} className={styles.orderRow} onClick={() => setSelectedOrderId(order.id)}>
@@ -211,6 +227,11 @@ export default function MechanicProjectsPanel() {
               </button>
             ))}
           </div>
+        )}
+        {archivedOrders !== null && archivedOrders.length < archivedTotal && (
+          <Button variant="outline" size="sm" className="mt-3" disabled={loadingArchived} onClick={() => loadArchived(archivedPage + 1)}>
+            {loadingArchived ? "Carregando..." : "Carregar mais"}
+          </Button>
         )}
       </div>
     );
@@ -256,6 +277,8 @@ export default function MechanicProjectsPanel() {
           </Button>
         </div>
       </div>
+
+      {user?.role === "ADMIN" && <HomeKpis />}
 
       {orders.length === 0 ? (
         <p className={styles.tlSub}>Nenhuma ordem de serviço cadastrada ainda.</p>

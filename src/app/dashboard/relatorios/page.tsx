@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ExportButtons } from "@/components/ui/export-buttons";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { DashboardReport, RevisionAlert } from "@/lib/types";
@@ -58,6 +59,28 @@ export default function RelatoriosPage() {
           <Label htmlFor="rep-to">Até</Label>
           <Input id="rep-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
+        {report && (
+          <ExportButtons
+            title="Indicadores gerenciais"
+            filename={`indicadores-${from}-a-${to}`}
+            subtitle={`Período: ${new Date(`${from}T12:00:00`).toLocaleDateString("pt-BR")} a ${new Date(`${to}T12:00:00`).toLocaleDateString("pt-BR")}.`}
+            rows={[
+              { label: "Faturamento recebido", value: `R$ ${report.revenue.total.toFixed(2).replace(".", ",")}` },
+              { label: "Atendimentos faturados", value: String(report.revenue.count) },
+              { label: "Ticket médio", value: `R$ ${report.revenue.ticketMedio.toFixed(2).replace(".", ",")}` },
+              { label: "Taxa de aprovação (reparos)", value: `${(report.approvalStats.rate * 100).toFixed(0)}%` },
+              { label: "Taxa de aceite (orçamentos)", value: `${(report.quoteStats.rate * 100).toFixed(0)}%` },
+              { label: "Peças usadas em projetos (qtd.)", value: String(report.partsUsage.totalQuantity) },
+              { label: "Peças usadas em projetos (valor)", value: `R$ ${report.partsUsage.totalValue.toFixed(2).replace(".", ",")}` },
+              ...report.partsUsage.topParts.map((p) => ({ label: `Peça usada — ${p.name}`, value: `${p.quantity} un. · R$ ${p.value.toFixed(2).replace(".", ",")}` })),
+              ...report.mechanicProductivity.map((m) => ({ label: `Itens concluídos — ${m.mechanicName}`, value: String(m.completedParts) })),
+            ]}
+            columns={[
+              { header: "Indicador", value: (r) => r.label },
+              { header: "Valor", value: (r) => r.value },
+            ]}
+          />
+        )}
       </div>
 
       {report && (
@@ -66,9 +89,35 @@ export default function RelatoriosPage() {
           <Kpi label="Ticket médio" value={`R$ ${report.revenue.ticketMedio.toFixed(2)}`} />
           <Kpi label="Taxa de aprovação (reparos)" value={`${(report.approvalStats.rate * 100).toFixed(0)}%`} />
           <Kpi label="Taxa de aceite (orçamentos)" value={`${(report.quoteStats.rate * 100).toFixed(0)}%`} />
-          <Kpi label="Giro de estoque" value={report.turnover.turnoverRatio.toFixed(2)} />
-          <Kpi label="Peças no ponto mínimo" value={String(report.lowStock)} tone={report.lowStock > 0 ? "warn" : undefined} />
+          <Kpi label="Peças usadas em projetos" value={`${report.partsUsage.totalQuantity} un.`} />
+          <Kpi label="Valor das peças usadas" value={`R$ ${report.partsUsage.totalValue.toFixed(2)}`} />
         </div>
+      )}
+
+      {report && report.partsUsage.topParts.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle className="text-base">Peças mais usadas no período</CardTitle></CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Peça</TableHead>
+                  <TableHead>Quantidade</TableHead>
+                  <TableHead>Valor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {report.partsUsage.topParts.map((p) => (
+                  <TableRow key={p.partId}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell>{p.quantity}</TableCell>
+                    <TableCell>R$ {p.value.toFixed(2)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -98,7 +147,22 @@ export default function RelatoriosPage() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Alertas de revisão preventiva</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-base">Alertas de revisão preventiva</CardTitle>
+            <ExportButtons
+              title="Revisão preventiva em atraso"
+              filename="revisao-preventiva"
+              rows={alerts ?? []}
+              columns={[
+                { header: "Veículo", value: (a) => `${a.vehicle.brand} ${a.vehicle.model}` },
+                { header: "Placa", value: (a) => a.vehicle.plate },
+                { header: "Cliente", value: (a) => a.owner.name },
+                { header: "Telefone", value: (a) => a.owner.phone },
+                { header: "Última visita", value: (a) => a.lastServiceAt, type: "date" },
+                { header: "Meses sem visita", value: (a) => a.monthsSinceLastService, type: "number" },
+              ]}
+            />
+          </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>

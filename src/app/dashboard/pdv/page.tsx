@@ -136,7 +136,7 @@ export default function PdvPage() {
     if (!token || !confirm(`Cancelar a venda ${sale.code}?`)) return;
     try {
       await api.cancelCounterSale(sale.id, token);
-      toast.success("Venda cancelada — estoque estornado.");
+      toast.success("Venda cancelada.");
       refetch();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Não foi possível cancelar a venda.");
@@ -185,7 +185,7 @@ export default function PdvPage() {
                         <SelectTrigger><SelectValue placeholder="Peça..." /></SelectTrigger>
                         <SelectContent>
                           {(parts ?? []).filter((p) => p.active).map((p) => (
-                            <SelectItem key={p.id} value={p.id}>{p.name} (estoque: {p.stockQty})</SelectItem>
+                            <SelectItem key={p.id} value={p.id}>{p.name} — R$ {p.unitCost.toFixed(2)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

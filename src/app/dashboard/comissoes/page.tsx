@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ExportButtons } from "@/components/ui/export-buttons";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -134,7 +135,22 @@ export default function ComissoesPage() {
         </div>
       )}
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <ExportButtons
+          title="Comissões"
+          filename="comissoes"
+          subtitle={status ? `Status: ${STATUS_LABELS[status as CommissionStatus]}.` : undefined}
+          rows={commissions ?? []}
+          columns={[
+            { header: "Mecânico", value: (c) => c.mechanic.name },
+            { header: "OS", value: (c) => c.serviceOrder.code },
+            { header: "Reparo", value: (c) => c.approval?.title ?? "Projeto inteiro" },
+            { header: "Base", value: (c) => c.baseAmount, type: "money" },
+            { header: "Taxa (%)", value: (c) => c.rate * 100, type: "number" },
+            { header: "Status", value: (c) => STATUS_LABELS[c.status] },
+            { header: "Comissão", value: (c) => c.amount, type: "money" },
+          ]}
+        />
         <Select value={status || "ALL"} onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Todos os status" />

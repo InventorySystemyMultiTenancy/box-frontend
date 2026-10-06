@@ -54,7 +54,7 @@ export default function LojasPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Lojas</h1>
           <p className="text-sm text-muted-foreground">
-            Unidades/filiais. Estoque, OS, boxes, pedidos de compra e vendas de balcão podem ser atribuídos a uma loja — clientes e
+            Unidades/filiais. Peças, OS, boxes, pedidos de compra e vendas de balcão podem ser atribuídos a uma loja — clientes e
             usuários continuam compartilhados entre todas.
           </p>
         </div>

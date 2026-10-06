@@ -2,16 +2,15 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Sparkles } from "lucide-react";
+import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PurchaseOrderFormDialog } from "@/components/dashboard/purchases/PurchaseOrderFormDialog";
 import { ReceivePurchaseOrderDialog } from "@/components/dashboard/purchases/ReceivePurchaseOrderDialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { PurchaseOrder, PurchaseOrderStatus, ReplenishmentSuggestion } from "@/lib/types";
+import type { PurchaseOrder, PurchaseOrderStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<PurchaseOrderStatus, string> = {
   DRAFT: "Rascunho",
@@ -40,15 +39,8 @@ export default function ComprasPage() {
     enabled: !!token,
   });
 
-  const { data: suggestions } = useQuery({
-    queryKey: ["replenishment-suggestions"],
-    queryFn: async () => (await api.replenishmentSuggestions(token!)).suggestions as ReplenishmentSuggestion[],
-    enabled: !!token && canManage,
-  });
-
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
-    queryClient.invalidateQueries({ queryKey: ["replenishment-suggestions"] });
   }
 
   async function handleSend(order: PurchaseOrder) {
@@ -73,17 +65,6 @@ export default function ComprasPage() {
     }
   }
 
-  async function handleGenerateFromSuggestions() {
-    if (!token) return;
-    try {
-      const res = await api.createPurchaseOrdersFromSuggestions(token);
-      toast.success(`${res.created.length} pedido(s) gerado(s) em rascunho.`);
-      refetch();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível gerar os pedidos.");
-    }
-  }
-
   const orderTotal = (order: PurchaseOrder) => order.items.reduce((sum, i) => sum + i.quantity * i.unitCost, 0);
 
   return (
@@ -91,7 +72,7 @@ export default function ComprasPage() {
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Compras</h1>
-          <p className="text-sm text-muted-foreground">Pedidos de compra e reposição de estoque.</p>
+          <p className="text-sm text-muted-foreground">Pedidos de compra a fornecedores — enviar gera a conta a pagar; &quot;Receber&quot; registra o que chegou.</p>
         </div>
         {canManage && (
           <PurchaseOrderFormDialog
@@ -105,33 +86,6 @@ export default function ComprasPage() {
           />
         )}
       </div>
-
-      {canManage && suggestions && suggestions.length > 0 && (
-        <Card className="mb-6 border-amber-500/40">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between text-base">
-              <span>Sugestões de reposição ({suggestions.length})</span>
-              <Button size="sm" variant="outline" onClick={handleGenerateFromSuggestions}>
-                <Sparkles className="size-4" />
-                Gerar pedidos automaticamente
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-2">
-            {suggestions.map((s) => (
-              <div key={s.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-                <span>
-                  {s.name} <span className="text-muted-foreground">— estoque {s.stockQty}, mínimo {s.minStockQty}</span>
-                </span>
-                <span className="text-muted-foreground">
-                  repor {s.suggestedQty}
-                  {s.preferredSupplier ? ` · ${s.preferredSupplier.name}` : " · sem fornecedor preferencial"}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
 
       <div className="min-w-0 rounded-lg border bg-card">
         <Table>

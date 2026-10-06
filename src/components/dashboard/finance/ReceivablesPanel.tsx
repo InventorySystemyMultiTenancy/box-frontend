@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ExportButtons } from "@/components/ui/export-buttons";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -65,7 +66,26 @@ export default function ReceivablesPanel() {
             ))}
           </SelectContent>
         </Select>
-        {canManage && <ReceivableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a receber</Button>} />}
+        <div className="flex flex-wrap items-center gap-2">
+          <ExportButtons
+            title="Contas a receber"
+            filename="contas-a-receber"
+            subtitle={status ? `Status: ${STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status}.` : undefined}
+            rows={data ?? []}
+            columns={[
+              { header: "Descrição", value: (r) => (r.installmentTotal && r.installmentTotal > 1 ? `${r.description} (${r.installmentNumber}/${r.installmentTotal})` : r.description) },
+              { header: "Cliente", value: (r) => r.client?.name },
+              { header: "OS", value: (r) => r.serviceOrder?.code },
+              { header: "Categoria", value: (r) => r.category },
+              { header: "Vencimento", value: (r) => r.dueDate, type: "date" },
+              { header: "Status", value: (r) => STATUS_LABELS[r.status as keyof typeof STATUS_LABELS] ?? r.status },
+              { header: "Forma", value: (r) => r.paymentMethod },
+              { header: "Valor", value: (r) => r.amount, type: "money" },
+              { header: "Recebido", value: (r) => r.receivedAmount, type: "money" },
+            ]}
+          />
+          {canManage && <ReceivableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a receber</Button>} />}
+        </div>
       </div>
 
       <div className="min-w-0 rounded-lg border bg-card">
