@@ -7,7 +7,7 @@ import { Check, Car, Wallet, Calendar, MessageCircle, type LucideIcon } from "lu
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, ALERTS_CHANGED_EVENT } from "@/lib/api";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { revisionReminderMessage, warrantyReminderMessage } from "@/lib/whatsapp-messages";
 import type { AppNotification, ExpiringWarrantyPart, RevisionAlert } from "@/lib/types";
@@ -106,6 +106,8 @@ export default function AlertasPage() {
     try {
       await api.markAlertRead(id, token);
       queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      // Atualiza o contador do sininho no topo na hora (senão só no próximo ciclo de 60s).
+      window.dispatchEvent(new Event(ALERTS_CHANGED_EVENT));
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Não foi possível marcar o alerta como lido.");
     }

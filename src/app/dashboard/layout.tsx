@@ -35,7 +35,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api, API_URL } from "@/lib/api";
+import { api, API_URL, ALERTS_CHANGED_EVENT } from "@/lib/api";
 import { AppNotification } from "@/lib/types";
 import { Toaster } from "@/components/ui/sonner";
 import { VoiceInputButton } from "@/components/ui/voice-input-button";
@@ -204,9 +204,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     }
     load();
     const interval = setInterval(load, 60000);
+    window.addEventListener(ALERTS_CHANGED_EVENT, load);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener(ALERTS_CHANGED_EVENT, load);
     };
   }, [token, isStaff]);
 

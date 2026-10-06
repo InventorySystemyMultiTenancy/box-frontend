@@ -32,6 +32,8 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
 }
 
 export const AUTH_EXPIRED_EVENT = "box:auth-expired";
+// Disparado ao marcar alerta como lido — o contador do sininho (dashboard/layout) recarrega.
+export const ALERTS_CHANGED_EVENT = "box:alerts-changed";
 
 export const api = {
   login: (email: string, password: string) =>
