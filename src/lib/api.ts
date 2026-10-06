@@ -1,3 +1,5 @@
+import type { ExpenseClassifications } from "@/lib/types";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export class ApiError extends Error {
@@ -425,10 +427,16 @@ export const api = {
       to?: string;
       payeeName?: string;
       invoiceNumber?: string;
+      sector?: string;
+      group?: string;
       page?: number;
       pageSize?: number;
     } = {}
   ) => request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/payables${toQuery(params)}`, {}, token),
+
+  // Categorias/grupos/descrições/setores já usados — sugestões dos formulários de despesa.
+  expenseClassifications: (token: string) =>
+    request<ExpenseClassifications>("/api/finance/payables/classifications", {}, token),
 
   createPayables: (payload: Record<string, unknown>, token: string) =>
     request<{ installments: unknown[] }>("/api/finance/payables", { method: "POST", body: JSON.stringify(payload) }, token),

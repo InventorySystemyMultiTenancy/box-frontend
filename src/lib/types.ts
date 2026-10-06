@@ -610,6 +610,23 @@ export interface AccountPayable {
   notes?: string | null;
   // Preenchido quando esta conta nasceu de um boleto de nota fiscal.
   invoice?: { id: string; number?: string | null } | null;
+  // Classificação (category = categoria/natureza da operação) e dados do documento.
+  expenseGroup?: string | null;
+  expenseDescription?: string | null;
+  expenseSector?: string | null;
+  invoiceNumber?: string | null;
+  issueDate?: string | null;
+  documentNumber?: string | null;
+  store?: { id: string; name: string } | null;
+  createdBy?: { id: string; name: string } | null;
+}
+
+// Classificações de despesa já usadas (ficam salvas para os próximos lançamentos).
+export interface ExpenseClassifications {
+  categories: string[];
+  groups: string[];
+  sectors: string[];
+  descriptions: { group: string; name: string }[];
 }
 
 export interface AccountReceivable {
@@ -681,6 +698,10 @@ export interface Invoice {
   recipientDocument?: string | null;
   paymentMethod?: string | null;
   description?: string | null;
+  expenseGroup?: string | null;
+  expenseDescription?: string | null;
+  expenseSector?: string | null;
+  bankAccountId?: string | null;
   totalAmount: number;
   discountAmount?: number | null;
   taxAmount?: number | null;

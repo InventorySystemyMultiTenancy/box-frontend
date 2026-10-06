@@ -8,8 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { toast } from "sonner";
+import { FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { generateFinancialReportPdf } from "@/lib/financial-report";
+import { openReportWindow } from "@/lib/printable-report";
 import type { DashboardReport, RevisionAlert } from "@/lib/types";
 
 function firstDayOfMonth() {
@@ -28,6 +33,7 @@ export default function RelatoriosPage() {
 
   const [from, setFrom] = useState(firstDayOfMonth());
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [financialBusy, setFinancialBusy] = useState(false);
 
   const { data: report } = useQuery({
     queryKey: ["dashboard-report", from, to],
@@ -42,6 +48,25 @@ export default function RelatoriosPage() {
   });
 
   if (!allowed) return null;
+
+  async function handleFinancialPdf() {
+    if (!token) return;
+    // Abre a janela já no clique (depois do await o navegador bloquearia como pop-up).
+    const popup = openReportWindow();
+    if (!popup) {
+      toast.error("O navegador bloqueou a janela do relatório. Permita pop-ups para este site e tente de novo.");
+      return;
+    }
+    setFinancialBusy(true);
+    try {
+      await generateFinancialReportPdf(token, from, to, popup);
+    } catch (err) {
+      popup.close();
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível gerar o relatório financeiro.");
+    } finally {
+      setFinancialBusy(false);
+    }
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -59,6 +84,12 @@ export default function RelatoriosPage() {
           <Label htmlFor="rep-to">Até</Label>
           <Input id="rep-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
+        {hasPermission("finance", "view") && (
+          <Button type="button" onClick={handleFinancialPdf} disabled={financialBusy || !from || !to} title="Relatório geral do financeiro no período: resumo, DRE, despesas por setor/grupo e lançamentos">
+            <FileText className="size-4" />
+            {financialBusy ? "Gerando..." : "PDF financeiro do período"}
+          </Button>
+        )}
         {report && (
           <ExportButtons
             title="Indicadores gerenciais"

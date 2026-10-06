@@ -2,9 +2,21 @@
 // abre um popup e chama window.print() — o usuário salva como PDF pelo diálogo de
 // impressão do navegador. Não há nenhuma lib de PDF no projeto, então esse é o único
 // mecanismo usado — aqui só uma versão compartilhada pras telas novas do financeiro.
-export function openPrintableReport(title: string, bodyHtml: string) {
+/**
+ * Quando o conteúdo depende de buscar dados antes, abra a janela já no clique com
+ * openReportWindow() e passe-a aqui — window.open depois de um await costuma ser
+ * bloqueado como pop-up pelo navegador.
+ */
+export function openReportWindow() {
   const popup = window.open("", "_blank", "width=960,height=720");
+  popup?.document.write('<p style="font-family: Arial, sans-serif; margin: 32px">Gerando relatório...</p>');
+  return popup;
+}
+
+export function openPrintableReport(title: string, bodyHtml: string, existingPopup?: Window | null) {
+  const popup = existingPopup ?? window.open("", "_blank", "width=960,height=720");
   if (!popup) return;
+  popup.document.open();
 
   popup.document.write(`
     <!doctype html>

@@ -11,10 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { SuggestInput } from "@/components/ui/suggest-input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Client, Invoice, InvoiceStatus, InvoiceType, ServiceOrder, ServiceOrderStatus } from "@/lib/types";
+import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import type { BankAccount, Client, ExpenseClassifications, Invoice, InvoiceStatus, InvoiceType, ServiceOrder, ServiceOrderStatus } from "@/lib/types";
 
 // "Em andamento" = mesma definição usada em MechanicProjectsPanel — qualquer OS que
 // ainda não chegou em FINISHED/READY_FOR_PICKUP.
@@ -198,25 +201,28 @@ export default function InvoicesPanel() {
   );
 }
 
+// Tipo, chave de acesso, destinatário e CNPJs saíram do formulário a pedido da oficina — o
+// tipo ainda é guardado internamente quando a leitura por IA o identifica (padrão NF-e).
 const EMPTY_FORM = {
-  type: "NFSE" as InvoiceType,
+  type: "NFE" as InvoiceType,
   clientId: "",
   serviceOrderId: "",
   number: "",
   series: "",
-  accessKey: "",
   operationNature: "",
   issuerName: "",
-  issuerDocument: "",
-  recipientName: "",
-  recipientDocument: "",
   paymentMethod: "",
   description: "",
   totalAmount: "",
   discountAmount: "",
   taxAmount: "",
   issueDate: "",
-  // Só usados quando paymentMethod é "boleto" — geram as parcelas em contas a pagar.
+  // Nota de despesa (conta a pagar): classificação, banco e parcelas.
+  isExpense: false,
+  expenseSector: "",
+  expenseGroup: "",
+  expenseDescription: "",
+  bankAccountId: "",
   dueDate: "",
   installments: "1",
 };
@@ -238,6 +244,18 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
   const { data: clients } = useQuery({
     queryKey: ["clients-all"],
     queryFn: async () => (await api.clients(token!, { pageSize: 100 })).items as Client[],
+    enabled: !!token && open,
+  });
+
+  const { data: classifications } = useQuery({
+    queryKey: ["expense-classifications"],
+    queryFn: async () => (await api.expenseClassifications(token!)) as ExpenseClassifications,
+    enabled: !!token && open,
+  });
+
+  const { data: bankAccounts } = useQuery({
+    queryKey: ["bank-accounts"],
+    queryFn: async () => (await api.bankAccounts(token!)).accounts as BankAccount[],
     enabled: !!token && open,
   });
 
@@ -275,14 +293,10 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
         type: extracted.type,
         number: extracted.number ?? f.number,
         series: extracted.series ?? f.series,
-        accessKey: extracted.accessKey ?? f.accessKey,
         operationNature: extracted.operationNature ?? f.operationNature,
         issuerName: extracted.issuerName ?? f.issuerName,
-        issuerDocument: extracted.issuerDocument ?? f.issuerDocument,
-        recipientName: extracted.recipientName ?? f.recipientName,
-        recipientDocument: extracted.recipientDocument ?? f.recipientDocument,
         paymentMethod: extracted.paymentMethod ?? f.paymentMethod,
-        description: extracted.description,
+        description: extracted.description ?? f.description,
         totalAmount: extracted.totalAmount ? String(extracted.totalAmount) : f.totalAmount,
         discountAmount: extracted.discountAmount ? String(extracted.discountAmount) : f.discountAmount,
         taxAmount: extracted.taxAmount ? String(extracted.taxAmount) : f.taxAmount,
@@ -304,13 +318,18 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
     }
   }
 
-  const boleto = isBoleto(form.paymentMethod);
+  // Gera contas a pagar quando é nota de despesa ou quando é paga por boleto.
+  const generatesPayables = form.isExpense || isBoleto(form.paymentMethod);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
-    if (boleto && !form.dueDate) {
-      toast.error("Informe a data de vencimento do primeiro boleto.");
+    if (generatesPayables && !form.dueDate) {
+      toast.error("Informe o vencimento da primeira parcela.");
+      return;
+    }
+    if (form.isExpense && !form.issuerName.trim()) {
+      toast.error("Informe o emitente/fornecedor da nota de despesa.");
       return;
     }
     setSaving(true);
@@ -321,26 +340,29 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           clientId: form.clientId || undefined,
           serviceOrderId: form.serviceOrderId || undefined,
           totalAmount: Number(form.totalAmount),
-          description: form.description,
+          description: form.description.trim() || undefined,
           number: form.number || undefined,
           series: form.series || undefined,
-          accessKey: form.accessKey || undefined,
           operationNature: form.operationNature || undefined,
           issuerName: form.issuerName || undefined,
-          issuerDocument: form.issuerDocument || undefined,
-          recipientName: form.recipientName || undefined,
-          recipientDocument: form.recipientDocument || undefined,
           paymentMethod: form.paymentMethod || undefined,
           discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined,
           taxAmount: form.taxAmount ? Number(form.taxAmount) : undefined,
           issueDate: form.issueDate || undefined,
-          dueDate: boleto ? form.dueDate : undefined,
-          installments: boleto ? Number(form.installments) || 1 : undefined,
+          isExpense: form.isExpense || undefined,
+          expenseSector: form.isExpense ? form.expenseSector || undefined : undefined,
+          expenseGroup: form.isExpense ? form.expenseGroup || undefined : undefined,
+          expenseDescription: form.isExpense ? form.expenseDescription || undefined : undefined,
+          bankAccountId: form.bankAccountId || undefined,
+          dueDate: generatesPayables ? form.dueDate : undefined,
+          installments: generatesPayables ? Number(form.installments) || 1 : undefined,
         },
         token
       );
+      queryClient.invalidateQueries({ queryKey: ["expense-classifications"] });
+      queryClient.invalidateQueries({ queryKey: ["payables"] });
       const payablesCount = (invoice as Invoice).payables?.length ?? 0;
-      toast.success(payablesCount > 0 ? `Nota fiscal salva — ${payablesCount} boleto(s) lançados em contas a pagar.` : "Nota fiscal salva.");
+      toast.success(payablesCount > 0 ? `Nota fiscal salva — ${payablesCount} parcela(s) lançada(s) em contas a pagar.` : "Nota fiscal salva.");
       setOpen(false);
       onSaved();
     } catch (err) {
@@ -353,7 +375,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Nova nota fiscal</DialogTitle>
         </DialogHeader>
@@ -368,19 +390,8 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="grid gap-1.5">
-              <Label>Tipo</Label>
-              <Select value={form.type} onValueChange={(v) => set("type", v as InvoiceType)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-number">Número</Label>
+            <div className="grid gap-1.5 sm:col-span-2">
+              <Label htmlFor="inv-number">Número da nota fiscal</Label>
               <Input id="inv-number" value={form.number} onChange={(e) => set("number", e.target.value)} placeholder="Automático se vazio" />
             </div>
             <div className="grid gap-1.5">
@@ -390,20 +401,17 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           </div>
 
           <div className="grid gap-1.5">
-            <Label htmlFor="inv-access-key">Chave de acesso</Label>
-            <Input id="inv-access-key" value={form.accessKey} onChange={(e) => set("accessKey", e.target.value)} placeholder="44 dígitos (NF-e/NFC-e)" />
+            <Label htmlFor="inv-issuer-name">Emitente / fornecedor{form.isExpense ? " *" : ""}</Label>
+            <Input id="inv-issuer-name" value={form.issuerName} onChange={(e) => set("issuerName", e.target.value)} />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-issuer-name">Emitente</Label>
-              <Input id="inv-issuer-name" value={form.issuerName} onChange={(e) => set("issuerName", e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-issuer-doc">CNPJ/CPF do emitente</Label>
-              <Input id="inv-issuer-doc" value={form.issuerDocument} onChange={(e) => set("issuerDocument", e.target.value)} />
-            </div>
-          </div>
+          {/* Nota de despesa — vira conta a pagar, classificada por setor/categoria/grupo/descrição. */}
+          <label className="flex items-center gap-2 rounded-md border p-2.5 text-sm">
+            <Checkbox checked={form.isExpense} onCheckedChange={(v) => set("isExpense", v === true)} />
+            <span>
+              <strong>Nota de despesa</strong> — lançar em contas a pagar
+            </span>
+          </label>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
@@ -435,43 +443,79 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="grid gap-1.5">
-              <Label htmlFor="inv-recipient-name">Destinatário (nome na nota)</Label>
-              <Input id="inv-recipient-name" value={form.recipientName} onChange={(e) => set("recipientName", e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-recipient-doc">CNPJ/CPF do destinatário</Label>
-              <Input id="inv-recipient-doc" value={form.recipientDocument} onChange={(e) => set("recipientDocument", e.target.value)} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-operation">Natureza da operação</Label>
-              <Input id="inv-operation" value={form.operationNature} onChange={(e) => set("operationNature", e.target.value)} placeholder="Venda de mercadoria" />
+              <Label htmlFor="inv-operation">Categoria (natureza da operação)</Label>
+              <SuggestInput
+                id="inv-operation"
+                options={classifications?.categories ?? []}
+                value={form.operationNature}
+                onChange={(e) => set("operationNature", e.target.value)}
+                placeholder="Ex.: Compra de peças"
+              />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="inv-payment">Forma de pagamento</Label>
-              <Input id="inv-payment" value={form.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)} placeholder="PIX, Boleto, Dinheiro..." />
+              <SuggestInput
+                id="inv-payment"
+                options={[...PAYMENT_METHODS]}
+                value={form.paymentMethod}
+                onChange={(e) => set("paymentMethod", e.target.value)}
+                placeholder="PIX, Boleto, Dinheiro..."
+              />
             </div>
           </div>
 
-          {boleto && (
+          {form.isExpense && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="inv-sector">Setor</Label>
+                <SuggestInput id="inv-sector" options={classifications?.sectors ?? []} value={form.expenseSector} onChange={(e) => set("expenseSector", e.target.value)} placeholder="Ex.: Oficina" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="inv-group">Grupo de despesa</Label>
+                <SuggestInput id="inv-group" options={classifications?.groups ?? []} value={form.expenseGroup} onChange={(e) => set("expenseGroup", e.target.value)} placeholder="Ex.: PEÇAS" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="inv-exp-desc">Descrição da despesa</Label>
+                <SuggestInput
+                  id="inv-exp-desc"
+                  options={[...new Set((classifications?.descriptions ?? []).filter((d) => !form.expenseGroup || d.group.toLowerCase() === form.expenseGroup.trim().toLowerCase()).map((d) => d.name))]}
+                  value={form.expenseDescription}
+                  onChange={(e) => set("expenseDescription", e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-1.5">
+            <Label>Banco associado (opcional)</Label>
+            <Select value={form.bankAccountId || "NONE"} onValueChange={(v) => set("bankAccountId", v === "NONE" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">—</SelectItem>
+                {(bankAccounts ?? []).map((a) => (
+                  <SelectItem key={a.id} value={a.id}>{a.name}{a.bank ? ` — ${a.bank}` : ""}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {generatesPayables && (
             <div className="grid grid-cols-1 gap-3 rounded-md border border-dashed p-3 sm:grid-cols-2">
               <div className="col-span-full text-xs font-medium text-muted-foreground">
-                Gera automaticamente uma conta a pagar por boleto, vencendo mês a mês.
+                Gera as parcelas em contas a pagar, vencendo mês a mês{form.bankAccountId ? ", previstas no banco escolhido" : ""}.
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="inv-due-date">Vencimento do 1º boleto *</Label>
-                <Input id="inv-due-date" type="date" required={boleto} value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
+                <Label htmlFor="inv-due-date">Vencimento da 1ª parcela *</Label>
+                <Input id="inv-due-date" type="date" required value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="inv-installments">Quantidade de boletos *</Label>
+                <Label htmlFor="inv-installments">Quantidade de parcelas *</Label>
                 <Input
                   id="inv-installments"
                   type="number"
                   min="1"
                   max="60"
-                  required={boleto}
+                  required
                   value={form.installments}
                   onChange={(e) => set("installments", e.target.value)}
                 />
@@ -480,8 +524,8 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           )}
 
           <div className="grid gap-1.5">
-            <Label htmlFor="inv-description">Descrição / discriminação *</Label>
-            <Input id="inv-description" required value={form.description} onChange={(e) => set("description", e.target.value)} />
+            <Label htmlFor="inv-description">Observação (opcional)</Label>
+            <Input id="inv-description" value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

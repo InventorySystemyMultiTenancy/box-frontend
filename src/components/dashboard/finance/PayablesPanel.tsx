@@ -11,10 +11,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { SuggestInput } from "@/components/ui/suggest-input";
+import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { AccountPayable, BankAccount, PayableStatus } from "@/lib/types";
+import type { AccountPayable, BankAccount, ExpenseClassifications, PayableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<PayableStatus, string> = { PENDING: "Pendente", PAID: "Pago", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
 const STATUS_VARIANTS: Record<PayableStatus, "default" | "secondary" | "outline" | "destructive"> = {
@@ -42,9 +44,19 @@ export default function PayablesPanel() {
   const [month, setMonth] = useState("");
   const [payeeName, setPayeeName] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  // Despesas separadas por setor (origem) e por categoria/grupo.
+  const [sector, setSector] = useState("");
+  const [category, setCategory] = useState("");
+  const [group, setGroup] = useState("");
+
+  const { data: classifications } = useQuery({
+    queryKey: ["expense-classifications"],
+    queryFn: async () => (await api.expenseClassifications(token!)) as ExpenseClassifications,
+    enabled: !!token,
+  });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["payables", status, month, payeeName, invoiceNumber],
+    queryKey: ["payables", status, month, payeeName, invoiceNumber, sector, category, group],
     queryFn: async () =>
       (
         await api.payables(token!, {
@@ -52,7 +64,10 @@ export default function PayablesPanel() {
           ...monthRange(month),
           payeeName: payeeName.trim() || undefined,
           invoiceNumber: invoiceNumber.trim() || undefined,
-          pageSize: 50,
+          sector: sector.trim() || undefined,
+          category: category.trim() || undefined,
+          group: group.trim() || undefined,
+          pageSize: 100,
         })
       ).items as AccountPayable[],
     enabled: !!token,
@@ -116,6 +131,18 @@ export default function PayablesPanel() {
               onChange={(e) => setInvoiceNumber(e.target.value)}
             />
           </div>
+          <div className="grid gap-1">
+            <Label htmlFor="p-filter-sector" className="text-xs text-muted-foreground">Setor</Label>
+            <SuggestInput id="p-filter-sector" className="w-40" options={classifications?.sectors ?? []} placeholder="Todos" value={sector} onChange={(e) => setSector(e.target.value)} />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="p-filter-category" className="text-xs text-muted-foreground">Categoria</Label>
+            <SuggestInput id="p-filter-category" className="w-44" options={classifications?.categories ?? []} placeholder="Todas" value={category} onChange={(e) => setCategory(e.target.value)} />
+          </div>
+          <div className="grid gap-1">
+            <Label htmlFor="p-filter-group" className="text-xs text-muted-foreground">Grupo</Label>
+            <SuggestInput id="p-filter-group" className="w-44" options={classifications?.groups ?? []} placeholder="Todos" value={group} onChange={(e) => setGroup(e.target.value)} />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
@@ -127,6 +154,10 @@ export default function PayablesPanel() {
               { header: "Descrição", value: (p) => (p.installmentTotal && p.installmentTotal > 1 ? `${p.description} (${p.installmentNumber}/${p.installmentTotal})` : p.description) },
               { header: "Fornecedor/Beneficiário", value: (p) => p.payeeName },
               { header: "Categoria", value: (p) => p.category },
+              { header: "Grupo", value: (p) => p.expenseGroup },
+              { header: "Descr. despesa", value: (p) => p.expenseDescription },
+              { header: "Setor", value: (p) => p.expenseSector },
+              { header: "Nota fiscal", value: (p) => p.invoiceNumber ?? p.invoice?.number },
               { header: "Vencimento", value: (p) => p.dueDate, type: "date" },
               { header: "Status", value: (p) => STATUS_LABELS[p.status as PayableStatus] ?? p.status },
               { header: "Forma", value: (p) => p.paymentMethod },
@@ -144,7 +175,8 @@ export default function PayablesPanel() {
             <TableRow>
               <TableHead>Descrição</TableHead>
               <TableHead>Fornecedor/Beneficiário</TableHead>
-              <TableHead>Categoria</TableHead>
+              <TableHead>Categoria / grupo</TableHead>
+              <TableHead>Setor</TableHead>
               <TableHead>Valor</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Status</TableHead>
@@ -153,10 +185,10 @@ export default function PayablesPanel() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             )}
             {!isLoading && (data ?? []).length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Nenhuma conta a pagar.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Nenhuma conta a pagar.</TableCell></TableRow>
             )}
             {(data ?? []).map((payable) => (
               <TableRow key={payable.id}>
@@ -167,12 +199,22 @@ export default function PayablesPanel() {
                       ({payable.installmentNumber}/{payable.installmentTotal})
                     </span>
                   )}
-                  {payable.invoice?.number && (
-                    <span className="block text-xs text-muted-foreground">Nota {payable.invoice.number}</span>
+                  {(payable.invoiceNumber || payable.invoice?.number) && (
+                    <span className="block text-xs text-muted-foreground">
+                      Nota {payable.invoiceNumber || payable.invoice?.number}
+                      {payable.documentNumber ? ` · dupl. ${payable.documentNumber}` : ""}
+                    </span>
                   )}
+                  {payable.createdBy && <span className="block text-xs text-muted-foreground">Lançado por {payable.createdBy.name}</span>}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{payable.payeeName}</TableCell>
-                <TableCell className="text-muted-foreground">{payable.category}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {payable.category}
+                  {(payable.expenseGroup || payable.expenseDescription) && (
+                    <span className="block text-xs">{[payable.expenseGroup, payable.expenseDescription].filter(Boolean).join(" › ")}</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{payable.expenseSector ?? "—"}</TableCell>
                 <TableCell>R$ {payable.amount.toFixed(2)}</TableCell>
                 <TableCell className="text-muted-foreground">{new Date(payable.dueDate).toLocaleDateString("pt-BR")}</TableCell>
                 <TableCell><Badge variant={STATUS_VARIANTS[payable.status]}>{STATUS_LABELS[payable.status]}</Badge></TableCell>
@@ -192,93 +234,6 @@ export default function PayablesPanel() {
         </Table>
       </div>
     </div>
-  );
-}
-
-function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onSaved: () => void }) {
-  const { token } = useAuth();
-  const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ description: "", category: "", payeeName: "", amount: "", dueDate: "", installments: "1", notes: "" });
-
-  function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
-    setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!token) return;
-    setSaving(true);
-    try {
-      await api.createPayables(
-        {
-          description: form.description,
-          category: form.category,
-          payeeName: form.payeeName,
-          amount: Number(form.amount),
-          dueDate: form.dueDate,
-          installments: Number(form.installments) || 1,
-          notes: form.notes || undefined,
-        },
-        token
-      );
-      toast.success("Conta a pagar criada.");
-      setOpen(false);
-      setForm({ description: "", category: "", payeeName: "", amount: "", dueDate: "", installments: "1", notes: "" });
-      onSaved();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível criar a conta.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Nova conta a pagar</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="grid gap-1.5">
-            <Label htmlFor="p-description">Descrição *</Label>
-            <Input id="p-description" required value={form.description} onChange={(e) => set("description", e.target.value)} />
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="p-category">Categoria *</Label>
-              <Input id="p-category" required value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="ALUGUEL" />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="p-payee">Beneficiário *</Label>
-              <Input id="p-payee" required value={form.payeeName} onChange={(e) => set("payeeName", e.target.value)} />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="p-amount">Valor *</Label>
-              <Input id="p-amount" type="number" min="0" step="0.01" required value={form.amount} onChange={(e) => set("amount", e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="p-due">Vencimento *</Label>
-              <Input id="p-due" type="date" required value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="p-installments">Parcelas</Label>
-              <Input id="p-installments" type="number" min="1" max="60" value={form.installments} onChange={(e) => set("installments", e.target.value)} />
-            </div>
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="p-notes">Observações</Label>
-            <Input id="p-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Criar"}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 }
 
