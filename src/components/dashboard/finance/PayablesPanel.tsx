@@ -16,6 +16,7 @@ import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDia
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
+import { settlementDateParam, todayInputValue } from "@/lib/dates";
 import type { AccountPayable, BankAccount, ExpenseClassifications, PayableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<PayableStatus, string> = { PENDING: "Pendente", PAID: "Pago", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
@@ -26,22 +27,27 @@ const STATUS_VARIANTS: Record<PayableStatus, "default" | "secondary" | "outline"
   CANCELLED: "secondary",
 };
 
-// A partir de "YYYY-MM" devolve o primeiro e o último dia do mês (para os
-// parâmetros from/to que a listagem já aceita) — "" quando nenhum mês escolhido.
-function monthRange(month: string): { from?: string; to?: string } {
-  if (!month) return {};
-  const [year, mo] = month.split("-").map(Number);
-  const from = new Date(Date.UTC(year, mo - 1, 1));
-  const to = new Date(Date.UTC(year, mo, 0));
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
-}
+type PayableView = "open" | "paid" | "cancelled" | "all";
+
+const VIEW_LABELS: Record<PayableView, string> = {
+  open: "A pagar",
+  paid: "Pagas",
+  cancelled: "Canceladas",
+  all: "Todas",
+};
+
+const dateLabel = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—");
 
 export default function PayablesPanel() {
   const { token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManage = hasPermission("finance", "manage");
-  const [status, setStatus] = useState<string>("");
-  const [month, setMonth] = useState("");
+  // Separação principal: a pagar (pendentes/vencidas), pagas, canceladas ou todas.
+  const [view, setView] = useState<PayableView>("open");
+  // Período, pelo vencimento ou pela data em que foi pago.
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [dateField, setDateField] = useState<"dueDate" | "paidAt">("dueDate");
   const [payeeName, setPayeeName] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   // Despesas separadas por setor (origem) e por categoria/grupo.
@@ -56,12 +62,14 @@ export default function PayablesPanel() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["payables", status, month, payeeName, invoiceNumber, sector, category, group],
+    queryKey: ["payables", view, from, to, dateField, payeeName, invoiceNumber, sector, category, group],
     queryFn: async () =>
       (
         await api.payables(token!, {
-          status: status || undefined,
-          ...monthRange(month),
+          ...(view === "open" ? { situation: "open" as const } : view === "paid" ? { situation: "paid" as const } : view === "cancelled" ? { status: "CANCELLED" } : {}),
+          from: from || undefined,
+          to: to || undefined,
+          dateField: from || to ? dateField : undefined,
           payeeName: payeeName.trim() || undefined,
           invoiceNumber: invoiceNumber.trim() || undefined,
           sector: sector.trim() || undefined,
@@ -91,26 +99,49 @@ export default function PayablesPanel() {
 
   return (
     <div className="grid gap-4">
+      <div className="inline-flex w-fit flex-wrap rounded-md border p-0.5 text-sm">
+        {(Object.keys(VIEW_LABELS) as PayableView[]).map((key) => (
+          <button
+            key={key}
+            type="button"
+            className={`rounded px-3 py-1 ${view === key ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            onClick={() => {
+              setView(key);
+              // Em "Pagas" o natural é procurar pela data em que foi pago; conta em aberto
+              // ainda não tem data de pagamento, então volta para o vencimento.
+              if (key === "paid") setDateField("paidAt");
+              if (key === "open") setDateField("dueDate");
+            }}
+          >
+            {VIEW_LABELS[key]}
+          </button>
+        ))}
+      </div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-2">
           <div className="grid gap-1">
-            <Label className="text-xs text-muted-foreground">Status</Label>
-            <Select value={status || "ALL"} onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}>
-              <SelectTrigger className="w-44">
-                <SelectValue placeholder="Todos os status" />
-              </SelectTrigger>
+            <Label className="text-xs text-muted-foreground">Período por</Label>
+            <Select value={dateField} onValueChange={(v) => setDateField(v as "dueDate" | "paidAt")}>
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="ALL">Todos os status</SelectItem>
-                {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
+                <SelectItem value="dueDate">Data de vencimento</SelectItem>
+                <SelectItem value="paidAt">Data de pagamento</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="p-filter-month" className="text-xs text-muted-foreground">Mês de vencimento</Label>
-            <Input id="p-filter-month" type="month" className="w-40" value={month} onChange={(e) => setMonth(e.target.value)} />
+            <Label htmlFor="p-filter-from" className="text-xs text-muted-foreground">De</Label>
+            <Input id="p-filter-from" type="date" className="w-40" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
+          <div className="grid gap-1">
+            <Label htmlFor="p-filter-to" className="text-xs text-muted-foreground">Até</Label>
+            <Input id="p-filter-to" type="date" className="w-40" value={to} onChange={(e) => setTo(e.target.value)} />
+          </div>
+          {(from || to) && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); }}>
+              Limpar período
+            </Button>
+          )}
           <div className="grid gap-1">
             <Label htmlFor="p-filter-name" className="text-xs text-muted-foreground">Nome</Label>
             <Input
@@ -148,7 +179,15 @@ export default function PayablesPanel() {
           <ExportButtons
             title="Contas a pagar"
             filename="contas-a-pagar"
-            subtitle={[status && `Status: ${STATUS_LABELS[status as PayableStatus]}.`, month && `Vencimento em ${month.split("-").reverse().join("/")}.`].filter(Boolean).join(" ") || undefined}
+            subtitle={
+              [
+                `${VIEW_LABELS[view]}.`,
+                (from || to) &&
+                  `${dateField === "paidAt" ? "Pagamento" : "Vencimento"}${from ? ` de ${dateLabel(`${from}T12:00:00`)}` : ""}${to ? ` até ${dateLabel(`${to}T12:00:00`)}` : ""}.`,
+              ]
+                .filter(Boolean)
+                .join(" ") || undefined
+            }
             rows={data ?? []}
             columns={[
               { header: "Descrição", value: (p) => (p.installmentTotal && p.installmentTotal > 1 ? `${p.description} (${p.installmentNumber}/${p.installmentTotal})` : p.description) },
@@ -162,7 +201,8 @@ export default function PayablesPanel() {
               { header: "Status", value: (p) => STATUS_LABELS[p.status as PayableStatus] ?? p.status },
               { header: "Forma", value: (p) => p.paymentMethod },
               { header: "Valor", value: (p) => p.amount, type: "money" },
-              { header: "Pago", value: (p) => p.paidAmount, type: "money" },
+              { header: "Pago em", value: (p) => p.paidAt, type: "date" },
+              { header: "Valor pago", value: (p) => p.paidAmount, type: "money" },
             ]}
           />
           {canManage && <PayableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a pagar</Button>} />}
@@ -179,16 +219,21 @@ export default function PayablesPanel() {
               <TableHead>Setor</TableHead>
               <TableHead>Valor</TableHead>
               <TableHead>Vencimento</TableHead>
+              <TableHead>Pago em</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-40" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             )}
             {!isLoading && (data ?? []).length === 0 && (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Nenhuma conta a pagar.</TableCell></TableRow>
+              <TableRow>
+                <TableCell colSpan={9} className="text-center text-muted-foreground">
+                  {view === "open" ? "Nenhuma conta a pagar em aberto." : view === "paid" ? "Nenhuma conta paga." : "Nenhuma conta encontrada."}
+                </TableCell>
+              </TableRow>
             )}
             {(data ?? []).map((payable) => (
               <TableRow key={payable.id}>
@@ -216,7 +261,19 @@ export default function PayablesPanel() {
                 </TableCell>
                 <TableCell className="text-muted-foreground">{payable.expenseSector ?? "—"}</TableCell>
                 <TableCell>R$ {payable.amount.toFixed(2)}</TableCell>
-                <TableCell className="text-muted-foreground">{new Date(payable.dueDate).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell className="text-muted-foreground">{dateLabel(payable.dueDate)}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {payable.paidAt ? (
+                    <>
+                      {dateLabel(payable.paidAt)}
+                      {payable.paidAmount != null && payable.paidAmount !== payable.amount && (
+                        <span className="block text-xs">R$ {payable.paidAmount.toFixed(2)}</span>
+                      )}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
                 <TableCell><Badge variant={STATUS_VARIANTS[payable.status]}>{STATUS_LABELS[payable.status]}</Badge></TableCell>
                 <TableCell>
                   {canManage && (payable.status === "PENDING" || payable.status === "OVERDUE") && (
@@ -242,8 +299,15 @@ function PayDialog({ payable, onSaved }: { payable: AccountPayable; onSaved: () 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [paidAmount, setPaidAmount] = useState(String(payable.amount));
-  const [bankAccountId, setBankAccountId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [bankAccountId, setBankAccountId] = useState(payable.bankAccountId ?? "");
+  const [paymentMethod, setPaymentMethod] = useState(payable.paymentMethod ?? "");
+  // Data em que foi pago — começa em hoje, dá pra mudar (ex.: pagamento feito ontem).
+  const [paidAt, setPaidAt] = useState(todayInputValue);
+
+  function handleOpenChange(next: boolean) {
+    if (next) setPaidAt(todayInputValue());
+    setOpen(next);
+  }
 
   const { data: accounts } = useQuery({
     queryKey: ["bank-accounts"],
@@ -256,7 +320,16 @@ function PayDialog({ payable, onSaved }: { payable: AccountPayable; onSaved: () 
     if (!token) return;
     setSaving(true);
     try {
-      await api.payPayable(payable.id, { paidAmount: Number(paidAmount), bankAccountId: bankAccountId || undefined, paymentMethod: paymentMethod || undefined }, token);
+      await api.payPayable(
+        payable.id,
+        {
+          paidAmount: Number(paidAmount),
+          paidAt: settlementDateParam(paidAt),
+          bankAccountId: bankAccountId || undefined,
+          paymentMethod: paymentMethod || undefined,
+        },
+        token
+      );
       toast.success("Conta baixada como paga.");
       setOpen(false);
       onSaved();
@@ -268,7 +341,7 @@ function PayDialog({ payable, onSaved }: { payable: AccountPayable; onSaved: () 
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">Pagar</Button>
       </DialogTrigger>
@@ -277,6 +350,10 @@ function PayDialog({ payable, onSaved }: { payable: AccountPayable; onSaved: () 
           <DialogTitle>Pagar &ldquo;{payable.description}&rdquo;</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor={`paid-at-${payable.id}`}>Data do pagamento</Label>
+            <Input id={`paid-at-${payable.id}`} type="date" required max={todayInputValue()} value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+          </div>
           <div className="grid gap-1.5">
             <Label>Valor pago</Label>
             <Input type="number" min="0" step="0.01" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />

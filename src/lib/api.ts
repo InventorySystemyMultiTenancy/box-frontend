@@ -451,6 +451,10 @@ export const api = {
       invoiceNumber?: string;
       sector?: string;
       group?: string;
+      // "open" = a pagar (pendente/vencida), "paid" = pagas.
+      situation?: "open" | "paid";
+      // Período (from/to) pelo vencimento (padrão) ou pela data em que foi pago.
+      dateField?: "dueDate" | "paidAt";
       page?: number;
       pageSize?: number;
     } = {}

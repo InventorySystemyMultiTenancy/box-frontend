@@ -14,6 +14,7 @@ import { ExportButtons } from "@/components/ui/export-buttons";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
+import { settlementDateParam, todayInputValue } from "@/lib/dates";
 import type { AccountReceivable, BankAccount, Client, ReceivableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<ReceivableStatus, string> = { PENDING: "Pendente", RECEIVED: "Recebido", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
@@ -81,7 +82,8 @@ export default function ReceivablesPanel() {
               { header: "Status", value: (r) => STATUS_LABELS[r.status as keyof typeof STATUS_LABELS] ?? r.status },
               { header: "Forma", value: (r) => r.paymentMethod },
               { header: "Valor", value: (r) => r.amount, type: "money" },
-              { header: "Recebido", value: (r) => r.receivedAmount, type: "money" },
+              { header: "Recebido em", value: (r) => r.receivedAt, type: "date" },
+              { header: "Valor recebido", value: (r) => r.receivedAmount, type: "money" },
             ]}
           />
           {canManage && <ReceivableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a receber</Button>} />}
@@ -97,16 +99,17 @@ export default function ReceivablesPanel() {
               <TableHead>Categoria</TableHead>
               <TableHead>Valor</TableHead>
               <TableHead>Vencimento</TableHead>
+              <TableHead>Recebido em</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-40" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             )}
             {!isLoading && (data ?? []).length === 0 && (
-              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Nenhuma conta a receber.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Nenhuma conta a receber.</TableCell></TableRow>
             )}
             {(data ?? []).map((receivable) => (
               <TableRow key={receivable.id}>
@@ -122,6 +125,18 @@ export default function ReceivablesPanel() {
                 <TableCell className="text-muted-foreground">{receivable.category}</TableCell>
                 <TableCell>R$ {receivable.amount.toFixed(2)}</TableCell>
                 <TableCell className="text-muted-foreground">{new Date(receivable.dueDate).toLocaleDateString("pt-BR")}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {receivable.receivedAt ? (
+                    <>
+                      {new Date(receivable.receivedAt).toLocaleDateString("pt-BR")}
+                      {receivable.receivedAmount != null && receivable.receivedAmount !== receivable.amount && (
+                        <span className="block text-xs">R$ {receivable.receivedAmount.toFixed(2)}</span>
+                      )}
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
                 <TableCell><Badge variant={STATUS_VARIANTS[receivable.status]}>{STATUS_LABELS[receivable.status]}</Badge></TableCell>
                 <TableCell>
                   {canManage && (receivable.status === "PENDING" || receivable.status === "OVERDUE") && (
@@ -248,8 +263,15 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [receivedAmount, setReceivedAmount] = useState(String(receivable.amount));
-  const [bankAccountId, setBankAccountId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [bankAccountId, setBankAccountId] = useState(receivable.bankAccountId ?? "");
+  const [paymentMethod, setPaymentMethod] = useState(receivable.paymentMethod ?? "");
+  // Data em que foi recebido — começa em hoje, dá pra mudar (ex.: recebido ontem).
+  const [receivedAt, setReceivedAt] = useState(todayInputValue);
+
+  function handleOpenChange(next: boolean) {
+    if (next) setReceivedAt(todayInputValue());
+    setOpen(next);
+  }
 
   const { data: accounts } = useQuery({
     queryKey: ["bank-accounts"],
@@ -262,7 +284,16 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
     if (!token) return;
     setSaving(true);
     try {
-      await api.receiveReceivable(receivable.id, { receivedAmount: Number(receivedAmount), bankAccountId: bankAccountId || undefined, paymentMethod: paymentMethod || undefined }, token);
+      await api.receiveReceivable(
+        receivable.id,
+        {
+          receivedAmount: Number(receivedAmount),
+          receivedAt: settlementDateParam(receivedAt),
+          bankAccountId: bankAccountId || undefined,
+          paymentMethod: paymentMethod || undefined,
+        },
+        token
+      );
       toast.success("Recebimento confirmado.");
       setOpen(false);
       onSaved();
@@ -274,7 +305,7 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">Receber</Button>
       </DialogTrigger>
@@ -283,6 +314,17 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
           <DialogTitle>Receber &ldquo;{receivable.description}&rdquo;</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4">
+          <div className="grid gap-1.5">
+            <Label htmlFor={`received-at-${receivable.id}`}>Data do recebimento</Label>
+            <Input
+              id={`received-at-${receivable.id}`}
+              type="date"
+              required
+              max={todayInputValue()}
+              value={receivedAt}
+              onChange={(e) => setReceivedAt(e.target.value)}
+            />
+          </div>
           <div className="grid gap-1.5">
             <Label>Valor recebido</Label>
             <Input type="number" min="0" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} />
