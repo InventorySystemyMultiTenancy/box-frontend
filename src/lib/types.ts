@@ -626,6 +626,14 @@ export interface AccountPayable {
   createdBy?: { id: string; name: string } | null;
 }
 
+// Totais do topo de Contas a pagar/receber: em aberto (pendentes + vencidas), só as
+// vencidas, e já quitado (pago/recebido — valor efetivo).
+export interface SettlementSummary {
+  open: { total: number; count: number };
+  overdue: { total: number; count: number };
+  settled: { total: number; count: number };
+}
+
 // Classificações de despesa já usadas (ficam salvas para os próximos lançamentos).
 export interface ExpenseClassifications {
   categories: string[];

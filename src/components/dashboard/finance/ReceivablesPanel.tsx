@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -30,6 +31,13 @@ export default function ReceivablesPanel() {
   const queryClient = useQueryClient();
   const canManage = hasPermission("finance", "manage");
   const [status, setStatus] = useState<string>("");
+
+  // Totais do topo (em aberto / vencido / já recebido) — não dependem do filtro de status.
+  const { data: summary } = useQuery({
+    queryKey: ["receivables", "summary"],
+    queryFn: async () => (await api.receivablesSummary(token!)).summary,
+    enabled: !!token,
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ["receivables", status],
@@ -55,6 +63,7 @@ export default function ReceivablesPanel() {
 
   return (
     <div className="grid gap-4">
+      <SettlementSummaryCards summary={summary} kind="receivable" filtered={false} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Select value={status || "ALL"} onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}>
           <SelectTrigger className="w-48">

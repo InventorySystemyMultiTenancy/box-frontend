@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { SuggestInput } from "@/components/ui/suggest-input";
 import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDialog";
+import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -61,6 +62,25 @@ export default function PayablesPanel() {
     enabled: !!token,
   });
 
+  // Filtros comuns à lista e aos totais do topo (os totais ignoram só a aba de situação).
+  const filterParams = {
+    from: from || undefined,
+    to: to || undefined,
+    dateField: from || to ? dateField : undefined,
+    payeeName: payeeName.trim() || undefined,
+    invoiceNumber: invoiceNumber.trim() || undefined,
+    sector: sector.trim() || undefined,
+    category: category.trim() || undefined,
+    group: group.trim() || undefined,
+  };
+  const hasFilters = Object.values(filterParams).some(Boolean);
+
+  const { data: summary } = useQuery({
+    queryKey: ["payables", "summary", filterParams],
+    queryFn: async () => (await api.payablesSummary(token!, filterParams)).summary,
+    enabled: !!token,
+  });
+
   const { data, isLoading } = useQuery({
     queryKey: ["payables", view, from, to, dateField, payeeName, invoiceNumber, sector, category, group],
     queryFn: async () =>
@@ -99,6 +119,7 @@ export default function PayablesPanel() {
 
   return (
     <div className="grid gap-4">
+      <SettlementSummaryCards summary={summary} kind="payable" filtered={hasFilters} />
       <div className="inline-flex w-fit flex-wrap rounded-md border p-0.5 text-sm">
         {(Object.keys(VIEW_LABELS) as PayableView[]).map((key) => (
           <button

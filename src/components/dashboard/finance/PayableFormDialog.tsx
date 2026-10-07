@@ -196,7 +196,12 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
         },
         token
       );
-      toast.success(installments.length > 1 ? `${installments.length} duplicatas lançadas em contas a pagar.` : "Conta a pagar lançada.");
+      toast.success(
+        `${installments.length > 1 ? `${installments.length} duplicatas lançadas em contas a pagar.` : "Conta a pagar lançada."}${
+          header.invoiceNumber.trim() ? ` Nota ${header.invoiceNumber.trim()} registrada em Notas fiscais.` : ""
+        }`
+      );
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
       queryClient.invalidateQueries({ queryKey: ["expense-classifications"] });
       setOpen(false);
       onSaved();

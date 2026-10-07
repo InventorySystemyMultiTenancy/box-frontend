@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import DayAgendaPanel from "@/components/dashboard/agenda/DayAgendaPanel";
+import GeneralAgendaPanel from "@/components/dashboard/agenda/GeneralAgendaPanel";
 import BaysPanel from "@/components/dashboard/agenda/BaysPanel";
 import WorkloadPanel from "@/components/dashboard/agenda/WorkloadPanel";
 import AgendaReportPanel from "@/components/dashboard/agenda/AgendaReportPanel";
 import { DriverSchedulePanel } from "@/components/dashboard/agenda/DriverSchedulePanel";
 
 const TABS = [
-  { key: "day", label: "Agenda do dia" },
+  { key: "general", label: "Agendas em geral" },
   { key: "drivers", label: "Motoristas (planilha)" },
   { key: "workload", label: "Carga de trabalho" },
   { key: "bays", label: "Boxes/Elevadores" },
@@ -22,7 +22,7 @@ type TabKey = (typeof TABS)[number]["key"];
 export default function AgendaPage() {
   const { user, hasPermission } = useAuth();
   const router = useRouter();
-  const [tab, setTab] = useState<TabKey>("day");
+  const [tab, setTab] = useState<TabKey>("general");
   const allowed = hasPermission("agenda", "view");
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export default function AgendaPage() {
         ))}
       </div>
 
-      {tab === "day" && <DayAgendaPanel />}
+      {tab === "general" && <GeneralAgendaPanel />}
       {tab === "drivers" && <DriverSchedulePanel />}
       {tab === "workload" && <WorkloadPanel />}
       {tab === "bays" && <BaysPanel />}

@@ -1,4 +1,4 @@
-import type { ExpenseClassifications, FinancialReportData } from "@/lib/types";
+import type { ExpenseClassifications, FinancialReportData, SettlementSummary } from "@/lib/types";
 import type { ReportAccess } from "@/lib/access";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -464,6 +464,10 @@ export const api = {
   expenseClassifications: (token: string) =>
     request<ExpenseClassifications>("/api/finance/payables/classifications", {}, token),
 
+  // Totais do topo (em aberto / vencido / já pago) — mesmos filtros da lista, sem situação.
+  payablesSummary: (token: string, params: Record<string, string | undefined> = {}) =>
+    request<{ summary: SettlementSummary }>(`/api/finance/payables/summary${toQuery(params)}`, {}, token),
+
   createPayables: (payload: Record<string, unknown>, token: string) =>
     request<{ installments: unknown[] }>("/api/finance/payables", { method: "POST", body: JSON.stringify(payload) }, token),
 
@@ -479,6 +483,10 @@ export const api = {
   // Financeiro — contas a receber
   receivables: (token: string, params: { status?: string; category?: string; clientId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) =>
     request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/receivables${toQuery(params)}`, {}, token),
+
+  // Totais do topo (em aberto / vencido / já recebido) — mesmos filtros da lista, sem status.
+  receivablesSummary: (token: string, params: Record<string, string | undefined> = {}) =>
+    request<{ summary: SettlementSummary }>(`/api/finance/receivables/summary${toQuery(params)}`, {}, token),
 
   createReceivables: (payload: Record<string, unknown>, token: string) =>
     request<{ installments: unknown[] }>("/api/finance/receivables", { method: "POST", body: JSON.stringify(payload) }, token),

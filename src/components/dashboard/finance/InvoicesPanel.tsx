@@ -106,7 +106,7 @@ export default function InvoicesPanel() {
           <Label htmlFor="search-client">Cliente</Label>
           <Input
             id="search-client"
-            placeholder="Nome do cliente"
+            placeholder="Cliente ou fornecedor"
             value={search.clientName}
             onChange={(e) => setSearchField("clientName", e.target.value)}
           />
@@ -165,8 +165,11 @@ export default function InvoicesPanel() {
                 <TableCell>{TYPE_LABELS[invoice.type]}</TableCell>
                 <TableCell className="text-muted-foreground">{invoice.number ? `${invoice.number}${invoice.series ? `/${invoice.series}` : ""}` : "—"}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  {invoice.client?.name || invoice.recipientName || "—"}
+                  {invoice.client?.name || invoice.recipientName || (invoice.issuerName ? `Fornecedor: ${invoice.issuerName}` : "—")}
                   {invoice.serviceOrder && <p className="text-xs">Projeto: {invoice.serviceOrder.code}</p>}
+                  {(invoice.expenseSector || invoice.expenseGroup) && (
+                    <p className="text-xs">{[invoice.expenseGroup, invoice.expenseSector].filter(Boolean).join(" · ")}</p>
+                  )}
                 </TableCell>
                 <TableCell>R$ {invoice.totalAmount.toFixed(2)}</TableCell>
                 <TableCell>
@@ -176,7 +179,11 @@ export default function InvoicesPanel() {
                   )}
                   {invoice.payables && invoice.payables.length > 0 && (
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {invoice.payables.length} boleto{invoice.payables.length > 1 ? "s" : ""} em contas a pagar
+                      {invoice.payables.length} parcela{invoice.payables.length > 1 ? "s" : ""} em contas a pagar
+                      {(() => {
+                        const paid = invoice.payables.filter((p) => p.status === "PAID").length;
+                        return paid > 0 ? ` · ${paid} paga${paid > 1 ? "s" : ""}` : "";
+                      })()}
                     </p>
                   )}
                 </TableCell>
