@@ -594,6 +594,10 @@ export const api = {
 
   myPickupsToday: (token: string) => request<{ appointments: unknown[] }>("/api/agenda/appointments/my-pickups-today", {}, token),
 
+  // Planilha de agendamento dos motoristas — scope "own" quando o usuário só pode ver os dele.
+  driverSchedule: (token: string, params: { from?: string; to?: string; driverId?: string } = {}) =>
+    request<{ appointments: unknown[]; scope: "all" | "own" }>(`/api/agenda/appointments/driver-schedule${toQuery(params)}`, {}, token),
+
   createAppointment: (payload: Record<string, unknown>, token: string) =>
     request<{ appointment: unknown }>("/api/agenda/appointments", { method: "POST", body: JSON.stringify(payload) }, token),
 

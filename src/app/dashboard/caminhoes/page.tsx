@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, Plus, Search, Trash2, Truck as TruckIcon } from "lucide-react";
+import { Bell, CalendarDays, Plus, Receipt, Search, Trash2, Truck as TruckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,8 @@ import { FinishTripDialog } from "@/components/dashboard/trucks/FinishTripDialog
 import { RefuelingDialog } from "@/components/dashboard/trucks/RefuelingDialog";
 import { TruckMovementsPanel } from "@/components/dashboard/trucks/TruckMovementsPanel";
 import { TruckRefuelingsPanel } from "@/components/dashboard/trucks/TruckRefuelingsPanel";
+import { DriverSchedulePanel } from "@/components/dashboard/agenda/DriverSchedulePanel";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { matchesSearch } from "@/lib/utils";
@@ -22,10 +24,10 @@ import type { Appointment, Truck } from "@/lib/types";
 const APPOINTMENT_TYPE_LABELS: Record<string, string> = { PICKUP: "retirar", DROPOFF: "entregar" };
 
 export default function CaminhoesPage() {
-  const { user, token } = useAuth();
+  const { user, token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const isAdmin = user?.role === "ADMIN";
-  const [view, setView] = useState<"trucks" | "movements" | "refuelings">("trucks");
+  const [view, setView] = useState<"trucks" | "movements" | "refuelings" | "schedule">("trucks");
   const [search, setSearch] = useState("");
 
   const { data: trucks, isLoading } = useQuery({
@@ -88,6 +90,13 @@ export default function CaminhoesPage() {
           <p className="text-sm text-muted-foreground">Controle de uso dos caminhões usados para buscar veículos de clientes.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Gastos da viagem (refeição, hotel...) — a aba Gastos mostra "Voltar aos caminhões". */}
+          <Button asChild variant="outline">
+            <Link href="/dashboard/gastos?de=caminhoes">
+              <Receipt className="size-4" />
+              Lançar gastos
+            </Link>
+          </Button>
           {isAdmin && view === "trucks" && (
             <TruckFormDialog
               onSaved={refetch}
@@ -121,6 +130,14 @@ export default function CaminhoesPage() {
             >
               Abastecimentos
             </button>
+            <button
+              type="button"
+              className={`inline-flex items-center gap-1 rounded px-3 py-1 ${view === "schedule" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              onClick={() => setView("schedule")}
+            >
+              <CalendarDays className="size-3.5" />
+              Agendamentos
+            </button>
           </div>
         </div>
       </div>
@@ -141,7 +158,9 @@ export default function CaminhoesPage() {
         </div>
       )}
 
-      {view === "movements" ? (
+      {view === "schedule" ? (
+        <DriverSchedulePanel title={hasPermission("agenda", "view") ? "Agendamentos dos motoristas" : "Meus agendamentos"} />
+      ) : view === "movements" ? (
         <TruckMovementsPanel />
       ) : view === "refuelings" ? (
         <TruckRefuelingsPanel />

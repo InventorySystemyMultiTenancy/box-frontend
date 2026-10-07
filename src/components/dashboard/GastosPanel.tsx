@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { FinancialEntry } from "@/lib/types";
@@ -16,8 +18,9 @@ function firstDayOfMonth() {
 
 /** Qualquer funcionário lança um gasto próprio aqui — quem filtra/analisa por data,
  * usuário e categoria é o admin, na aba Financeiro » Resumo. */
-export default function GastosPanel() {
+export default function GastosPanel({ backTo }: { backTo?: { href: string; label: string } }) {
   const { token, user } = useAuth();
+  const [saved, setSaved] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [categories, setCategories] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -83,8 +86,9 @@ export default function GastosPanel() {
         },
         token
       );
-      setForm(EMPTY_FORM);
+      setForm({ ...EMPTY_FORM, occurredAt: form.occurredAt });
       setMessage("Gasto registrado.");
+      setSaved(true);
     } catch {
       setMessage("Não foi possível registrar o gasto.");
     } finally {
@@ -94,6 +98,11 @@ export default function GastosPanel() {
 
   return (
     <div className={styles.content}>
+      {backTo && (
+        <Link href={backTo.href} className={styles.linkButton} style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", marginBottom: "0.8rem" }}>
+          <ArrowLeft size={14} /> {backTo.label}
+        </Link>
+      )}
       <div className={styles.sectionTitle}>Meus gastos</div>
       <p className={styles.tlSub} style={{ marginBottom: "1rem" }}>
         Lance aqui um gasto que você teve — {user?.name} — o administrador consegue ver e filtrar todos os gastos
@@ -107,7 +116,7 @@ export default function GastosPanel() {
               list="gasto-categorias"
               value={form.category}
               onChange={(e) => setForm((prev) => ({ ...prev, category: e.target.value }))}
-              placeholder="Ex.: Combustível, Alimentação..."
+              placeholder="Refeição, Hotel, Diversos..."
               required
             />
             <datalist id="gasto-categorias">
@@ -148,6 +157,11 @@ export default function GastosPanel() {
           <button className={styles.actionButton} type="submit" disabled={busy}>
             {busy ? "Registrando..." : "Registrar gasto"}
           </button>
+          {backTo && saved && (
+            <Link href={backTo.href} className={styles.actionButton} style={{ textAlign: "center" }}>
+              {backTo.label}
+            </Link>
+          )}
         </form>
       </div>
 

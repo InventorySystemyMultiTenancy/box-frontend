@@ -48,6 +48,9 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
   const [startAt, setStartAt] = useState(toLocalInputValue(defaultStartAt));
   const [durationMin, setDurationMin] = useState("60");
   const [notes, setNotes] = useState("");
+  // Tarefa de motorista: locais das colunas "retirada" e "entrega" da planilha.
+  const [pickupLocation, setPickupLocation] = useState("");
+  const [dropoffLocation, setDropoffLocation] = useState("");
 
   const isPickupOrDropoff = type !== "SERVICE";
 
@@ -88,6 +91,8 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
     setStartAt(toLocalInputValue(defaultStartAt));
     setDurationMin("60");
     setNotes("");
+    setPickupLocation("");
+    setDropoffLocation("");
   }
 
   function handleOpenChange(next: boolean) {
@@ -138,6 +143,8 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
           startAt: new Date(startAt).toISOString(),
           estimatedDurationMin: Number(durationMin) || 60,
           notes: notes || undefined,
+          pickupLocation: isPickupOrDropoff ? pickupLocation || undefined : undefined,
+          dropoffLocation: isPickupOrDropoff ? dropoffLocation || undefined : undefined,
         },
         token
       );
@@ -240,6 +247,19 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
               </div>
             )}
           </div>
+
+          {isPickupOrDropoff && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="ap-pickup">Retirada (onde buscar)</Label>
+                <Input id="ap-pickup" value={pickupLocation} onChange={(e) => setPickupLocation(e.target.value)} placeholder="Ex.: Rua X, 123 — casa do cliente" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="ap-dropoff">Entrega (onde deixar)</Label>
+                <Input id="ap-dropoff" value={dropoffLocation} onChange={(e) => setDropoffLocation(e.target.value)} placeholder="Ex.: Oficina Reblind" />
+              </div>
+            </div>
+          )}
 
           {isPickupOrDropoff ? (
             <div className="grid gap-1.5">

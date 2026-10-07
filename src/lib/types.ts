@@ -100,6 +100,7 @@ export interface Vehicle {
   year: number;
   engine?: string | null;
   plate?: string | null;
+  chassi?: string | null;
   mileage: number;
   owner?: { id: string; name: string; email?: string; phone?: string | null };
 }
@@ -823,6 +824,9 @@ export interface Appointment {
   estimatedDurationMin: number;
   status: AppointmentStatus;
   notes?: string | null;
+  // Tarefa de motorista: de onde retirar e onde entregar o veículo.
+  pickupLocation?: string | null;
+  dropoffLocation?: string | null;
 }
 
 export interface MechanicWorkload {

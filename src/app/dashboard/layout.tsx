@@ -159,9 +159,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   // guard, a pessoa continuava caindo direto na aba Projetos (raiz /dashboard) ao
   // entrar, já que aquela página não verificava allowedTabs, só a navegação escondia
   // o link. Sem aba permitida nenhuma (allTabs vazio pro cargo), cai no Perfil.
+  // Quem usa a aba Caminhões lança os gastos da viagem pelo botão "Lançar gastos" — então
+  // Gastos fica liberado junto, mesmo pra um cargo restrito só a Caminhões.
+  const canUseTrucks = tabs.some((tab) => tab.key === "trucks");
   const isOnAllowedTab =
     allowedTabs.length === 0 ||
     ALWAYS_ALLOWED_PATHS.includes(pathname) ||
+    (canUseTrucks && pathname === "/dashboard/gastos") ||
     tabs.some((tab) => pathMatchesTab(pathname, tab.href));
 
   useEffect(() => {

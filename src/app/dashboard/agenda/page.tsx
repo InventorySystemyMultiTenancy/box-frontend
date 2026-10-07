@@ -7,9 +7,11 @@ import DayAgendaPanel from "@/components/dashboard/agenda/DayAgendaPanel";
 import BaysPanel from "@/components/dashboard/agenda/BaysPanel";
 import WorkloadPanel from "@/components/dashboard/agenda/WorkloadPanel";
 import AgendaReportPanel from "@/components/dashboard/agenda/AgendaReportPanel";
+import { DriverSchedulePanel } from "@/components/dashboard/agenda/DriverSchedulePanel";
 
 const TABS = [
   { key: "day", label: "Agenda do dia" },
+  { key: "drivers", label: "Motoristas (planilha)" },
   { key: "workload", label: "Carga de trabalho" },
   { key: "bays", label: "Boxes/Elevadores" },
   { key: "report", label: "Relatório" },
@@ -33,7 +35,7 @@ export default function AgendaPage() {
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Agenda</h1>
-        <p className="text-sm text-muted-foreground">Calendário de agendamentos, ocupação de box/elevador e carga de trabalho por mecânico.</p>
+        <p className="text-sm text-muted-foreground">Calendário de agendamentos, tarefas dos motoristas (retiradas/entregas), ocupação de box/elevador e carga de trabalho por mecânico.</p>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-1 border-b">
@@ -51,6 +53,7 @@ export default function AgendaPage() {
       </div>
 
       {tab === "day" && <DayAgendaPanel />}
+      {tab === "drivers" && <DriverSchedulePanel />}
       {tab === "workload" && <WorkloadPanel />}
       {tab === "bays" && <BaysPanel />}
       {tab === "report" && <AgendaReportPanel />}
