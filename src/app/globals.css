@@ -98,6 +98,21 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* Alerta piscante (contas vencidas / perto do vencimento). */
+@keyframes alert-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.animate-alert-blink {
+  animation: alert-blink 1s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

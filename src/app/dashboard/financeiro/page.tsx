@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
+import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import AdminFinancePanel from "@/components/dashboard/AdminFinancePanel";
 import BankAccountsPanel from "@/components/dashboard/finance/BankAccountsPanel";
@@ -22,10 +25,19 @@ const TABS = [
 type TabKey = (typeof TABS)[number]["key"];
 
 export default function FinanceiroPage() {
-  const { user, hasPermission } = useAuth();
+  const { user, token, hasPermission } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("resumo");
   const allowed = user?.role === "ADMIN" || hasPermission("finance", "view");
+
+  // Contas vencidas (vermelho) ou perto do vencimento (amarelo): a aba Contas a pagar pisca.
+  const { data: dueWarnings } = useQuery({
+    queryKey: ["payables", "due-warnings"],
+    queryFn: async () => (await api.payableDueWarnings(token!)).warnings,
+    enabled: !!token && allowed,
+    refetchInterval: 5 * 60 * 1000,
+  });
+  const payablesAlert = dueWarnings?.overdue.count ? "overdue" : dueWarnings?.dueSoon.count ? "dueSoon" : null;
 
   useEffect(() => {
     if (user && !allowed) router.replace("/dashboard");
@@ -49,7 +61,15 @@ export default function FinanceiroPage() {
               tab === t.key ? "border-b-2 border-primary text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            {t.label}
+            <span className="inline-flex items-center gap-1.5">
+              {t.label}
+              {t.key === "payables" && payablesAlert && (
+                <AlertTriangle
+                  aria-label={payablesAlert === "overdue" ? "Há contas vencidas" : "Há contas perto do vencimento"}
+                  className={`size-4 animate-alert-blink ${payablesAlert === "overdue" ? "text-red-600" : "text-amber-500"}`}
+                />
+              )}
+            </span>
           </button>
         ))}
       </div>

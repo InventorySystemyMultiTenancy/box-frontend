@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { AlertTriangle, Clock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,14 +37,15 @@ const VIEW_LABELS: Record<PayableView, string> = {
   all: "Todas",
 };
 
+const brl = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateLabel = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—");
 
 export default function PayablesPanel() {
   const { token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManage = hasPermission("finance", "manage");
-  // Separação principal: a pagar (pendentes/vencidas), pagas, canceladas ou todas.
-  const [view, setView] = useState<PayableView>("open");
+  // Separação principal: todas (padrão), a pagar (pendentes/vencidas), pagas ou canceladas.
+  const [view, setView] = useState<PayableView>("all");
   // Período, pelo vencimento ou pela data em que foi pago.
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -81,7 +82,7 @@ export default function PayablesPanel() {
     enabled: !!token,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, dataUpdatedAt } = useQuery({
     queryKey: ["payables", view, from, to, dateField, payeeName, invoiceNumber, sector, category, group],
     queryFn: async () =>
       (
@@ -101,6 +102,22 @@ export default function PayablesPanel() {
     enabled: !!token,
   });
 
+  // Vencidas e que vencem em breve, sem filtros — mesmo dado do indicador da aba.
+  const { data: dueWarnings } = useQuery({
+    queryKey: ["payables", "due-warnings"],
+    queryFn: async () => (await api.payableDueWarnings(token!)).warnings,
+    enabled: !!token,
+    refetchInterval: 5 * 60 * 1000,
+  });
+  const dueSoonDays = dueWarnings?.dueSoonDays ?? 3;
+  const isDueSoon = (p: AccountPayable) =>
+    p.status === "PENDING" && new Date(p.dueDate).getTime() - dataUpdatedAt <= dueSoonDays * 24 * 60 * 60 * 1000;
+
+  function showOpen() {
+    setView("open");
+    setDateField("dueDate");
+  }
+
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["payables"] });
     queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
@@ -119,6 +136,34 @@ export default function PayablesPanel() {
 
   return (
     <div className="grid gap-4">
+      {!!dueWarnings?.overdue.count && (
+        <button
+          type="button"
+          onClick={showOpen}
+          className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-left text-sm font-medium text-red-700"
+        >
+          <AlertTriangle className="size-5 shrink-0 animate-alert-blink text-red-600" />
+          <span className="animate-alert-blink">
+            {dueWarnings.overdue.count} conta{dueWarnings.overdue.count === 1 ? "" : "s"} vencida{dueWarnings.overdue.count === 1 ? "" : "s"} —{" "}
+            {brl(dueWarnings.overdue.total)}
+          </span>
+          <span className="ml-auto text-xs font-normal underline">Ver a pagar</span>
+        </button>
+      )}
+      {!!dueWarnings?.dueSoon.count && (
+        <button
+          type="button"
+          onClick={showOpen}
+          className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-left text-sm font-medium text-amber-800"
+        >
+          <Clock className="size-5 shrink-0 animate-alert-blink text-amber-500" />
+          <span className="animate-alert-blink">
+            {dueWarnings.dueSoon.count} conta{dueWarnings.dueSoon.count === 1 ? "" : "s"} vence{dueWarnings.dueSoon.count === 1 ? "" : "m"} nos
+            próximos {dueWarnings.dueSoonDays} dias — {brl(dueWarnings.dueSoon.total)}
+          </span>
+          <span className="ml-auto text-xs font-normal underline">Ver a pagar</span>
+        </button>
+      )}
       <SettlementSummaryCards summary={summary} kind="payable" filtered={hasFilters} />
       <div className="inline-flex w-fit flex-wrap rounded-md border p-0.5 text-sm">
         {(Object.keys(VIEW_LABELS) as PayableView[]).map((key) => (
@@ -295,7 +340,16 @@ export default function PayablesPanel() {
                     "—"
                   )}
                 </TableCell>
-                <TableCell><Badge variant={STATUS_VARIANTS[payable.status]}>{STATUS_LABELS[payable.status]}</Badge></TableCell>
+                <TableCell>
+                  <Badge variant={STATUS_VARIANTS[payable.status]} className={payable.status === "OVERDUE" ? "animate-alert-blink" : undefined}>
+                    {STATUS_LABELS[payable.status]}
+                  </Badge>
+                  {isDueSoon(payable) && (
+                    <Badge variant="outline" className="mt-1 flex w-fit animate-alert-blink border-amber-400 text-amber-700">
+                      Vence em breve
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell>
                   {canManage && (payable.status === "PENDING" || payable.status === "OVERDUE") && (
                     <div className="flex justify-end gap-2">

@@ -1,4 +1,4 @@
-import type { ExpenseClassifications, FinancialReportData, SettlementSummary } from "@/lib/types";
+import type { ExpenseClassifications, FinancialReportData, PayableDueWarnings, SettlementSummary } from "@/lib/types";
 import type { ReportAccess } from "@/lib/access";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -467,6 +467,9 @@ export const api = {
   // Totais do topo (em aberto / vencido / já pago) — mesmos filtros da lista, sem situação.
   payablesSummary: (token: string, params: Record<string, string | undefined> = {}) =>
     request<{ summary: SettlementSummary }>(`/api/finance/payables/summary${toQuery(params)}`, {}, token),
+
+  payableDueWarnings: (token: string) =>
+    request<{ warnings: PayableDueWarnings }>("/api/finance/payables/due-warnings", {}, token),
 
   createPayables: (payload: Record<string, unknown>, token: string) =>
     request<{ installments: unknown[] }>("/api/finance/payables", { method: "POST", body: JSON.stringify(payload) }, token),

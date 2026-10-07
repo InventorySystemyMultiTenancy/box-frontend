@@ -634,6 +634,13 @@ export interface SettlementSummary {
   settled: { total: number; count: number };
 }
 
+// Aviso da aba Contas a pagar: vencidas e que vencem nos próximos `dueSoonDays` dias.
+export interface PayableDueWarnings {
+  dueSoonDays: number;
+  overdue: { total: number; count: number };
+  dueSoon: { total: number; count: number };
+}
+
 // Classificações de despesa já usadas (ficam salvas para os próximos lançamentos).
 export interface ExpenseClassifications {
   categories: string[];
