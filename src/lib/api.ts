@@ -323,6 +323,12 @@ export const api = {
   createExpense: (payload: { category: string; description: string; amount: number; occurredAt?: string }, token: string) =>
     request<{ entry: unknown }>("/api/finance/expenses", { method: "POST", body: JSON.stringify(payload) }, token),
 
+  updateExpense: (id: string, payload: { category?: string; description?: string; amount?: number; occurredAt?: string }, token: string) =>
+    request<{ entry: unknown }>(`/api/finance/expenses/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  deleteExpense: (id: string, token: string) =>
+    request<void>(`/api/finance/expenses/${id}`, { method: "DELETE" }, token),
+
   myExpenses: (token: string, params: { from?: string; to?: string } = {}) =>
     request<{ entries: unknown[]; total: number }>(`/api/finance/my-expenses${toQuery(params)}`, {}, token),
 
@@ -603,6 +609,9 @@ export const api = {
 
   updateAppointment: (id: string, payload: Record<string, unknown>, token: string) =>
     request<{ appointment: unknown }>(`/api/agenda/appointments/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+
+  deleteAppointment: (id: string, token: string) =>
+    request<void>(`/api/agenda/appointments/${id}`, { method: "DELETE" }, token),
 
   setAppointmentStatus: (id: string, status: string, token: string) =>
     request<{ appointment: unknown }>(`/api/agenda/appointments/${id}/status`, { method: "PATCH", body: JSON.stringify({ status }) }, token),

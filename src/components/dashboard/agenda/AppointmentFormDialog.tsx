@@ -10,12 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { AppointmentType, Bay, Client, ClientDetail, User, Vehicle } from "@/lib/types";
+import type { Appointment, AppointmentType, Bay, Client, ClientDetail, User, Vehicle } from "@/lib/types";
 
 interface AppointmentFormDialogProps {
   trigger: React.ReactNode;
   onSaved: () => void;
   defaultStartAt?: string;
+  appointment?: Appointment;
 }
 
 const TYPE_LABELS: Record<AppointmentType, string> = {
@@ -32,7 +33,7 @@ function toLocalInputValue(iso?: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: AppointmentFormDialogProps) {
+export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt, appointment }: AppointmentFormDialogProps) {
   const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -79,20 +80,20 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
   });
 
   function reset() {
-    setType("SERVICE");
-    setTitle("");
-    setClientId("");
+    setType(appointment?.type ?? "SERVICE");
+    setTitle(appointment?.title ?? "");
+    setClientId(appointment?.clientId ?? "");
     setVehicleMode("existing");
-    setVehicleId("");
+    setVehicleId(appointment?.vehicleId ?? "");
     setNewVehicle(EMPTY_NEW_VEHICLE);
-    setMechanicId("");
-    setDriverId("");
-    setBayId("");
-    setStartAt(toLocalInputValue(defaultStartAt));
-    setDurationMin("60");
-    setNotes("");
-    setPickupLocation("");
-    setDropoffLocation("");
+    setMechanicId(appointment?.mechanicId ?? "");
+    setDriverId(appointment?.driverId ?? "");
+    setBayId(appointment?.bayId ?? "");
+    setStartAt(toLocalInputValue(appointment?.startAt ?? defaultStartAt));
+    setDurationMin(String(appointment?.estimatedDurationMin ?? 60));
+    setNotes(appointment?.notes ?? "");
+    setPickupLocation(appointment?.pickupLocation ?? "");
+    setDropoffLocation(appointment?.dropoffLocation ?? "");
   }
 
   function handleOpenChange(next: boolean) {
@@ -131,28 +132,38 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
         finalVehicleId = (vehicle as Vehicle).id;
       }
 
-      await api.createAppointment(
-        {
-          title,
-          type,
-          clientId: clientId || undefined,
-          vehicleId: finalVehicleId,
-          mechanicId: !isPickupOrDropoff ? mechanicId || undefined : undefined,
-          driverId: isPickupOrDropoff ? driverId || undefined : undefined,
-          bayId: !isPickupOrDropoff ? bayId || undefined : undefined,
-          startAt: new Date(startAt).toISOString(),
-          estimatedDurationMin: Number(durationMin) || 60,
-          notes: notes || undefined,
-          pickupLocation: isPickupOrDropoff ? pickupLocation || undefined : undefined,
-          dropoffLocation: isPickupOrDropoff ? dropoffLocation || undefined : undefined,
-        },
-        token
-      );
-      toast.success("Agendamento criado.");
+      const payload = {
+        title,
+        type,
+        clientId: clientId || undefined,
+        vehicleId: finalVehicleId,
+        mechanicId: !isPickupOrDropoff ? mechanicId || undefined : undefined,
+        driverId: isPickupOrDropoff ? driverId || undefined : undefined,
+        bayId: !isPickupOrDropoff ? bayId || undefined : undefined,
+        startAt: new Date(startAt).toISOString(),
+        estimatedDurationMin: Number(durationMin) || 60,
+        notes: notes || undefined,
+        pickupLocation: isPickupOrDropoff ? pickupLocation || undefined : undefined,
+        dropoffLocation: isPickupOrDropoff ? dropoffLocation || undefined : undefined,
+      };
+
+      if (appointment) {
+        await api.updateAppointment(appointment.id, payload, token);
+        toast.success("Agendamento atualizado.");
+      } else {
+        await api.createAppointment(payload, token);
+        toast.success("Agendamento criado.");
+      }
       setOpen(false);
       onSaved();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível criar o agendamento.");
+      toast.error(
+        err instanceof ApiError
+          ? err.message
+          : appointment
+            ? "Não foi possível atualizar o agendamento."
+            : "Não foi possível criar o agendamento."
+      );
     } finally {
       setSaving(false);
     }
@@ -163,7 +174,7 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Novo agendamento</DialogTitle>
+          <DialogTitle>{appointment ? "Editar agendamento" : "Novo agendamento"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
           <div className="grid min-h-0 gap-4 overflow-y-auto overscroll-contain pr-1">
@@ -320,7 +331,7 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
           </div>
           </div>
           <DialogFooter className="border-t pt-3">
-            <Button type="submit" className="w-full sm:w-auto" disabled={saving}>{saving ? "Salvando..." : "Criar agendamento"}</Button>
+            <Button type="submit" className="w-full sm:w-auto" disabled={saving}>{saving ? "Salvando..." : appointment ? "Salvar agendamento" : "Criar agendamento"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Edit3, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,6 +97,17 @@ export default function DayAgendaPanel() {
     }
   }
 
+  async function deleteAppointment(appt: Appointment) {
+    if (!token || !confirm(`Excluir o agendamento "${appt.title}"?`)) return;
+    try {
+      await api.deleteAppointment(appt.id, token);
+      toast.success("Agendamento excluÃ­do.");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "NÃ£o foi possÃ­vel excluir o agendamento.");
+    }
+  }
+
   return (
     <div className="grid gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
@@ -147,6 +158,24 @@ export default function DayAgendaPanel() {
                         </Button>
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => cancel(appt, "CANCELLED")}>
                           Cancelar
+                        </Button>
+                      </>
+                    )}
+                    {canManage && (
+                      <>
+                        <AppointmentFormDialog
+                          appointment={appt}
+                          onSaved={refetch}
+                          trigger={
+                            <Button size="sm" variant="outline">
+                              <Edit3 className="size-4" />
+                              Editar
+                            </Button>
+                          }
+                        />
+                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteAppointment(appt)}>
+                          <Trash2 className="size-4" />
+                          Excluir
                         </Button>
                       </>
                     )}
