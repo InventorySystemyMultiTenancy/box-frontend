@@ -520,6 +520,10 @@ export interface Role {
   isSystem: boolean;
   baseRole: "MECHANIC" | "ADMIN";
   allowedTabs: string[];
+  // Relatórios e alertas (vazio = vê tudo) — ver lib/access.ts.
+  reportSections?: string[];
+  expenseSectors?: string[];
+  alertTypes?: string[];
   createdAt: string;
   _count?: { users: number };
 }
@@ -669,6 +673,16 @@ export interface CashFlow {
   receivables: AccountReceivable[];
   payables: AccountPayable[];
   entries: FinancialEntry[];
+}
+
+// Dados do PDF financeiro (GET /api/reports/financial). Com restrictedSectors, o cargo só vê
+// as despesas desses setores: sem receitas, lançamentos manuais nem saldos bancários.
+export interface FinancialReportData {
+  restrictedSectors: string[] | null;
+  cashFlow: Omit<CashFlow, "initialBalance" | "finalBalance"> & { initialBalance: number | null; finalBalance: number | null };
+  dre: DRE;
+  openPayables: AccountPayable[];
+  openReceivables: AccountReceivable[];
 }
 
 export interface DRE {
@@ -851,17 +865,18 @@ export interface CounterSale {
 }
 
 // Relatórios / Dashboard
+// Blocos que o cargo não libera (Role.reportSections) vêm como null.
 export interface DashboardReport {
-  revenue: { total: number; count: number; ticketMedio: number };
-  approvalStats: { approved: number; rejected: number; total: number; rate: number };
-  quoteStats: { accepted: number; declined: number; total: number; rate: number };
-  mechanicProductivity: { mechanicId: string; mechanicName: string; completedParts: number }[];
+  revenue: { total: number; count: number; ticketMedio: number } | null;
+  approvalStats: { approved: number; rejected: number; total: number; rate: number } | null;
+  quoteStats: { accepted: number; declined: number; total: number; rate: number } | null;
+  mechanicProductivity: { mechanicId: string; mechanicName: string; completedParts: number }[] | null;
   // Peças usadas em projetos no período (substitui os antigos giro de estoque / ponto mínimo).
   partsUsage: {
     totalValue: number;
     totalQuantity: number;
     topParts: { partId: string; name: string; quantity: number; value: number }[];
-  };
+  } | null;
 }
 
 // Histórico de veículo
@@ -991,6 +1006,8 @@ export interface TruckRefueling {
   driverId: string;
   driver?: { id: string; name: string };
   photoUrl: string;
+  // Foto do painel/hodômetro no abastecimento (opcional — registros antigos não têm).
+  panelPhotoUrl?: string | null;
   currentKm: number;
   referenceKm: number;
   liters: number;

@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { Role, Permission } from "@/lib/types";
 import { TAB_KEYS, TAB_LABELS } from "@/lib/tab-keys";
+import { RoleReportAlertAccess } from "@/components/dashboard/roles/RoleReportAlertAccess";
 
 // Nome em pt-BR de cada recurso do catálogo de permissões — sem entrada aqui, a tela
 // mostraria a chave técnica em inglês (ex.: "invoices" em vez de "Notas fiscais").
@@ -262,6 +263,8 @@ export default function CargosPage() {
                     {savingTabs ? "Salvando..." : "Salvar abas visíveis"}
                   </Button>
                 </div>
+
+                <RoleReportAlertAccess key={selectedRole.id} role={selectedRole} onSaved={refetchRoles} />
               </div>
             )}
           </CardContent>

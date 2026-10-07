@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { api, AUTH_EXPIRED_EVENT } from "@/lib/api";
+import { FULL_ACCESS, ReportAccess } from "@/lib/access";
 
 interface AuthUser {
   id: string;
@@ -22,6 +23,8 @@ interface AuthContextValue {
   // Vazio = sem restrição extra de abas (cai no role/hasPermission de sempre); quando o
   // cargo do usuário define allowedTabs, só essas abas aparecem na navegação.
   allowedTabs: string[];
+  // O que o cargo libera na aba Relatórios (blocos/setores) e na aba Alertas (tipos).
+  reportAccess: ReportAccess;
   login: (email: string, password: string) => Promise<void>;
   registerCustomer: (payload: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => void;
@@ -40,16 +43,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [permissions, setPermissions] = useState<Set<string>>(new Set());
   const [allowedTabs, setAllowedTabs] = useState<string[]>([]);
+  const [reportAccess, setReportAccess] = useState<ReportAccess>(FULL_ACCESS);
   const [loading, setLoading] = useState(() => readStoredToken() !== null);
   const router = useRouter();
 
   useEffect(() => {
     if (!token) return;
-    Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [], allowedTabs: [] }))])
-      .then(([{ user }, { permissions, allowedTabs }]) => {
+    Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [] as string[], allowedTabs: [] as string[], reportAccess: FULL_ACCESS }))])
+      .then(([{ user }, { permissions, allowedTabs, reportAccess }]) => {
         setUser(user as AuthUser);
         setPermissions(new Set(permissions));
         setAllowedTabs(allowedTabs ?? []);
+        setReportAccess(reportAccess ?? FULL_ACCESS);
       })
       .catch(() => {
         window.localStorage.removeItem(STORAGE_KEY);
@@ -68,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setPermissions(new Set());
       setAllowedTabs([]);
+      setReportAccess(FULL_ACCESS);
       router.replace("/login?sessao=expirada");
     }
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
@@ -99,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setPermissions(new Set());
     setAllowedTabs([]);
+    setReportAccess(FULL_ACCESS);
     router.push("/");
   }, [router]);
 
@@ -112,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, permissions, hasPermission, allowedTabs, login, registerCustomer, logout, updateAvatar }}>
+    <AuthContext.Provider value={{ user, token, loading, permissions, hasPermission, allowedTabs, reportAccess, login, registerCustomer, logout, updateAvatar }}>
       {children}
     </AuthContext.Provider>
   );

@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError, ALERTS_CHANGED_EVENT } from "@/lib/api";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { revisionReminderMessage, warrantyReminderMessage } from "@/lib/whatsapp-messages";
+import { ALERT_TYPE_OPTIONS, canSeeAlertType } from "@/lib/access";
 import type { AppNotification, ExpiringWarrantyPart, RevisionAlert } from "@/lib/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -76,14 +77,30 @@ const CATEGORY_THEME: Record<AlertCategory, CategoryTheme> = {
 
 const CATEGORY_ORDER: AlertCategory[] = ["VEICULOS", "FINANCEIRO", "AGENDA", "CLIENTES"];
 
+// Grupo do tipo de alerta (lib/access.ts) → categoria (card) desta tela.
+const CATEGORY_OF_ALERT_GROUP: Record<string, AlertCategory> = {
+  Veículos: "VEICULOS",
+  Financeiro: "FINANCEIRO",
+  Agenda: "AGENDA",
+  "Lembretes p/ clientes": "CLIENTES",
+};
+
 function categoryOf(type: string): AlertCategory {
   return TYPE_CATEGORY[type] ?? "VEICULOS";
 }
 
 export default function AlertasPage() {
-  const { token } = useAuth();
+  const { token, reportAccess } = useAuth();
   const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState<AlertCategory | null>(null);
+
+  // Tipos de alerta liberados pelo cargo (Cargos → Relatórios e alertas). Os alertas
+  // gravados já chegam filtrados do servidor; aqui some a categoria sem nenhum tipo liberado.
+  const showRevisionReminders = canSeeAlertType(reportAccess, "REVISION_REMINDER");
+  const showWarrantyReminders = canSeeAlertType(reportAccess, "WARRANTY_REMINDER");
+  const visibleCategories = CATEGORY_ORDER.filter((category) =>
+    ALERT_TYPE_OPTIONS.some((a) => CATEGORY_OF_ALERT_GROUP[a.group] === category && canSeeAlertType(reportAccess, a.key))
+  );
 
   const { data: notifications, isLoading } = useQuery({
     queryKey: ["alerts"],
@@ -117,11 +134,15 @@ export default function AlertasPage() {
   // dias) — envio manual pelo WhatsApp com a mensagem já pronta. Sem permissão para algum
   // dos dois relatórios, a lista correspondente só fica vazia.
   const { data: reminders } = useQuery({
-    queryKey: ["customer-reminders"],
+    queryKey: ["customer-reminders", showRevisionReminders, showWarrantyReminders],
     queryFn: async () => {
       const [revisions, warranties] = await Promise.all([
-        api.revisionAlerts(token!).then((r) => r.alerts as RevisionAlert[]).catch(() => [] as RevisionAlert[]),
-        api.expiringWarranties(token!, 30).then((r) => r.parts as ExpiringWarrantyPart[]).catch(() => [] as ExpiringWarrantyPart[]),
+        showRevisionReminders
+          ? api.revisionAlerts(token!).then((r) => r.alerts as RevisionAlert[]).catch(() => [] as RevisionAlert[])
+          : Promise.resolve([] as RevisionAlert[]),
+        showWarrantyReminders
+          ? api.expiringWarranties(token!, 30).then((r) => r.parts as ExpiringWarrantyPart[]).catch(() => [] as ExpiringWarrantyPart[])
+          : Promise.resolve([] as ExpiringWarrantyPart[]),
       ]);
       return [
         ...warranties.map((part) => {
@@ -148,7 +169,7 @@ export default function AlertasPage() {
         }),
       ];
     },
-    enabled: !!token,
+    enabled: !!token && (showRevisionReminders || showWarrantyReminders),
   });
 
   const visibleNotifications = selectedCategory && selectedCategory !== "CLIENTES" ? grouped.get(selectedCategory) ?? [] : [];
@@ -164,9 +185,15 @@ export default function AlertasPage() {
 
       {isLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
 
-      {!isLoading && (
+      {!isLoading && visibleCategories.length === 0 && (
+        <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
+          Seu cargo não tem nenhum tipo de alerta liberado. Peça ao administrador para ajustar em Cargos → Relatórios e alertas.
+        </p>
+      )}
+
+      {!isLoading && visibleCategories.length > 0 && (
         <div className="mb-6 grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
-          {CATEGORY_ORDER.map((category) => {
+          {visibleCategories.map((category) => {
             const theme = CATEGORY_THEME[category];
             const Icon = theme.icon;
             const count = category === "CLIENTES" ? reminders?.length ?? 0 : grouped.get(category)?.length ?? 0;
@@ -191,7 +218,7 @@ export default function AlertasPage() {
         </div>
       )}
 
-      {!isLoading && !selectedCategory && (
+      {!isLoading && visibleCategories.length > 0 && !selectedCategory && (
         <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">
           Selecione uma categoria acima para ver os alertas.
         </p>

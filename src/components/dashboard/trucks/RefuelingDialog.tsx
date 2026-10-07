@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { compressImage } from "@/lib/image-compress";
-import type { RecognizedFuelPump, Truck } from "@/lib/types";
+import type { RecognizedFuelPump, RecognizedTruckPanel, Truck } from "@/lib/types";
 
 export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () => void }) {
   const { token } = useAuth();
@@ -24,6 +24,9 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
   const [pricePerLiter, setPricePerLiter] = useState("");
   const [notes, setNotes] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
+  // Foto do painel (opcional): a IA lê o hodômetro e preenche a km; fica salva no histórico.
+  const [panelPhoto, setPanelPhoto] = useState<File | null>(null);
+  const [readingPanel, setReadingPanel] = useState(false);
 
   function reset() {
     setCurrentKm("");
@@ -32,6 +35,32 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
     setPricePerLiter("");
     setNotes("");
     setPhoto(null);
+    setPanelPhoto(null);
+  }
+
+  async function handlePanelPhoto(file: File | null) {
+    if (!file) {
+      setPanelPhoto(null);
+      return;
+    }
+    const compressed = await compressImage(file);
+    setPanelPhoto(compressed);
+    if (!token) return;
+    setReadingPanel(true);
+    try {
+      const { recognized } = await api.recognizeTruckPanel(compressed, token);
+      const data = recognized as RecognizedTruckPanel;
+      if (data.km != null) {
+        setCurrentKm(String(data.km));
+        toast.success(`Painel lido pela IA: ${data.km.toLocaleString("pt-BR")} km — confira antes de salvar.`);
+      } else {
+        toast.info("Não consegui ler o hodômetro — preencha a km manualmente.");
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível analisar a foto do painel.");
+    } finally {
+      setReadingPanel(false);
+    }
   }
 
   // Foto da bomba é obrigatória — assim que escolhida, a IA já tenta ler valor
@@ -93,6 +122,7 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
           pricePerLiter: pricePerLiter ? Number(pricePerLiter) : undefined,
           notes: notes || undefined,
           photo,
+          panelPhoto,
         },
         token
       );
@@ -129,6 +159,14 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
               busy={reading}
               busyLabel="Lendo bomba com IA..."
             />
+            <PhotoCaptureField
+              id="refuel-panel-photo"
+              label="Foto do painel (km)"
+              file={panelPhoto}
+              onChange={handlePanelPhoto}
+              busy={readingPanel}
+              busyLabel="Lendo painel com IA..."
+            />
             <div className="grid gap-1.5">
               <Label htmlFor="refuel-km">Km atual *</Label>
               <Input id="refuel-km" type="number" inputMode="numeric" min="0" value={currentKm} onChange={(e) => setCurrentKm(e.target.value)} />
@@ -151,7 +189,7 @@ export function RefuelingDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={saving || reading}>
+            <Button type="submit" size="lg" className="w-full sm:w-auto" disabled={saving || reading || readingPanel}>
               {saving ? "Salvando..." : "Salvar abastecimento"}
             </Button>
           </DialogFooter>

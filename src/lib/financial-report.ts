@@ -1,6 +1,6 @@
 import { api } from "@/lib/api";
 import { escapeHtml, formatCurrencyBRL, openPrintableReport } from "@/lib/printable-report";
-import type { AccountPayable, AccountReceivable, CashFlow, DRE } from "@/lib/types";
+import type { AccountPayable, AccountReceivable } from "@/lib/types";
 
 // Relatório financeiro geral do período (aba Relatórios → "PDF financeiro do período"):
 // resumo, DRE por categoria, despesas pagas por setor e por grupo, contas recebidas/pagas,
@@ -30,12 +30,10 @@ const receivedValue = (r: AccountReceivable) => r.receivedAmount ?? r.amount;
 
 /** `popup`: janela aberta já no clique (openReportWindow) — evita o bloqueio de pop-up. */
 export async function generateFinancialReportPdf(token: string, from: string, to: string, popup: Window | null) {
-  const [cashFlow, dre, openPayables, openReceivables] = await Promise.all([
-    api.cashFlow(token, { from, to }).then((r) => r.cashFlow as CashFlow),
-    api.dre(token, { from, to }).then((r) => r.dre as DRE),
-    api.payables(token, { from, to, pageSize: 100 }).then((r) => (r.items as AccountPayable[]).filter((p) => p.status === "PENDING" || p.status === "OVERDUE")),
-    api.receivables(token, { from, to, pageSize: 100 }).then((r) => (r.items as AccountReceivable[]).filter((p) => p.status === "PENDING" || p.status === "OVERDUE")),
-  ]);
+  // Já vem recortado pelo cargo: com setores restritos, só as despesas desses setores.
+  const { report } = await api.financialReport(token, { from, to });
+  const { cashFlow, dre, openPayables, openReceivables, restrictedSectors } = report;
+  const restricted = restrictedSectors !== null;
 
   const period = `${new Date(`${from}T12:00:00`).toLocaleDateString("pt-BR")} a ${new Date(`${to}T12:00:00`).toLocaleDateString("pt-BR")}`;
   const bySector = groupTotals(cashFlow.payables, (p) => p.expenseSector || "Sem setor", paidValue);
@@ -66,11 +64,37 @@ export async function generateFinancialReportPdf(token: string, from: string, to
     .join("");
   const sum = <T,>(rows: T[], f: (r: T) => number) => formatCurrencyBRL(rows.reduce((s, r) => s + f(r), 0));
 
-  const body = `
+  // Relatório de setor(es): só despesas — receitas, lançamentos manuais e saldos bancários
+  // não têm setor e ficam de fora.
+  const body = restricted
+    ? `
+    <h1>Relatório de despesas — ${escapeHtml(restrictedSectors!.join(", "))}</h1>
+    <div class="muted">Período: ${period} · Gerado em ${new Date().toLocaleString("pt-BR")} · Somente os setores liberados para o seu cargo</div>
+    <div class="summary">
+      <div class="box"><strong>Despesas pagas no período</strong><br />${formatCurrencyBRL(cashFlow.totalOut)}</div>
+      <div class="box"><strong>A pagar em aberto (vence no período)</strong><br />${sum(openPayables, (p) => p.amount)}</div>
+    </div>
+
+    ${totalsTable("Despesas por categoria (natureza da operação)", dre.expensesByCategory.map((r) => ({ name: r.category, total: r.amount })), "Categoria")}
+    ${totalsTable("Despesas pagas por setor", bySector, "Setor")}
+    ${totalsTable("Despesas pagas por grupo", byGroup, "Grupo")}
+    ${byDescription.length ? totalsTable("Despesas pagas por descrição", byDescription, "Grupo › descrição") : ""}
+
+    <h2>Contas pagas</h2>
+    <table><thead><tr><th>Paga em</th><th>Descrição</th><th>Fornecedor</th><th>Categoria / grupo</th><th>Setor</th><th>Valor</th></tr></thead>
+      <tbody>${paidRows || '<tr><td colspan="6">Nenhuma no período.</td></tr>'}</tbody></table>
+
+    <h2>A pagar em aberto com vencimento no período</h2>
+    <table><thead><tr><th>Vencimento</th><th>A pagar</th><th>Fornecedor</th><th>Situação</th><th>Valor</th></tr></thead>
+      <tbody>${openPayRows || '<tr><td colspan="5">Nenhuma conta a pagar em aberto.</td></tr>'}</tbody></table>
+
+    <div class="total">Total de despesas pagas no período: ${formatCurrencyBRL(cashFlow.totalOut)}</div>
+  `
+    : `
     <h1>Relatório financeiro</h1>
     <div class="muted">Período: ${period} · Gerado em ${new Date().toLocaleString("pt-BR")}</div>
     <div class="summary">
-      <div class="box"><strong>Saldo inicial das contas</strong><br />${formatCurrencyBRL(cashFlow.initialBalance)}</div>
+      <div class="box"><strong>Saldo inicial das contas</strong><br />${formatCurrencyBRL(cashFlow.initialBalance ?? 0)}</div>
       <div class="box"><strong>Entradas no período</strong><br />${formatCurrencyBRL(cashFlow.totalIn)}</div>
       <div class="box"><strong>Saídas no período</strong><br />${formatCurrencyBRL(cashFlow.totalOut)}</div>
       <div class="box"><strong>Resultado do período</strong><br />${formatCurrencyBRL(dre.netResult)}</div>
@@ -104,5 +128,5 @@ export async function generateFinancialReportPdf(token: string, from: string, to
 
     <div class="total">Resultado líquido do período: ${formatCurrencyBRL(dre.netResult)}</div>
   `;
-  openPrintableReport(`Relatório financeiro ${period}`, body, popup);
+  openPrintableReport(restricted ? `Despesas ${restrictedSectors!.join(", ")} ${period}` : `Relatório financeiro ${period}`, body, popup);
 }

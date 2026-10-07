@@ -1,4 +1,5 @@
-import type { ExpenseClassifications } from "@/lib/types";
+import type { ExpenseClassifications, FinancialReportData } from "@/lib/types";
+import type { ReportAccess } from "@/lib/access";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -356,7 +357,12 @@ export const api = {
       token
     ),
 
-  mePermissions: (token: string) => request<{ permissions: string[]; allowedTabs: string[] }>("/api/auth/me/permissions", {}, token),
+  mePermissions: (token: string) =>
+    request<{ permissions: string[]; allowedTabs: string[]; reportAccess?: ReportAccess }>("/api/auth/me/permissions", {}, token),
+
+  // PDF financeiro do período — já recortado pelos setores de despesa do cargo.
+  financialReport: (token: string, params: { from?: string; to?: string }) =>
+    request<{ report: FinancialReportData }>(`/api/reports/financial${toQuery(params)}`, {}, token),
 
   clients: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) => {
     const search = new URLSearchParams();
@@ -389,7 +395,15 @@ export const api = {
 
   updateRole: (
     id: string,
-    payload: { name?: string; description?: string; baseRole?: "MECHANIC" | "ADMIN"; allowedTabs?: string[] },
+    payload: {
+      name?: string;
+      description?: string;
+      baseRole?: "MECHANIC" | "ADMIN";
+      allowedTabs?: string[];
+      reportSections?: string[];
+      expenseSectors?: string[];
+      alertTypes?: string[];
+    },
     token: string
   ) => request<{ role: unknown }>(`/api/roles/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
 
@@ -871,7 +885,7 @@ export const api = {
 
   createTruckRefueling: (
     truckId: string,
-    payload: { currentKm: number; liters: number; amountPaid: number; pricePerLiter?: number; notes?: string; photo: File },
+    payload: { currentKm: number; liters: number; amountPaid: number; pricePerLiter?: number; notes?: string; photo: File; panelPhoto?: File | null },
     token: string
   ) => {
     const form = new FormData();
@@ -881,6 +895,7 @@ export const api = {
     if (payload.pricePerLiter != null) form.append("pricePerLiter", String(payload.pricePerLiter));
     if (payload.notes) form.append("notes", payload.notes);
     form.append("photo", payload.photo);
+    if (payload.panelPhoto) form.append("panelPhoto", payload.panelPhoto);
     return request<{ refueling: unknown }>(`/api/trucks/${truckId}/refuelings`, { method: "POST", body: form }, token);
   },
 

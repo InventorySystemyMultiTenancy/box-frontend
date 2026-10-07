@@ -71,10 +71,20 @@ function RefuelingCard({ refueling }: { refueling: TruckRefueling }) {
           )}
         </div>
 
-        <a href={mediaUrl(refueling.photoUrl)} target="_blank" rel="noreferrer" className="block">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mediaUrl(refueling.photoUrl)} alt="Foto da bomba" className="h-28 w-40 rounded-md border object-cover" />
-        </a>
+        <div className="flex flex-wrap gap-3">
+          <a href={mediaUrl(refueling.photoUrl)} target="_blank" rel="noreferrer" className="block text-xs text-muted-foreground">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={mediaUrl(refueling.photoUrl)} alt="Foto da bomba" className="h-28 w-40 rounded-md border object-cover" />
+            <span className="mt-1 block">Bomba</span>
+          </a>
+          {refueling.panelPhotoUrl && (
+            <a href={mediaUrl(refueling.panelPhotoUrl)} target="_blank" rel="noreferrer" className="block text-xs text-muted-foreground">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={mediaUrl(refueling.panelPhotoUrl)} alt="Foto do painel" className="h-28 w-40 rounded-md border object-cover" />
+              <span className="mt-1 block">Painel — {refueling.currentKm.toLocaleString("pt-BR")} km</span>
+            </a>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
