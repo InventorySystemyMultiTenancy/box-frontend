@@ -101,10 +101,10 @@ export default function DayAgendaPanel() {
     if (!token || !confirm(`Excluir o agendamento "${appt.title}"?`)) return;
     try {
       await api.deleteAppointment(appt.id, token);
-      toast.success("Agendamento excluÃ­do.");
+      toast.success("Agendamento excluído.");
       refetch();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "NÃ£o foi possÃ­vel excluir o agendamento.");
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível excluir o agendamento.");
     }
   }
 

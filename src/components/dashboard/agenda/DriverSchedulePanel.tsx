@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { FileSpreadsheet, FileText } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Edit3, FileSpreadsheet, FileText, Plus, Trash2 } from "lucide-react";
+import { AppointmentFormDialog } from "@/components/dashboard/agenda/AppointmentFormDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { ExportColumn, exportCsv } from "@/lib/export";
 import { escapeHtml, openPrintableReport } from "@/lib/printable-report";
 import type { Appointment } from "@/lib/types";
@@ -62,7 +64,10 @@ const COLUMNS: ExportColumn<Appointment>[] = [
 ];
 
 export function DriverSchedulePanel({ title = "Agendamento diário dos motoristas" }: { title?: string }) {
-  const { token } = useAuth();
+  const { token, hasPermission } = useAuth();
+  const queryClient = useQueryClient();
+  // Quem gerencia a agenda edita/exclui direto na planilha (motorista só consulta).
+  const canManage = hasPermission("agenda", "manage");
   const today = isoDate(new Date());
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(addDays(today, 6));
@@ -78,6 +83,25 @@ export function DriverSchedulePanel({ title = "Agendamento diário dos motorista
   });
   const appointments = useMemo(() => data?.appointments ?? [], [data]);
   const canPickDriver = data?.scope === "all";
+
+  function refetch() {
+    queryClient.invalidateQueries({ queryKey: ["driver-schedule"] });
+    queryClient.invalidateQueries({ queryKey: ["appointments"] });
+    queryClient.invalidateQueries({ queryKey: ["my-pickups-today"] });
+  }
+
+  async function handleDelete(appt: Appointment) {
+    if (!token) return;
+    const what = `${appt.type === "DROPOFF" ? "entrega" : "retirada"} de ${dateLabel(appt.startAt)} às ${timeLabel(appt.startAt)}${appt.driver ? ` (${appt.driver.name})` : ""}`;
+    if (!confirm(`Excluir o agendamento da ${what}?`)) return;
+    try {
+      await api.deleteAppointment(appt.id, token);
+      toast.success("Agendamento excluído.");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível excluir o agendamento.");
+    }
+  }
 
   const { data: team } = useQuery({
     queryKey: ["team"],
@@ -163,6 +187,17 @@ export function DriverSchedulePanel({ title = "Agendamento diário dos motorista
               </Select>
             </div>
           )}
+          {canManage && (
+            <AppointmentFormDialog
+              onSaved={refetch}
+              trigger={
+                <Button type="button" size="sm" className="w-full lg:w-auto">
+                  <Plus className="size-4" />
+                  Novo agendamento
+                </Button>
+              }
+            />
+          )}
           <Button type="button" variant="outline" size="sm" className="w-full lg:w-auto" disabled={appointments.length === 0} onClick={() => exportCsv(fileBase, COLUMNS, appointments)}>
             <FileSpreadsheet className="size-4" />
             Planilha (Excel)
@@ -196,6 +231,7 @@ export function DriverSchedulePanel({ title = "Agendamento diário dos motorista
                   <TableHead>Entrega</TableHead>
                   <TableHead>Modelo veíc.</TableHead>
                   <TableHead>Placa ou chassi</TableHead>
+                  {canManage && <TableHead className="w-44" />}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -209,6 +245,25 @@ export function DriverSchedulePanel({ title = "Agendamento diário dos motorista
                     <TableCell>{dropoffCell(a) || "—"}</TableCell>
                     <TableCell>{vehicleModel(a) || "—"}</TableCell>
                     <TableCell>{plateOrChassi(a) || "—"}</TableCell>
+                    {canManage && (
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <AppointmentFormDialog
+                            appointment={a}
+                            onSaved={refetch}
+                            trigger={
+                              <Button size="sm" variant="outline">
+                                <Edit3 className="size-4" />
+                                Editar
+                              </Button>
+                            }
+                          />
+                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleDelete(a)} aria-label="Excluir agendamento">
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

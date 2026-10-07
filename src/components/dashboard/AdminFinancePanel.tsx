@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { FinancialEntry } from "@/lib/types";
 import { FinanceCostBreakdownChart, FinanceTrendChart, MonthlyPoint } from "@/components/dashboard/FinanceCharts";
 import { openPrintableReport, escapeHtml, formatCurrencyBRL } from "@/lib/printable-report";
@@ -54,6 +56,17 @@ export default function AdminFinancePanel() {
     await api.createExpense({ category: form.category, description: form.description, amount: Number(form.amount) }, token);
     setForm({ category: "Despesa fixa", description: "", amount: "" });
     load();
+  }
+
+  async function deleteExpense(entry: FinancialEntry) {
+    if (!token || !confirm(`Excluir o gasto "${entry.description}" de ${formatCurrencyBRL(entry.amount)}${entry.createdBy ? `, lançado por ${entry.createdBy.name}` : ""}?`)) return;
+    try {
+      await api.deleteExpense(entry.id, token);
+      toast.success("Gasto excluído.");
+      load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível excluir o gasto.");
+    }
   }
 
   const loggedByUsers = useMemo(() => {
@@ -214,6 +227,12 @@ export default function AdminFinancePanel() {
               <i className={styles.dot} />
               {entry.type === "INCOME" ? "+" : "-"} R$ {entry.amount.toFixed(2)}
             </span>
+            {/* Só gasto lançado por uma pessoa (aba Gastos/aqui) — os automáticos do sistema não. */}
+            {entry.type === "EXPENSE" && entry.createdBy && (
+              <button type="button" className={styles.linkButton} style={{ color: "var(--critical)" }} onClick={() => deleteExpense(entry)} aria-label="Excluir gasto">
+                <Trash2 size={14} /> Excluir
+              </button>
+            )}
           </div>
         ))}
       </div>

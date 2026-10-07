@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import type { FinancialEntry } from "@/lib/types";
 import { openPrintableReport, escapeHtml, formatCurrencyBRL } from "@/lib/printable-report";
 import styles from "./dashboard.module.css";
@@ -20,6 +22,7 @@ function firstDayOfMonth() {
  * usuário e categoria é o admin, na aba Financeiro » Resumo. */
 export default function GastosPanel({ backTo }: { backTo?: { href: string; label: string } }) {
   const { token, user } = useAuth();
+  const queryClient = useQueryClient();
   const [saved, setSaved] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [categories, setCategories] = useState<string[]>([]);
@@ -89,6 +92,7 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
       setForm({ ...EMPTY_FORM, occurredAt: form.occurredAt });
       setMessage("Gasto registrado.");
       setSaved(true);
+      queryClient.invalidateQueries({ queryKey: ["my-expenses"] });
     } catch {
       setMessage("Não foi possível registrar o gasto.");
     } finally {
@@ -166,7 +170,7 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
       </div>
 
       <div className={styles.panel}>
-        <h2>Relatório de gastos por período</h2>
+        <h2>Gastos lançados no período</h2>
         <div className={styles.formGrid}>
           <label>
             De
@@ -182,7 +186,167 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
             {generatingReport ? "Gerando..." : "Gerar PDF do período"}
           </button>
         </div>
+        <MyExpensesList from={reportFrom} to={reportTo} categories={categories} />
       </div>
+    </div>
+  );
+}
+
+// Lista dos gastos que o próprio usuário lançou no período, com editar/excluir — o servidor
+// só deixa mexer nos próprios (admin mexe em qualquer um) e nunca em lançamento automático.
+function MyExpensesList({ from, to, categories }: { from: string; to: string; categories: string[] }) {
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [edit, setEdit] = useState({ category: "", description: "", amount: "", occurredAt: "" });
+  const [savingId, setSavingId] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["my-expenses", from, to],
+    queryFn: async () => {
+      const res = await api.myExpenses(token!, { from, to });
+      return { entries: res.entries as FinancialEntry[], total: res.total };
+    },
+    enabled: !!token && !!from && !!to,
+  });
+
+  function refetch() {
+    queryClient.invalidateQueries({ queryKey: ["my-expenses"] });
+  }
+
+  function startEdit(entry: FinancialEntry) {
+    setEditingId(entry.id);
+    setEdit({
+      category: entry.category,
+      description: entry.description,
+      amount: String(entry.amount),
+      occurredAt: new Date(entry.occurredAt).toISOString().slice(0, 10),
+    });
+  }
+
+  async function saveEdit(id: string) {
+    if (!token) return;
+    if (!edit.category.trim() || !edit.description.trim() || !(Number(edit.amount) >= 0)) {
+      toast.error("Preencha categoria, descrição e valor.");
+      return;
+    }
+    setSavingId(id);
+    try {
+      await api.updateExpense(
+        id,
+        {
+          category: edit.category.trim(),
+          description: edit.description.trim(),
+          amount: Number(edit.amount),
+          occurredAt: new Date(`${edit.occurredAt}T12:00:00`).toISOString(),
+        },
+        token
+      );
+      toast.success("Gasto atualizado.");
+      setEditingId(null);
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível atualizar o gasto.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function remove(entry: FinancialEntry) {
+    if (!token || !confirm(`Excluir o gasto "${entry.description}" de ${formatCurrencyBRL(entry.amount)}?`)) return;
+    setSavingId(entry.id);
+    try {
+      await api.deleteExpense(entry.id, token);
+      toast.success("Gasto excluído.");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível excluir o gasto.");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  const entries = data?.entries ?? [];
+
+  return (
+    <div style={{ marginTop: "1rem", overflowX: "auto" }}>
+      {isLoading && <p className={styles.tlSub}>Carregando...</p>}
+      {!isLoading && entries.length === 0 && <p className={styles.tlSub}>Nenhum gasto lançado por você no período.</p>}
+      {entries.length > 0 && (
+        <table className={styles.usersTable}>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Categoria</th>
+              <th>Descrição</th>
+              <th>Valor</th>
+              <th style={{ width: 150 }} />
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map((entry) =>
+              editingId === entry.id ? (
+                <tr key={entry.id}>
+                  <td>
+                    <input type="date" value={edit.occurredAt} onChange={(e) => setEdit((p) => ({ ...p, occurredAt: e.target.value }))} />
+                  </td>
+                  <td>
+                    <input list="gasto-categorias-edit" value={edit.category} onChange={(e) => setEdit((p) => ({ ...p, category: e.target.value }))} />
+                    <datalist id="gasto-categorias-edit">
+                      {categories.map((c) => (
+                        <option key={c} value={c} />
+                      ))}
+                    </datalist>
+                  </td>
+                  <td>
+                    <input value={edit.description} onChange={(e) => setEdit((p) => ({ ...p, description: e.target.value }))} />
+                  </td>
+                  <td>
+                    <input type="number" min="0" step="0.01" value={edit.amount} onChange={(e) => setEdit((p) => ({ ...p, amount: e.target.value }))} style={{ width: 110 }} />
+                  </td>
+                  <td>
+                    <button type="button" className={styles.linkButton} disabled={savingId === entry.id} onClick={() => saveEdit(entry.id)}>
+                      {savingId === entry.id ? "Salvando..." : "Salvar"}
+                    </button>
+                    <button type="button" className={styles.linkButton} style={{ marginLeft: "0.6rem" }} onClick={() => setEditingId(null)}>
+                      Cancelar
+                    </button>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={entry.id}>
+                  <td>{new Date(entry.occurredAt).toLocaleDateString("pt-BR")}</td>
+                  <td>{entry.category}</td>
+                  <td>{entry.description}</td>
+                  <td>{formatCurrencyBRL(entry.amount)}</td>
+                  <td>
+                    <button type="button" className={styles.linkButton} onClick={() => startEdit(entry)} aria-label="Editar gasto">
+                      <Pencil size={14} /> Editar
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.linkButton}
+                      style={{ marginLeft: "0.6rem", color: "var(--critical)" }}
+                      disabled={savingId === entry.id}
+                      onClick={() => remove(entry)}
+                      aria-label="Excluir gasto"
+                    >
+                      <Trash2 size={14} /> Excluir
+                    </button>
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th colSpan={3}>Total do período</th>
+              <th>{formatCurrencyBRL(data?.total ?? 0)}</th>
+              <th />
+            </tr>
+          </tfoot>
+        </table>
+      )}
     </div>
   );
 }

@@ -375,184 +375,187 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Nova nota fiscal</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="grid gap-1.5">
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleExtract} />
-            <Button type="button" variant="outline" size="sm" className="w-fit" disabled={extracting} onClick={() => fileInputRef.current?.click()}>
-              <Sparkles className="size-4" />
-              {extracting ? "Lendo nota fiscal..." : "Ler nota fiscal por foto (IA)"}
-            </Button>
-            {autoClientMessage && <p className="text-xs text-muted-foreground">{autoClientMessage}</p>}
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="grid gap-1.5 sm:col-span-2">
-              <Label htmlFor="inv-number">Número da nota fiscal</Label>
-              <Input id="inv-number" value={form.number} onChange={(e) => set("number", e.target.value)} placeholder="Automático se vazio" />
-            </div>
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
+          {/* Só esta área rola (no celular a rolagem fica no formulário, não na página). */}
+          <div className="grid min-h-0 gap-4 overflow-y-auto overscroll-contain pr-1">
             <div className="grid gap-1.5">
-              <Label htmlFor="inv-series">Série</Label>
-              <Input id="inv-series" value={form.series} onChange={(e) => set("series", e.target.value)} />
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleExtract} />
+              <Button type="button" variant="outline" size="sm" className="w-fit" disabled={extracting} onClick={() => fileInputRef.current?.click()}>
+                <Sparkles className="size-4" />
+                {extracting ? "Lendo nota fiscal..." : "Ler nota fiscal por foto (IA)"}
+              </Button>
+              {autoClientMessage && <p className="text-xs text-muted-foreground">{autoClientMessage}</p>}
             </div>
-          </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="inv-issuer-name">Emitente / fornecedor{form.isExpense ? " *" : ""}</Label>
-            <Input id="inv-issuer-name" value={form.issuerName} onChange={(e) => set("issuerName", e.target.value)} />
-          </div>
-
-          {/* Nota de despesa — vira conta a pagar, classificada por setor/categoria/grupo/descrição. */}
-          <label className="flex items-center gap-2 rounded-md border p-2.5 text-sm">
-            <Checkbox checked={form.isExpense} onCheckedChange={(v) => set("isExpense", v === true)} />
-            <span>
-              <strong>Nota de despesa</strong> — lançar em contas a pagar
-            </span>
-          </label>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label>Cliente cadastrado</Label>
-              <Select value={form.clientId || "NONE"} onValueChange={(v) => set("clientId", v === "NONE" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NONE">—</SelectItem>
-                  {(clients ?? []).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="grid gap-1.5 sm:col-span-2">
+                <Label htmlFor="inv-number">Número da nota fiscal</Label>
+                <Input id="inv-number" value={form.number} onChange={(e) => set("number", e.target.value)} placeholder="Automático se vazio" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="inv-series">Série</Label>
+                <Input id="inv-series" value={form.series} onChange={(e) => set("series", e.target.value)} />
+              </div>
             </div>
+
             <div className="grid gap-1.5">
-              <Label>Projeto em andamento (opcional)</Label>
-              <Select value={form.serviceOrderId || "NONE"} onValueChange={(v) => set("serviceOrderId", v === "NONE" ? "" : v)}>
+              <Label htmlFor="inv-issuer-name">Emitente / fornecedor{form.isExpense ? " *" : ""}</Label>
+              <Input id="inv-issuer-name" value={form.issuerName} onChange={(e) => set("issuerName", e.target.value)} />
+            </div>
+
+            {/* Nota de despesa — vira conta a pagar, classificada por setor/categoria/grupo/descrição. */}
+            <label className="flex items-center gap-2 rounded-md border p-2.5 text-sm">
+              <Checkbox checked={form.isExpense} onCheckedChange={(v) => set("isExpense", v === true)} />
+              <span>
+                <strong>Nota de despesa</strong> — lançar em contas a pagar
+              </span>
+            </label>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label>Cliente cadastrado</Label>
+                <Select value={form.clientId || "NONE"} onValueChange={(v) => set("clientId", v === "NONE" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">—</SelectItem>
+                    {(clients ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Projeto em andamento (opcional)</Label>
+                <Select value={form.serviceOrderId || "NONE"} onValueChange={(v) => set("serviceOrderId", v === "NONE" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NONE">—</SelectItem>
+                    {(openOrders ?? []).map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.code} — {o.vehicle.brand} {o.vehicle.model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label htmlFor="inv-operation">Categoria (natureza da operação)</Label>
+                <SuggestInput
+                  id="inv-operation"
+                  options={classifications?.categories ?? []}
+                  value={form.operationNature}
+                  onChange={(e) => set("operationNature", e.target.value)}
+                  placeholder="Ex.: Compra de peças"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="inv-payment">Forma de pagamento</Label>
+                <SuggestInput
+                  id="inv-payment"
+                  options={[...PAYMENT_METHODS]}
+                  value={form.paymentMethod}
+                  onChange={(e) => set("paymentMethod", e.target.value)}
+                  placeholder="PIX, Boleto, Dinheiro..."
+                />
+              </div>
+            </div>
+
+            {form.isExpense && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="grid gap-1.5">
+                  <Label htmlFor="inv-sector">Setor</Label>
+                  <SuggestInput id="inv-sector" options={classifications?.sectors ?? []} value={form.expenseSector} onChange={(e) => set("expenseSector", e.target.value)} placeholder="Ex.: Oficina" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="inv-group">Grupo de despesa</Label>
+                  <SuggestInput id="inv-group" options={classifications?.groups ?? []} value={form.expenseGroup} onChange={(e) => set("expenseGroup", e.target.value)} placeholder="Ex.: PEÇAS" />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="inv-exp-desc">Descrição da despesa</Label>
+                  <SuggestInput
+                    id="inv-exp-desc"
+                    options={[...new Set((classifications?.descriptions ?? []).filter((d) => !form.expenseGroup || d.group.toLowerCase() === form.expenseGroup.trim().toLowerCase()).map((d) => d.name))]}
+                    value={form.expenseDescription}
+                    onChange={(e) => set("expenseDescription", e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-1.5">
+              <Label>Banco associado (opcional)</Label>
+              <Select value={form.bankAccountId || "NONE"} onValueChange={(v) => set("bankAccountId", v === "NONE" ? "" : v)}>
                 <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NONE">—</SelectItem>
-                  {(openOrders ?? []).map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.code} — {o.vehicle.brand} {o.vehicle.model}
-                    </SelectItem>
+                  {(bankAccounts ?? []).map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}{a.bank ? ` — ${a.bank}` : ""}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-operation">Categoria (natureza da operação)</Label>
-              <SuggestInput
-                id="inv-operation"
-                options={classifications?.categories ?? []}
-                value={form.operationNature}
-                onChange={(e) => set("operationNature", e.target.value)}
-                placeholder="Ex.: Compra de peças"
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-payment">Forma de pagamento</Label>
-              <SuggestInput
-                id="inv-payment"
-                options={[...PAYMENT_METHODS]}
-                value={form.paymentMethod}
-                onChange={(e) => set("paymentMethod", e.target.value)}
-                placeholder="PIX, Boleto, Dinheiro..."
-              />
-            </div>
-          </div>
 
-          {form.isExpense && (
+            {generatesPayables && (
+              <div className="grid grid-cols-1 gap-3 rounded-md border border-dashed p-3 sm:grid-cols-2">
+                <div className="col-span-full text-xs font-medium text-muted-foreground">
+                  Gera as parcelas em contas a pagar, vencendo mês a mês{form.bankAccountId ? ", previstas no banco escolhido" : ""}.
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="inv-due-date">Vencimento da 1ª parcela *</Label>
+                  <Input id="inv-due-date" type="date" required value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="inv-installments">Quantidade de parcelas *</Label>
+                  <Input
+                    id="inv-installments"
+                    type="number"
+                    min="1"
+                    max="60"
+                    required
+                    value={form.installments}
+                    onChange={(e) => set("installments", e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="inv-description">Observação (opcional)</Label>
+              <Input id="inv-description" value={form.description} onChange={(e) => set("description", e.target.value)} />
+            </div>
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="grid gap-1.5">
-                <Label htmlFor="inv-sector">Setor</Label>
-                <SuggestInput id="inv-sector" options={classifications?.sectors ?? []} value={form.expenseSector} onChange={(e) => set("expenseSector", e.target.value)} placeholder="Ex.: Oficina" />
+                <Label htmlFor="inv-amount">Valor total *</Label>
+                <Input id="inv-amount" type="number" min="0" step="0.01" required value={form.totalAmount} onChange={(e) => set("totalAmount", e.target.value)} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="inv-group">Grupo de despesa</Label>
-                <SuggestInput id="inv-group" options={classifications?.groups ?? []} value={form.expenseGroup} onChange={(e) => set("expenseGroup", e.target.value)} placeholder="Ex.: PEÇAS" />
+                <Label htmlFor="inv-discount">Desconto</Label>
+                <Input id="inv-discount" type="number" min="0" step="0.01" value={form.discountAmount} onChange={(e) => set("discountAmount", e.target.value)} />
               </div>
               <div className="grid gap-1.5">
-                <Label htmlFor="inv-exp-desc">Descrição da despesa</Label>
-                <SuggestInput
-                  id="inv-exp-desc"
-                  options={[...new Set((classifications?.descriptions ?? []).filter((d) => !form.expenseGroup || d.group.toLowerCase() === form.expenseGroup.trim().toLowerCase()).map((d) => d.name))]}
-                  value={form.expenseDescription}
-                  onChange={(e) => set("expenseDescription", e.target.value)}
-                />
+                <Label htmlFor="inv-tax">Impostos</Label>
+                <Input id="inv-tax" type="number" min="0" step="0.01" value={form.taxAmount} onChange={(e) => set("taxAmount", e.target.value)} />
               </div>
             </div>
-          )}
 
-          <div className="grid gap-1.5">
-            <Label>Banco associado (opcional)</Label>
-            <Select value={form.bankAccountId || "NONE"} onValueChange={(v) => set("bankAccountId", v === "NONE" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NONE">—</SelectItem>
-                {(bankAccounts ?? []).map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}{a.bank ? ` — ${a.bank}` : ""}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {generatesPayables && (
-            <div className="grid grid-cols-1 gap-3 rounded-md border border-dashed p-3 sm:grid-cols-2">
-              <div className="col-span-full text-xs font-medium text-muted-foreground">
-                Gera as parcelas em contas a pagar, vencendo mês a mês{form.bankAccountId ? ", previstas no banco escolhido" : ""}.
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="inv-due-date">Vencimento da 1ª parcela *</Label>
-                <Input id="inv-due-date" type="date" required value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="inv-installments">Quantidade de parcelas *</Label>
-                <Input
-                  id="inv-installments"
-                  type="number"
-                  min="1"
-                  max="60"
-                  required
-                  value={form.installments}
-                  onChange={(e) => set("installments", e.target.value)}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-1.5">
-            <Label htmlFor="inv-description">Observação (opcional)</Label>
-            <Input id="inv-description" value={form.description} onChange={(e) => set("description", e.target.value)} />
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="inv-amount">Valor total *</Label>
-              <Input id="inv-amount" type="number" min="0" step="0.01" required value={form.totalAmount} onChange={(e) => set("totalAmount", e.target.value)} />
+              <Label htmlFor="inv-issue-date">Data de emissão</Label>
+              <Input id="inv-issue-date" type="date" value={form.issueDate} onChange={(e) => set("issueDate", e.target.value)} />
+              <p className="text-xs text-muted-foreground">
+                {form.number ? "Com número preenchido, a nota é salva como já emitida." : "Sem número, a nota é salva como rascunho para emitir depois."}
+              </p>
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-discount">Desconto</Label>
-              <Input id="inv-discount" type="number" min="0" step="0.01" value={form.discountAmount} onChange={(e) => set("discountAmount", e.target.value)} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="inv-tax">Impostos</Label>
-              <Input id="inv-tax" type="number" min="0" step="0.01" value={form.taxAmount} onChange={(e) => set("taxAmount", e.target.value)} />
-            </div>
-          </div>
 
-          <div className="grid gap-1.5">
-            <Label htmlFor="inv-issue-date">Data de emissão</Label>
-            <Input id="inv-issue-date" type="date" value={form.issueDate} onChange={(e) => set("issueDate", e.target.value)} />
-            <p className="text-xs text-muted-foreground">
-              {form.number ? "Com número preenchido, a nota é salva como já emitida." : "Sem número, a nota é salva como rascunho para emitir depois."}
-            </p>
           </div>
-
-          <DialogFooter>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar nota fiscal"}</Button>
+          <DialogFooter className="border-t pt-3">
+            <Button type="submit" className="w-full sm:w-auto" disabled={saving}>{saving ? "Salvando..." : "Salvar nota fiscal"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

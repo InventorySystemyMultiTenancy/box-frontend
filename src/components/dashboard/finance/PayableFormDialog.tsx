@@ -210,232 +210,235 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Cadastrar contas a pagar</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          {/* Cabeçalho do lançamento */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
-            {stores && stores.length > 0 && (
-              <div className="grid gap-1.5 sm:col-span-4">
-                <Label>Empresa</Label>
-                <Select value={header.storeId || "NONE"} onValueChange={(v) => setH("storeId", v === "NONE" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NONE">—</SelectItem>
-                    {stores.filter((s) => s.active).map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className={`grid gap-1.5 ${stores && stores.length > 0 ? "sm:col-span-2" : "sm:col-span-6"}`}>
-              <Label>Responsável pelo lançamento</Label>
-              <div className="flex h-9 items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm">
-                <UserRound className="size-4 text-muted-foreground" />
-                {user?.name}
-              </div>
-            </div>
-
-            <div className="grid gap-1.5 sm:col-span-3">
-              <Label htmlFor="ap-nf">Nota fiscal</Label>
-              <Input id="ap-nf" value={header.invoiceNumber} onChange={(e) => setH("invoiceNumber", e.target.value)} placeholder="Nº da nota (opcional)" />
-            </div>
-            <div className="grid gap-1.5 sm:col-span-3">
-              <Label htmlFor="ap-issue">Data emissão</Label>
-              <Input id="ap-issue" type="date" value={header.issueDate} onChange={(e) => setH("issueDate", e.target.value)} />
-            </div>
-
-            <div className="grid gap-1.5 sm:col-span-6">
-              <Label htmlFor="ap-supplier">Fornecedor *</Label>
-              <SuggestInput
-                id="ap-supplier"
-                options={(suppliers ?? []).filter((s) => s.active !== false).map((s) => s.name)}
-                value={header.payeeName}
-                onChange={(e) => setH("payeeName", e.target.value)}
-                placeholder="Escolha um fornecedor cadastrado ou digite o nome"
-              />
-            </div>
-
-            <div className="grid gap-1.5 sm:col-span-3">
-              <Label htmlFor="ap-group">Grupo despesa</Label>
-              <SuggestInput id="ap-group" options={classifications?.groups ?? []} value={header.expenseGroup} onChange={(e) => setH("expenseGroup", e.target.value)} placeholder="Ex.: FOLHA DE PAGAMENTO" />
-            </div>
-            <div className="grid gap-1.5 sm:col-span-3">
-              <Label htmlFor="ap-desc">Descr. despesa</Label>
-              <SuggestInput id="ap-desc" options={descriptionOptions} value={header.expenseDescription} onChange={(e) => setH("expenseDescription", e.target.value)} placeholder="Ex.: ASSISTÊNCIA MÉDICA" />
-            </div>
-
-            <div className="grid gap-1.5 sm:col-span-3">
-              <Label htmlFor="ap-category">Categoria (natureza da operação) *</Label>
-              <SuggestInput id="ap-category" options={classifications?.categories ?? []} value={header.category} onChange={(e) => setH("category", e.target.value)} placeholder="Ex.: Despesas administrativas" />
-            </div>
-            <div className="grid gap-1.5 sm:col-span-3">
-              <Label htmlFor="ap-sector">Origem despesa (setor)</Label>
-              <SuggestInput id="ap-sector" options={classifications?.sectors ?? []} value={header.expenseSector} onChange={(e) => setH("expenseSector", e.target.value)} placeholder="Ex.: Administração" />
-            </div>
-
-            <div className="grid gap-1.5 sm:col-span-2">
-              <Label htmlFor="ap-total">Valor N.F.</Label>
-              <Input id="ap-total" type="number" min="0" step="0.01" value={header.totalAmount} onChange={(e) => setH("totalAmount", e.target.value)} />
-            </div>
-            <div className="grid gap-1.5 sm:col-span-4">
-              <Label htmlFor="ap-notes">Observação</Label>
-              <Input id="ap-notes" value={header.notes} onChange={(e) => setH("notes", e.target.value)} placeholder="Opcional" />
-            </div>
-          </div>
-          <p className="-mt-2 text-xs text-muted-foreground">
-            Categorias, grupos, descrições e setores novos ficam salvos e aparecem como sugestão nos próximos lançamentos.
-          </p>
-
-          {/* Condições de pagamento */}
-          <fieldset className="grid gap-3 rounded-lg border p-3">
-            <legend className="px-1 text-sm font-semibold">Condições de pagamento</legend>
-
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
+          {/* Só esta área rola (no celular a rolagem fica no formulário, não na página). */}
+          <div className="grid min-h-0 gap-4 overflow-y-auto overscroll-contain pr-1">
+            {/* Cabeçalho do lançamento */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
-              <div className="grid gap-1.5 sm:col-span-3">
-                <Label>Pagto previsto na C/C</Label>
-                <Select value={plannedBankAccountId || "NONE"} onValueChange={(v) => setPlannedBankAccountId(v === "NONE" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Conta bancária..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NONE">—</SelectItem>
-                    {(accounts ?? []).map((a) => (
-                      <SelectItem key={a.id} value={a.id}>{a.name}{a.bank ? ` — ${a.bank}` : ""}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-1.5 sm:col-span-3">
-                <Label>Tipo docto</Label>
-                <Select value={dup.paymentMethod} onValueChange={(v) => setDup((d) => ({ ...d, paymentMethod: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {["Boleto", ...PAYMENT_METHODS.filter((m) => m !== "Boleto")].map((m) => (
-                      <SelectItem key={m} value={m}>{m}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-1.5 sm:col-span-1">
-                <Label htmlFor="ap-dup">Dupl.</Label>
-                <Input id="ap-dup" value={dup.documentNumber} onChange={(e) => setDup((d) => ({ ...d, documentNumber: e.target.value }))} placeholder={String(rows.length + 1)} />
-              </div>
-              <div className="grid gap-1.5 sm:col-span-2">
-                <Label htmlFor="ap-due">Vencto</Label>
-                <Input id="ap-due" type="date" value={dup.dueDate} onChange={(e) => setDup((d) => ({ ...d, dueDate: e.target.value }))} />
-              </div>
-              <div className="grid gap-1.5 sm:col-span-2">
-                <Label htmlFor="ap-dup-value">Valor</Label>
-                <Input
-                  id="ap-dup-value"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={dup.amount}
-                  onChange={(e) => setDup((d) => ({ ...d, amount: e.target.value }))}
-                  placeholder={remaining > 0 ? remaining.toFixed(2) : ""}
-                />
-              </div>
-              <div className="flex items-end sm:col-span-1">
-                <Button type="button" className="w-full" onClick={confirmDuplicate} title="Adicionar duplicata">
-                  <Check className="size-4" />
-                  Confirme
-                </Button>
-              </div>
-            </div>
-
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input type="checkbox" checked={dup.paid} onChange={(e) => setDup((d) => ({ ...d, paid: e.target.checked }))} />
-              Banco — preencher somente se o pagamento foi efetuado
-            </label>
-            {dup.paid && (
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <Label>Data do pagamento</Label>
-                  <Input type="date" value={dup.paidAt} onChange={(e) => setDup((d) => ({ ...d, paidAt: e.target.value }))} />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label>Banco do pagamento</Label>
-                  <Select value={dup.paidBankAccountId || "NONE"} onValueChange={(v) => setDup((d) => ({ ...d, paidBankAccountId: v === "NONE" ? "" : v }))}>
-                    <SelectTrigger><SelectValue placeholder="Conta bancária..." /></SelectTrigger>
+              {stores && stores.length > 0 && (
+                <div className="grid gap-1.5 sm:col-span-4">
+                  <Label>Empresa</Label>
+                  <Select value={header.storeId || "NONE"} onValueChange={(v) => setH("storeId", v === "NONE" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="NONE">—</SelectItem>
-                      {(accounts ?? []).map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                      {stores.filter((s) => s.active).map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-end gap-2 rounded-md border border-dashed p-2 text-sm">
-              <span className="text-muted-foreground">Ou gere parcelas iguais do Valor N.F.:</span>
-              <Input className="w-20" type="number" min="1" max="60" value={split.count} onChange={(e) => setSplit((s) => ({ ...s, count: e.target.value }))} aria-label="Quantidade de parcelas" />
-              <span className="text-muted-foreground">x, 1º vencimento</span>
-              <Input className="w-40" type="date" value={split.firstDueDate} onChange={(e) => setSplit((s) => ({ ...s, firstDueDate: e.target.value }))} aria-label="Vencimento da primeira parcela" />
-              <Button type="button" variant="outline" size="sm" onClick={generateInstallments}>
-                <Plus className="size-4" />
-                Gerar parcelas
-              </Button>
-            </div>
-
-            <div className="min-w-0 overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Duplicata</TableHead>
-                    <TableHead>Vencimento</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Dt. pagto</TableHead>
-                    <TableHead>Banco</TableHead>
-                    <TableHead>Documento</TableHead>
-                    <TableHead>Emissão</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground">
-                        Nenhuma duplicata — preencha vencimento e valor acima e clique em &quot;Confirme&quot;.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {rows.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell>{r.documentNumber}</TableCell>
-                      <TableCell>{new Date(`${r.dueDate}T12:00:00`).toLocaleDateString("pt-BR")}</TableCell>
-                      <TableCell>{brl(r.amount)}</TableCell>
-                      <TableCell>{r.paidAt ? new Date(`${r.paidAt}T12:00:00`).toLocaleDateString("pt-BR") : "—"}</TableCell>
-                      <TableCell>{r.paidAt ? bankName(r.bankAccountId) : "—"}</TableCell>
-                      <TableCell>{r.paymentMethod}</TableCell>
-                      <TableCell>{header.issueDate ? new Date(`${header.issueDate}T12:00:00`).toLocaleDateString("pt-BR") : "—"}</TableCell>
-                      <TableCell>
-                        <Button type="button" size="icon" variant="ghost" onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))} aria-label="Remover duplicata">
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex flex-wrap justify-end gap-4 text-sm">
-              <span>Total das duplicatas: <strong>{brl(duplicatesTotal)}</strong></span>
-              {totalAmount > 0 && (
-                <span className={Math.abs(remaining) >= 0.01 ? "font-semibold text-destructive" : "text-muted-foreground"}>
-                  {Math.abs(remaining) < 0.01 ? "Bate com o Valor N.F." : remaining > 0 ? `Faltam ${brl(remaining)}` : `Passou ${brl(-remaining)} do Valor N.F.`}
-                </span>
               )}
-            </div>
-          </fieldset>
+              <div className={`grid gap-1.5 ${stores && stores.length > 0 ? "sm:col-span-2" : "sm:col-span-6"}`}>
+                <Label>Responsável pelo lançamento</Label>
+                <div className="flex h-9 items-center gap-2 rounded-md border bg-muted/40 px-3 text-sm">
+                  <UserRound className="size-4 text-muted-foreground" />
+                  {user?.name}
+                </div>
+              </div>
 
-          <DialogFooter>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Salvar conta a pagar"}</Button>
+              <div className="grid gap-1.5 sm:col-span-3">
+                <Label htmlFor="ap-nf">Nota fiscal</Label>
+                <Input id="ap-nf" value={header.invoiceNumber} onChange={(e) => setH("invoiceNumber", e.target.value)} placeholder="Nº da nota (opcional)" />
+              </div>
+              <div className="grid gap-1.5 sm:col-span-3">
+                <Label htmlFor="ap-issue">Data emissão</Label>
+                <Input id="ap-issue" type="date" value={header.issueDate} onChange={(e) => setH("issueDate", e.target.value)} />
+              </div>
+
+              <div className="grid gap-1.5 sm:col-span-6">
+                <Label htmlFor="ap-supplier">Fornecedor *</Label>
+                <SuggestInput
+                  id="ap-supplier"
+                  options={(suppliers ?? []).filter((s) => s.active !== false).map((s) => s.name)}
+                  value={header.payeeName}
+                  onChange={(e) => setH("payeeName", e.target.value)}
+                  placeholder="Escolha um fornecedor cadastrado ou digite o nome"
+                />
+              </div>
+
+              <div className="grid gap-1.5 sm:col-span-3">
+                <Label htmlFor="ap-group">Grupo despesa</Label>
+                <SuggestInput id="ap-group" options={classifications?.groups ?? []} value={header.expenseGroup} onChange={(e) => setH("expenseGroup", e.target.value)} placeholder="Ex.: FOLHA DE PAGAMENTO" />
+              </div>
+              <div className="grid gap-1.5 sm:col-span-3">
+                <Label htmlFor="ap-desc">Descr. despesa</Label>
+                <SuggestInput id="ap-desc" options={descriptionOptions} value={header.expenseDescription} onChange={(e) => setH("expenseDescription", e.target.value)} placeholder="Ex.: ASSISTÊNCIA MÉDICA" />
+              </div>
+
+              <div className="grid gap-1.5 sm:col-span-3">
+                <Label htmlFor="ap-category">Categoria (natureza da operação) *</Label>
+                <SuggestInput id="ap-category" options={classifications?.categories ?? []} value={header.category} onChange={(e) => setH("category", e.target.value)} placeholder="Ex.: Despesas administrativas" />
+              </div>
+              <div className="grid gap-1.5 sm:col-span-3">
+                <Label htmlFor="ap-sector">Origem despesa (setor)</Label>
+                <SuggestInput id="ap-sector" options={classifications?.sectors ?? []} value={header.expenseSector} onChange={(e) => setH("expenseSector", e.target.value)} placeholder="Ex.: Administração" />
+              </div>
+
+              <div className="grid gap-1.5 sm:col-span-2">
+                <Label htmlFor="ap-total">Valor N.F.</Label>
+                <Input id="ap-total" type="number" min="0" step="0.01" value={header.totalAmount} onChange={(e) => setH("totalAmount", e.target.value)} />
+              </div>
+              <div className="grid gap-1.5 sm:col-span-4">
+                <Label htmlFor="ap-notes">Observação</Label>
+                <Input id="ap-notes" value={header.notes} onChange={(e) => setH("notes", e.target.value)} placeholder="Opcional" />
+              </div>
+            </div>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Categorias, grupos, descrições e setores novos ficam salvos e aparecem como sugestão nos próximos lançamentos.
+            </p>
+
+            {/* Condições de pagamento */}
+            <fieldset className="grid gap-3 rounded-lg border p-3">
+              <legend className="px-1 text-sm font-semibold">Condições de pagamento</legend>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+                <div className="grid gap-1.5 sm:col-span-3">
+                  <Label>Pagto previsto na C/C</Label>
+                  <Select value={plannedBankAccountId || "NONE"} onValueChange={(v) => setPlannedBankAccountId(v === "NONE" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="Conta bancária..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NONE">—</SelectItem>
+                      {(accounts ?? []).map((a) => (
+                        <SelectItem key={a.id} value={a.id}>{a.name}{a.bank ? ` — ${a.bank}` : ""}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-1.5 sm:col-span-3">
+                  <Label>Tipo docto</Label>
+                  <Select value={dup.paymentMethod} onValueChange={(v) => setDup((d) => ({ ...d, paymentMethod: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["Boleto", ...PAYMENT_METHODS.filter((m) => m !== "Boleto")].map((m) => (
+                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid gap-1.5 sm:col-span-1">
+                  <Label htmlFor="ap-dup">Dupl.</Label>
+                  <Input id="ap-dup" value={dup.documentNumber} onChange={(e) => setDup((d) => ({ ...d, documentNumber: e.target.value }))} placeholder={String(rows.length + 1)} />
+                </div>
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <Label htmlFor="ap-due">Vencto</Label>
+                  <Input id="ap-due" type="date" value={dup.dueDate} onChange={(e) => setDup((d) => ({ ...d, dueDate: e.target.value }))} />
+                </div>
+                <div className="grid gap-1.5 sm:col-span-2">
+                  <Label htmlFor="ap-dup-value">Valor</Label>
+                  <Input
+                    id="ap-dup-value"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={dup.amount}
+                    onChange={(e) => setDup((d) => ({ ...d, amount: e.target.value }))}
+                    placeholder={remaining > 0 ? remaining.toFixed(2) : ""}
+                  />
+                </div>
+                <div className="flex items-end sm:col-span-1">
+                  <Button type="button" className="w-full" onClick={confirmDuplicate} title="Adicionar duplicata">
+                    <Check className="size-4" />
+                    Confirme
+                  </Button>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input type="checkbox" checked={dup.paid} onChange={(e) => setDup((d) => ({ ...d, paid: e.target.checked }))} />
+                Banco — preencher somente se o pagamento foi efetuado
+              </label>
+              {dup.paid && (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid gap-1.5">
+                    <Label>Data do pagamento</Label>
+                    <Input type="date" value={dup.paidAt} onChange={(e) => setDup((d) => ({ ...d, paidAt: e.target.value }))} />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Banco do pagamento</Label>
+                    <Select value={dup.paidBankAccountId || "NONE"} onValueChange={(v) => setDup((d) => ({ ...d, paidBankAccountId: v === "NONE" ? "" : v }))}>
+                      <SelectTrigger><SelectValue placeholder="Conta bancária..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NONE">—</SelectItem>
+                        {(accounts ?? []).map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-end gap-2 rounded-md border border-dashed p-2 text-sm">
+                <span className="text-muted-foreground">Ou gere parcelas iguais do Valor N.F.:</span>
+                <Input className="w-20" type="number" min="1" max="60" value={split.count} onChange={(e) => setSplit((s) => ({ ...s, count: e.target.value }))} aria-label="Quantidade de parcelas" />
+                <span className="text-muted-foreground">x, 1º vencimento</span>
+                <Input className="w-40" type="date" value={split.firstDueDate} onChange={(e) => setSplit((s) => ({ ...s, firstDueDate: e.target.value }))} aria-label="Vencimento da primeira parcela" />
+                <Button type="button" variant="outline" size="sm" onClick={generateInstallments}>
+                  <Plus className="size-4" />
+                  Gerar parcelas
+                </Button>
+              </div>
+
+              <div className="min-w-0 overflow-x-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Duplicata</TableHead>
+                      <TableHead>Vencimento</TableHead>
+                      <TableHead>Valor</TableHead>
+                      <TableHead>Dt. pagto</TableHead>
+                      <TableHead>Banco</TableHead>
+                      <TableHead>Documento</TableHead>
+                      <TableHead>Emissão</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rows.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center text-muted-foreground">
+                          Nenhuma duplicata — preencha vencimento e valor acima e clique em &quot;Confirme&quot;.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {rows.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{r.documentNumber}</TableCell>
+                        <TableCell>{new Date(`${r.dueDate}T12:00:00`).toLocaleDateString("pt-BR")}</TableCell>
+                        <TableCell>{brl(r.amount)}</TableCell>
+                        <TableCell>{r.paidAt ? new Date(`${r.paidAt}T12:00:00`).toLocaleDateString("pt-BR") : "—"}</TableCell>
+                        <TableCell>{r.paidAt ? bankName(r.bankAccountId) : "—"}</TableCell>
+                        <TableCell>{r.paymentMethod}</TableCell>
+                        <TableCell>{header.issueDate ? new Date(`${header.issueDate}T12:00:00`).toLocaleDateString("pt-BR") : "—"}</TableCell>
+                        <TableCell>
+                          <Button type="button" size="icon" variant="ghost" onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))} aria-label="Remover duplicata">
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="flex flex-wrap justify-end gap-4 text-sm">
+                <span>Total das duplicatas: <strong>{brl(duplicatesTotal)}</strong></span>
+                {totalAmount > 0 && (
+                  <span className={Math.abs(remaining) >= 0.01 ? "font-semibold text-destructive" : "text-muted-foreground"}>
+                    {Math.abs(remaining) < 0.01 ? "Bate com o Valor N.F." : remaining > 0 ? `Faltam ${brl(remaining)}` : `Passou ${brl(-remaining)} do Valor N.F.`}
+                  </span>
+                )}
+              </div>
+            </fieldset>
+
+          </div>
+          <DialogFooter className="border-t pt-3">
+            <Button type="submit" className="w-full sm:w-auto" disabled={saving}>{saving ? "Salvando..." : "Salvar conta a pagar"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

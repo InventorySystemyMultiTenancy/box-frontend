@@ -132,19 +132,22 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt, appoin
         finalVehicleId = (vehicle as Vehicle).id;
       }
 
+      // Na edição, campo vazio vai como null (= limpar no servidor); undefined manteria o
+      // valor antigo — ex.: tirar o mecânico ou trocar uma retirada por serviço na oficina.
+      const empty = appointment ? null : undefined;
       const payload = {
         title,
         type,
-        clientId: clientId || undefined,
-        vehicleId: finalVehicleId,
-        mechanicId: !isPickupOrDropoff ? mechanicId || undefined : undefined,
-        driverId: isPickupOrDropoff ? driverId || undefined : undefined,
-        bayId: !isPickupOrDropoff ? bayId || undefined : undefined,
+        clientId: clientId || empty,
+        vehicleId: finalVehicleId ?? empty,
+        mechanicId: !isPickupOrDropoff ? mechanicId || empty : empty,
+        driverId: isPickupOrDropoff ? driverId || empty : empty,
+        bayId: !isPickupOrDropoff ? bayId || empty : empty,
         startAt: new Date(startAt).toISOString(),
         estimatedDurationMin: Number(durationMin) || 60,
-        notes: notes || undefined,
-        pickupLocation: isPickupOrDropoff ? pickupLocation || undefined : undefined,
-        dropoffLocation: isPickupOrDropoff ? dropoffLocation || undefined : undefined,
+        notes: notes || empty,
+        pickupLocation: isPickupOrDropoff ? pickupLocation || empty : empty,
+        dropoffLocation: isPickupOrDropoff ? dropoffLocation || empty : empty,
       };
 
       if (appointment) {
