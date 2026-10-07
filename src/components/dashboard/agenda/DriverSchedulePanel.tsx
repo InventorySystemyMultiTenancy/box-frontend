@@ -133,27 +133,27 @@ export function DriverSchedulePanel({ title = "Agendamento diário dos motorista
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
         <div>
           <h2 className="text-base font-semibold">{title}</h2>
           <p className="text-xs text-muted-foreground">
             Retiradas e entregas de veículos {canPickDriver ? "de todos os motoristas" : "agendadas para você"}. Crie novas pela Agenda (tipo &quot;Retirada&quot; ou &quot;Entrega&quot;).
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:w-auto lg:grid-cols-none lg:flex lg:flex-wrap lg:items-end">
           <div className="grid gap-1">
             <Label htmlFor="ds-from" className="text-xs text-muted-foreground">De</Label>
-            <Input id="ds-from" type="date" className="w-40" value={from} onChange={(e) => setFrom(e.target.value)} />
+            <Input id="ds-from" type="date" className="w-full lg:w-40" value={from} onChange={(e) => setFrom(e.target.value)} />
           </div>
           <div className="grid gap-1">
             <Label htmlFor="ds-to" className="text-xs text-muted-foreground">Até</Label>
-            <Input id="ds-to" type="date" className="w-40" value={to} onChange={(e) => setTo(e.target.value)} />
+            <Input id="ds-to" type="date" className="w-full lg:w-40" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
           {canPickDriver && (
             <div className="grid gap-1">
               <Label className="text-xs text-muted-foreground">Motorista</Label>
               <Select value={driverId || "ALL"} onValueChange={(v) => setDriverId(v === "ALL" ? "" : v)}>
-                <SelectTrigger className="w-44"><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectTrigger className="w-full lg:w-44"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="ALL">Todos</SelectItem>
                   {(team ?? []).map((m) => (
@@ -163,11 +163,11 @@ export function DriverSchedulePanel({ title = "Agendamento diário dos motorista
               </Select>
             </div>
           )}
-          <Button type="button" variant="outline" size="sm" disabled={appointments.length === 0} onClick={() => exportCsv(fileBase, COLUMNS, appointments)}>
+          <Button type="button" variant="outline" size="sm" className="w-full lg:w-auto" disabled={appointments.length === 0} onClick={() => exportCsv(fileBase, COLUMNS, appointments)}>
             <FileSpreadsheet className="size-4" />
             Planilha (Excel)
           </Button>
-          <Button type="button" variant="outline" size="sm" disabled={appointments.length === 0} onClick={printPdf}>
+          <Button type="button" variant="outline" size="sm" className="w-full lg:w-auto" disabled={appointments.length === 0} onClick={printPdf}>
             <FileText className="size-4" />
             Imprimir / PDF
           </Button>
@@ -184,8 +184,8 @@ export function DriverSchedulePanel({ title = "Agendamento diário dos motorista
           <div className="border-b px-3 py-2 text-center text-sm font-semibold">
             Agendamento diário — {new Date(`${day}T12:00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}
           </div>
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Motorista</TableHead>

@@ -99,16 +99,16 @@ export default function DayAgendaPanel() {
 
   return (
     <div className="grid gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="grid gap-1.5">
           <Label htmlFor="agenda-date">Dia</Label>
-          <Input id="agenda-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-44" />
+          <Input id="agenda-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full sm:w-44" />
         </div>
         {canManage && (
           <AppointmentFormDialog
             onSaved={refetch}
             defaultStartAt={`${date}T09:00:00`}
-            trigger={<Button size="sm"><Plus className="size-4" />Novo agendamento</Button>}
+            trigger={<Button size="sm" className="w-full sm:w-auto"><Plus className="size-4" />Novo agendamento</Button>}
           />
         )}
       </div>
@@ -122,8 +122,8 @@ export default function DayAgendaPanel() {
             <div className="border-b px-4 py-2 text-sm font-medium">{bayName}</div>
             <div className="divide-y">
               {list.map((appt) => (
-                <div key={appt.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-                  <div>
+                <div key={appt.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <p className="font-medium">
                       {new Date(appt.startAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} — {appt.title}
                     </p>
@@ -133,7 +133,7 @@ export default function DayAgendaPanel() {
                       {appt.estimatedDurationMin} min
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={STATUS_VARIANTS[appt.status]}>{STATUS_LABELS[appt.status]}</Badge>
                     {canManage && OPEN_STATUSES.includes(appt.status) && (
                       <>

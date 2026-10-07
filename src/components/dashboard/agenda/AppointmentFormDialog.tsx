@@ -161,12 +161,13 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Novo agendamento</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <div className="grid gap-1.5">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col gap-4">
+          <div className="grid min-h-0 gap-4 overflow-y-auto overscroll-contain pr-1">
+            <div className="grid gap-1.5">
             <Label>Tipo</Label>
             <Select value={type} onValueChange={(v) => setType(v as AppointmentType)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -317,8 +318,9 @@ export function AppointmentFormDialog({ trigger, onSaved, defaultStartAt }: Appo
             <Label htmlFor="ap-notes">Observações</Label>
             <Input id="ap-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
-          <DialogFooter>
-            <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Criar agendamento"}</Button>
+          </div>
+          <DialogFooter className="border-t pt-3">
+            <Button type="submit" className="w-full sm:w-auto" disabled={saving}>{saving ? "Salvando..." : "Criar agendamento"}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
