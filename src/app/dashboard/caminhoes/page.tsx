@@ -84,14 +84,14 @@ export default function CaminhoesPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Caminhões</h1>
           <p className="text-sm text-muted-foreground">Controle de uso dos caminhões usados para buscar veículos de clientes.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
           {/* Gastos da viagem (refeição, hotel...) — a aba Gastos mostra "Voltar aos caminhões". */}
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="w-full sm:w-auto">
             <Link href="/dashboard/gastos?de=caminhoes">
               <Receipt className="size-4" />
               Lançar gastos
@@ -101,38 +101,38 @@ export default function CaminhoesPage() {
             <TruckFormDialog
               onSaved={refetch}
               trigger={
-                <Button>
+                <Button className="w-full sm:w-auto">
                   <Plus className="size-4" />
                   Novo caminhão
                 </Button>
               }
             />
           )}
-          <div className="inline-flex rounded-md border p-0.5 text-sm">
+          <div className="grid w-full grid-cols-2 gap-1 rounded-md border p-1 text-sm sm:w-auto sm:grid-cols-4 sm:gap-0 sm:p-0.5">
             <button
               type="button"
-              className={`rounded px-3 py-1 ${view === "trucks" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              className={`min-w-0 rounded px-2 py-1.5 text-center sm:px-3 sm:py-1 ${view === "trucks" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
               onClick={() => setView("trucks")}
             >
               Caminhões
             </button>
             <button
               type="button"
-              className={`rounded px-3 py-1 ${view === "movements" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              className={`min-w-0 rounded px-2 py-1.5 text-center sm:px-3 sm:py-1 ${view === "movements" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
               onClick={() => setView("movements")}
             >
               Movimentações
             </button>
             <button
               type="button"
-              className={`rounded px-3 py-1 ${view === "refuelings" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              className={`min-w-0 rounded px-2 py-1.5 text-center sm:px-3 sm:py-1 ${view === "refuelings" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
               onClick={() => setView("refuelings")}
             >
               Abastecimentos
             </button>
             <button
               type="button"
-              className={`inline-flex items-center gap-1 rounded px-3 py-1 ${view === "schedule" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+              className={`inline-flex min-w-0 items-center justify-center gap-1 rounded px-2 py-1.5 text-center sm:px-3 sm:py-1 ${view === "schedule" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
               onClick={() => setView("schedule")}
             >
               <CalendarDays className="size-3.5" />
