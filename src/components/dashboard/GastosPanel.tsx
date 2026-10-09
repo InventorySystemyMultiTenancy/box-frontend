@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { FinancialEntry } from "@/lib/types";
 import { openPrintableReport, escapeHtml, formatCurrencyBRL } from "@/lib/printable-report";
+import { ScrollX } from "@/components/ui/scroll-x";
 import styles from "./dashboard.module.css";
 
 const EMPTY_FORM = { category: "", description: "", amount: "", occurredAt: new Date().toISOString().slice(0, 10) };
@@ -269,7 +270,7 @@ function MyExpensesList({ from, to, categories }: { from: string; to: string; ca
   const entries = data?.entries ?? [];
 
   return (
-    <div style={{ marginTop: "1rem", overflowX: "auto" }}>
+    <ScrollX style={{ marginTop: "1rem" }}>
       {isLoading && <p className={styles.tlSub}>Carregando...</p>}
       {!isLoading && entries.length === 0 && <p className={styles.tlSub}>Nenhum gasto lançado por você no período.</p>}
       {entries.length > 0 && (
@@ -347,6 +348,6 @@ function MyExpensesList({ from, to, categories }: { from: string; to: string; ca
           </tfoot>
         </table>
       )}
-    </div>
+    </ScrollX>
   );
 }

@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   X,
   Bell,
   LogOut,
@@ -84,6 +86,8 @@ const TAB_ICONS: Record<string, LucideIcon> = {
   "/dashboard/cargos": UserCog,
 };
 
+const SIDEBAR_COLLAPSED_KEY = "dashboard.sidebarCollapsed";
+
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: "Administrador",
   MECHANIC: "Mecânico",
@@ -105,6 +109,25 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const [lastPathname, setLastPathname] = useState(pathname);
   const [unreadAlerts, setUnreadAlerts] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  // Sidebar recolhível (só computador) — a escolha fica lembrada neste navegador.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+
+  function toggleSidebar() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {}
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!loading && !token) router.replace("/login");
@@ -354,16 +377,28 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       <div className={styles.body}>
         {isStaff && (
-          <aside className={styles.sidebar}>
-            <nav className={styles.sidebarNav}>{navList}</nav>
-            <div className={styles.sidebarPromo}>
-              <div className={styles.sidebarPromoIcon}>
-                <Sparkles size={18} />
+          <div className={`${styles.sidebarWrap} ${sidebarCollapsed ? styles.sidebarCollapsed : ""}`}>
+            <aside className={styles.sidebar} aria-hidden={sidebarCollapsed} inert={sidebarCollapsed}>
+              <nav className={styles.sidebarNav}>{navList}</nav>
+              <div className={styles.sidebarPromo}>
+                <div className={styles.sidebarPromoIcon}>
+                  <Sparkles size={18} />
+                </div>
+                <strong>Reblind ERP</strong>
+                <p>Gestão completa da oficina em um só lugar.</p>
               </div>
-              <strong>Reblind ERP</strong>
-              <p>Gestão completa da oficina em um só lugar.</p>
-            </div>
-          </aside>
+            </aside>
+            <button
+              type="button"
+              className={styles.sidebarToggle}
+              onClick={toggleSidebar}
+              aria-label={sidebarCollapsed ? "Mostrar menu lateral" : "Esconder menu lateral"}
+              title={sidebarCollapsed ? "Mostrar menu lateral" : "Esconder menu lateral"}
+              aria-expanded={!sidebarCollapsed}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            </button>
+          </div>
         )}
         <div className={styles.mainArea}>{children}</div>
       </div>

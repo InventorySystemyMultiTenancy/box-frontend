@@ -382,6 +382,7 @@
   display: flex;
   align-items: flex-start;
 }
+.sidebarWrap,
 .sidebar {
   display: none;
 }
@@ -390,6 +391,17 @@
   min-width: 0;
 }
 @media (min-width: 761px) {
+  /* O wrapper é quem gruda no topo; o aside desliza pra fora (margin-left negativa)
+     quando recolhido, e o botão continua visível colado na borda esquerda. */
+  .sidebarWrap {
+    display: flex;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    height: 100vh;
+    z-index: 20;
+  }
   .sidebar {
     display: flex;
     flex-direction: column;
@@ -400,12 +412,38 @@
     background: var(--shell-bg);
     border-right: 1px solid var(--shell-border);
     padding: 1.1rem 0.85rem;
-    position: sticky;
-    top: 0;
-    align-self: flex-start;
-    height: 100vh;
+    height: 100%;
     overflow-y: auto;
+    transition: margin-left 0.22s ease;
   }
+  .sidebarCollapsed .sidebar {
+    margin-left: -220px;
+  }
+  .sidebarToggle {
+    position: absolute;
+    top: 0.9rem;
+    left: 100%;
+    width: 22px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--shell-border);
+    border-left: none;
+    border-radius: 0 8px 8px 0;
+    background: var(--shell-bg);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  .sidebarToggle:hover {
+    color: #fff;
+    background: var(--shell-active);
+  }
+}
+@media (min-width: 761px) and (prefers-reduced-motion: reduce) {
+  .sidebar { transition: none; }
 }
 .sidebarNav {
   display: flex;

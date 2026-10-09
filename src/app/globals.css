@@ -122,3 +122,25 @@ a {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Barra de rolagem horizontal flutuante das tabelas largas (ver components/ui/scroll-x.tsx):
+   fica presa no rodapé da tela enquanto a barra nativa da tabela está fora de vista. */
+.floating-scrollbar {
+  position: fixed;
+  bottom: 0;
+  z-index: 40;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  background: rgba(245, 246, 248, 0.92);
+  border-top: 1px solid var(--border);
+  scrollbar-width: auto;
+  scrollbar-color: rgba(27, 34, 44, 0.35) transparent;
+}
+.floating-scrollbar::-webkit-scrollbar { height: 12px; }
+.floating-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(27, 34, 44, 0.35);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.floating-scrollbar::-webkit-scrollbar-track { background: transparent; }

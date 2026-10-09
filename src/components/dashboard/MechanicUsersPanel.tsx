@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { User, Role } from "@/lib/types";
 import { UserFormDialog } from "@/components/dashboard/users/UserFormDialog";
+import { ScrollX } from "@/components/ui/scroll-x";
 import styles from "./dashboard.module.css";
 
 export default function MechanicUsersPanel() {
@@ -187,7 +188,7 @@ export default function MechanicUsersPanel() {
       </div>
 
       <div className={styles.sectionTitle}>Usuários existentes ({users.length})</div>
-      <div className={styles.usersTableWrap}>
+      <ScrollX className={styles.usersTableWrap}>
         <table className={styles.usersTable}>
           <thead>
             <tr>
@@ -259,7 +260,7 @@ export default function MechanicUsersPanel() {
             )}
           </tbody>
         </table>
-      </div>
+      </ScrollX>
     </div>
   );
 }
