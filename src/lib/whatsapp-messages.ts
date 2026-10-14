@@ -36,6 +36,15 @@ export function statusUpdateMessage(order: OrderForMessage, trackingUrl: string)
   ].join("\n\n");
 }
 
+/** Número que recebe o PDF de toda finalização de projeto (WhatsApp interno da oficina). */
+export const FINISHED_ORDER_WHATSAPP = "11971337142";
+
+/** Mensagem enviada ao finalizar o projeto, com o link do PDF do serviço. */
+export function finishedOrderMessage(vehicle: { brand: string; model: string; plate?: string | null }, pdfUrl: string | null) {
+  const name = `${vehicle.brand} ${vehicle.model}${vehicle.plate ? ` (${vehicle.plate})` : ""}`;
+  return [`Veículo ${name} finalizado, segue pdf do serviço!`, pdfUrl].filter(Boolean).join("\n\n");
+}
+
 export function revisionReminderMessage(ownerName: string, vehicle: string, months: number) {
   return [
     `Olá, ${firstName(ownerName)}! Aqui é da Reblind.`,

@@ -398,6 +398,9 @@ export default function KanbanBoard({ orders, selectedOrderId, onSelect, onStatu
                       <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                         {order.code} {order.vehicle.plate ? `· ${order.vehicle.plate}` : ""}
                       </div>
+                      {order.assignees?.length ? (
+                        <div className="mt-0.5 truncate text-xs text-muted-foreground">{order.assignees.map((a) => a.user.name).join(", ")}</div>
+                      ) : null}
                       <div className="mt-1.5 flex items-center justify-between gap-1 text-[11px] text-muted-foreground">
                         <span className={`rounded-full px-1.5 py-0.5 ${TONE_CLASSES[STATUS_TONE[expandedStatus]]}`}>
                           {days != null ? `${days}d nesta etapa` : "—"}
@@ -470,6 +473,9 @@ function OrderCard({ order, status, theme, selected, dragging, onPointerDown, on
       <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
         {order.code} {order.vehicle.plate ? `· ${order.vehicle.plate}` : ""}
       </div>
+      {order.assignees?.length ? (
+        <div className="mt-0.5 truncate text-xs text-muted-foreground">{order.assignees.map((a) => a.user.name).join(", ")}</div>
+      ) : null}
       {order.insuranceCompany && (
         <div className="mt-1 truncate text-xs text-muted-foreground">{order.insuranceCompany.tradeName ?? order.insuranceCompany.legalName}</div>
       )}

@@ -246,12 +246,22 @@ export const api = {
     if (payload.receivedNow !== undefined) form.append("receivedNow", payload.receivedNow ? "true" : "false");
     if (payload.bankAccountId) form.append("bankAccountId", payload.bankAccountId);
 
-    return request<{ order: unknown }>(
+    // reportUrl: PDF de finalização gerado no servidor (null se falhou) — vai no WhatsApp.
+    return request<{ order: unknown; reportUrl: string | null }>(
       `/api/service-orders/${orderId}/finalize`,
       { method: "PATCH", body: form },
       token
     );
   },
+
+  setOrderAssignees: (orderId: string, userIds: string[], token: string) =>
+    request<{ assignees: unknown[] }>(
+      `/api/service-orders/${orderId}/assignees`,
+      { method: "PUT", body: JSON.stringify({ userIds }) },
+      token
+    ),
+
+  assignableStaff: (token: string) => request<{ staff: unknown[] }>("/api/team/assignable", {}, token),
 
   archiveServiceOrder: (orderId: string, token: string) =>
     request<{ order: unknown }>(`/api/service-orders/${orderId}/archive`, { method: "PATCH" }, token),

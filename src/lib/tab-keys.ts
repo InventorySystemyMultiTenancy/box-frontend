@@ -26,7 +26,7 @@ export const TAB_KEYS = [
 export type TabKey = (typeof TAB_KEYS)[number];
 
 export const TAB_LABELS: Record<TabKey, string> = {
-  projects: "Projetos",
+  projects: "Serviços",
   requests: "Solicitações",
   users: "Usuários",
   parts: "Peças",

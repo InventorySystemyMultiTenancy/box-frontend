@@ -17,7 +17,7 @@ import { matchesSearch } from "@/lib/utils";
 import styles from "./dashboard.module.css";
 
 function orderSearchFields(order: ServiceOrder): (string | null | undefined)[] {
-  return [order.vehicle.brand, order.vehicle.model, order.vehicle.plate, order.vehicle.owner?.name, order.code];
+  return [order.vehicle.brand, order.vehicle.model, order.vehicle.plate, order.vehicle.owner?.name, order.code, ...(order.assignees ?? []).map((a) => a.user.name)];
 }
 
 const DONE_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);

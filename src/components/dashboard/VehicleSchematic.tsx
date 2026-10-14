@@ -348,7 +348,11 @@ export default function VehicleSchematic({
           {active.note && <div className={styles.partNote}>{active.note}</div>}
           <div className={styles.partMeta}>
             <span>Atualizado {new Date(active.updatedAt).toLocaleString("pt-BR")}</span>
-            {active.responsible && <span>Responsável: {active.responsible.name}</span>}
+            {active.responsible && (
+              <span>
+                {active.status === "DONE" ? "Concluído por" : active.status === "IN_PROGRESS" ? "Em reparo com" : "Responsável"}: {active.responsible.name}
+              </span>
+            )}
             {active.warranty && <span>Garantia: {active.warranty}</span>}
           </div>
           {active.media.length > 0 && (

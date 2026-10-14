@@ -26,7 +26,11 @@ export default function Timeline({
             event.id === justArrivedId ? styles.entering : ""
           }`}
         >
-          <div className={styles.tlTime}>{formatTime(event.occurredAt)}</div>
+          <div className={styles.tlTime}>
+            {formatTime(event.occurredAt)}
+            {/* Quem avançou a etapa / concluiu a manutenção / registrou o evento. */}
+            {event.author?.name && ` · por ${event.author.name}`}
+          </div>
           <div className={styles.tlText}>{event.title}</div>
           {event.description && (canViewPrices || !/R\$|valor/i.test(event.description)) && <div className={styles.tlSub}>{event.description}</div>}
         </div>

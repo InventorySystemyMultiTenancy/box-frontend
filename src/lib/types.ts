@@ -262,8 +262,23 @@ export interface ServiceOrder {
   deductibleAmount?: number | null;
   serviceType?: string | null;
   authorizationNumber?: string | null;
+  // Funcionários associados (admin associa). Funcionário não-admin só vê os projetos dele.
+  assignees?: ServiceOrderAssignee[];
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ServiceOrderAssignee {
+  id: string;
+  userId: string;
+  user: { id: string; name: string };
+}
+
+export interface AssignableStaff {
+  id: string;
+  name: string;
+  role: string;
+  roleLabel: string;
 }
 
 // --- Gaps SIGMA (fases 1-8) -------------------------------------------------

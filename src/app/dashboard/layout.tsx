@@ -53,7 +53,7 @@ import "../dashboard.css";
 // key = identificador estável de cada aba, usado pelo Role.allowedTabs (ver aba Cargos)
 // pra restringir quais abas um cargo específico pode ver — independente do href/label.
 const STAFF_TABS = [
-  { href: "/dashboard", label: "Projetos", key: "projects" },
+  { href: "/dashboard", label: "Serviços", key: "projects" },
   { href: "/dashboard/solicitacoes", label: "Solicitações", key: "requests" },
 ];
 

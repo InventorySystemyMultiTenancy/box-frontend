@@ -6,7 +6,7 @@ import { api, ApiError, API_URL } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
 import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, BankAccount, InventoryPart, PART_STATUS_LABELS, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
-import { statusUpdateMessage } from "@/lib/whatsapp-messages";
+import { FINISHED_ORDER_WHATSAPP, finishedOrderMessage, statusUpdateMessage } from "@/lib/whatsapp-messages";
 import { PAID_ON_THE_SPOT, PAYMENT_METHODS } from "@/lib/payment-methods";
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ import StatusStrip from "@/components/dashboard/StatusStrip";
 import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
 import { ShareLinkDialog } from "@/components/dashboard/ShareLinkDialog";
+import OrderAssigneesPanel from "@/components/dashboard/OrderAssigneesPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -430,6 +431,9 @@ export default function OrderDetail({
   async function finalizeOrder(e: React.FormEvent) {
     e.preventDefault();
     if (!token || !order) return;
+    // Aba do WhatsApp aberta já no clique (antes de qualquer await) — aberta depois da
+    // resposta do servidor, o navegador bloqueia como pop-up. Recebe o link no fim.
+    const whatsAppWindow = window.open("", "_blank");
     setFinalizeBusy(true);
     setFinalizeError(null);
     try {
@@ -454,7 +458,14 @@ export default function OrderDetail({
       setFinalizeForm(emptyFinalizeForm());
       setNotifyPrompt(true);
       toast.success("Entrega confirmada — a cobrança foi lançada em Financeiro > Contas a receber.");
+
+      // PDF de finalização vai para o WhatsApp da oficina, com a mensagem já pronta.
+      const link = buildWhatsAppLink(FINISHED_ORDER_WHATSAPP, finishedOrderMessage(order.vehicle, result.reportUrl ? mediaUrl(result.reportUrl) : null));
+      if (!result.reportUrl) toast.error("Não foi possível gerar o PDF do serviço — a mensagem vai sem o arquivo.");
+      if (link && whatsAppWindow && !whatsAppWindow.closed) whatsAppWindow.location.href = link;
+      else if (link) toast.info("O navegador bloqueou a abertura do WhatsApp — use o botão \"Enviar PDF no WhatsApp\".");
     } catch (err) {
+      whatsAppWindow?.close();
       setFinalizeError(err instanceof ApiError ? err.message : "Não foi possível confirmar a entrega.");
     } finally {
       setFinalizeBusy(false);
@@ -587,7 +598,12 @@ export default function OrderDetail({
         `;
       })
       .join("");
-    const completedList = completedParts.map((part) => `<li>${escapeHtml(part.name)} - ${escapeHtml(part.note ?? "Serviço concluído")}</li>`).join("");
+    const completedList = completedParts
+      .map((part) => {
+        const by = part.responsible?.name ? ` (concluído por ${escapeHtml(part.responsible.name)})` : "";
+        return `<li>${escapeHtml(part.name)} - ${escapeHtml(part.note ?? "Serviço concluído")}${by}</li>`;
+      })
+      .join("");
     const printedAt = new Date().toLocaleString("pt-BR");
     const vehicle = `${order.vehicle.brand} ${order.vehicle.model} ${order.vehicle.year}`;
     const popup = window.open("", "_blank", "width=960,height=720");
@@ -754,6 +770,11 @@ export default function OrderDetail({
   const billingPreview = (doneWork || order.estimatedMin || 0) + (Number(finalizeForm.extraValue) || 0);
   const installmentsCount = Math.max(1, Number(finalizeForm.installments) || 1);
   const signatures = order.media.filter((m) => m.signatureKind);
+  // PDF gerado na finalização (mídia mais recente primeiro) — reenvio manual pelo WhatsApp.
+  const finishedPdf = order.media.find((m) => m.type === "DOCUMENT" && m.label === "PDF de finalização do serviço");
+  const finishedPdfWhatsAppLink = finishedPdf
+    ? buildWhatsAppLink(FINISHED_ORDER_WHATSAPP, finishedOrderMessage(order.vehicle, mediaUrl(finishedPdf.url)))
+    : null;
 
   return (
     <div>
@@ -784,6 +805,11 @@ export default function OrderDetail({
           <button className={styles.btnApprove} type="button" onClick={generateServicePdf}>
             Baixar PDF do projeto
           </button>
+          {finishedPdfWhatsAppLink && (
+            <a className={styles.btnApprove} href={finishedPdfWhatsAppLink} target="_blank" rel="noreferrer">
+              Enviar PDF no WhatsApp
+            </a>
+          )}
           {isReady && !order.archivedAt && (
             <button className={styles.btnApprove} type="button" disabled={archiveBusy} onClick={archiveOrder}>
               {archiveBusy ? "Dando baixa..." : "Dar baixa no projeto"}
@@ -857,6 +883,15 @@ export default function OrderDetail({
           <span>{order.progress}%</span>
         </div>
       </div>
+
+      {isStaff && (
+        <OrderAssigneesPanel
+          orderId={order.id}
+          assignees={order.assignees ?? []}
+          isAdmin={isAdmin}
+          onChange={(assignees) => setOrder((prev) => (prev ? { ...prev, assignees } : prev))}
+        />
+      )}
 
       {isStaff && order.status === "SCHEDULED" && (
         <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
