@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ExternalLink, Search, Sparkles } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,19 +14,15 @@ import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad"
 import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Client, PlateLookupResult, PlateLookupStatus, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
+import type { Client, PlateLookupResult, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
 import { PRIORITY_LABELS, SERVICE_ORDER_PRIORITIES } from "@/lib/types";
 
 const EMPTY_NEW_CLIENT = { name: "", phone: "", email: "" };
 // color/version/fuelType/chassi só são preenchidos pela consulta de placa (vão no cadastro).
 const EMPTY_NEW_VEHICLE = { brand: "", model: "", year: "", plate: "", mileage: "0", color: "", version: "", fuelType: "", chassi: "" };
 
-const PLATE_LOOKUP_MESSAGES: Partial<Record<PlateLookupStatus, string>> = {
-  NOT_FOUND: "Placa não encontrada na consulta — confira marca e modelo.",
-  NOT_CONFIGURED: "Consulta de placa não configurada (PLATE_API_TOKEN) — dados vêm só da foto.",
-  INVALID_PLATE: "Placa inválida — use o formato ABC1234 ou ABC1D23.",
-  ERROR: "Não foi possível consultar a placa agora — confira marca e modelo.",
-};
+// Placa antiga (ABC1234) ou Mercosul (ABC1D23), já sem traço/espaço.
+const PLATE_PATTERN = /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/;
 
 function plateLookupSummary(r: PlateLookupResult) {
   return [
@@ -76,7 +72,6 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   const [aiBusy, setAiBusy] = useState(false);
   const [aiResult, setAiResult] = useState<RecognizedVehicleData | null>(null);
   const [includeAiProblems, setIncludeAiProblems] = useState(true);
-  const [plateBusy, setPlateBusy] = useState(false);
   const [plateResult, setPlateResult] = useState<PlateLookupResult | null>(null);
 
   const [priority, setPriority] = useState<ServiceOrderPriority>("NORMAL");
@@ -134,10 +129,8 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
         color: data.color ?? prev.color,
       }));
       // Placa lida na foto já é consultada no backend — marca/modelo/ano acima vêm de lá.
+      // Se a consulta não funcionou (sem token, não achou, erro), segue só com a IA, sem aviso.
       if (data.plateLookup) applyPlateLookup(data.plateLookup);
-      else if (data.plate && data.plateLookupStatus && PLATE_LOOKUP_MESSAGES[data.plateLookupStatus]) {
-        toast.info(PLATE_LOOKUP_MESSAGES[data.plateLookupStatus]!);
-      }
       if (data.visibleProblems.length === 0) {
         toast.info("Veículo identificado — nenhum problema visível encontrado na foto.");
       } else {
@@ -165,22 +158,16 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     }));
   }
 
-  // Placa digitada à mão — mesma consulta que roda sozinha quando a foto mostra a placa.
-  async function handlePlateLookup() {
-    if (!token || !newVehicle.plate.trim()) return;
-    setPlateBusy(true);
+  // Placa digitada à mão: consulta ao sair do campo. Silenciosa — se a consulta não
+  // estiver configurada, não achar ou falhar, o formulário só segue como está.
+  async function handlePlateBlur() {
+    const plate = newVehicle.plate.replace(/[^a-z0-9]/gi, "").toUpperCase();
+    if (!token || !PLATE_PATTERN.test(plate) || plateResult?.plate === plate) return;
     try {
-      const { status, result } = await api.lookupPlate(newVehicle.plate.trim(), token);
-      if (status === "FOUND" && result) {
-        applyPlateLookup(result as PlateLookupResult);
-        toast.success("Placa encontrada — dados do veículo atualizados.");
-      } else {
-        toast.info(PLATE_LOOKUP_MESSAGES[status as PlateLookupStatus] ?? "Placa não encontrada.");
-      }
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível consultar a placa.");
-    } finally {
-      setPlateBusy(false);
+      const { status, result } = await api.lookupPlate(plate, token);
+      if (status === "FOUND" && result) applyPlateLookup(result as PlateLookupResult);
+    } catch {
+      // Sem aviso: a consulta de placa é só um complemento.
     }
   }
 
@@ -405,28 +392,16 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                   <Input placeholder="Marca *" value={newVehicle.brand} onChange={(e) => setNewVehicle((p) => ({ ...p, brand: e.target.value }))} />
                   <Input placeholder="Modelo *" value={newVehicle.model} onChange={(e) => setNewVehicle((p) => ({ ...p, model: e.target.value }))} />
                   <Input placeholder="Ano *" type="number" value={newVehicle.year} onChange={(e) => setNewVehicle((p) => ({ ...p, year: e.target.value }))} />
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Placa"
-                      value={newVehicle.plate}
-                      onChange={(e) => {
-                        // Placa mudou: dados da consulta anterior não valem mais para este carro.
-                        setNewVehicle((p) => ({ ...p, plate: e.target.value, version: "", fuelType: "", chassi: "" }));
-                        setPlateResult(null);
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      title="Consultar placa"
-                      aria-label="Consultar placa"
-                      disabled={plateBusy || !newVehicle.plate.trim()}
-                      onClick={handlePlateLookup}
-                    >
-                      <Search className="size-4" />
-                    </Button>
-                  </div>
+                  <Input
+                    placeholder="Placa"
+                    value={newVehicle.plate}
+                    onBlur={handlePlateBlur}
+                    onChange={(e) => {
+                      // Placa mudou: dados da consulta anterior não valem mais para este carro.
+                      setNewVehicle((p) => ({ ...p, plate: e.target.value, version: "", fuelType: "", chassi: "" }));
+                      setPlateResult(null);
+                    }}
+                  />
                   {plateResult && (
                     <div className="rounded-md border bg-muted/30 p-2.5 text-xs text-muted-foreground sm:col-span-2">
                       <span className="font-medium text-foreground">Confirmado pela placa {plateResult.plate}:</span> {plateLookupSummary(plateResult)}
