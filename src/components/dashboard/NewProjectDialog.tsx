@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker";
+import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { Client, PlateLookupResult, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
@@ -116,7 +117,8 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     if (!file || !token) return;
     setAiBusy(true);
     try {
-      const { recognized } = await api.recognizeVehiclePhoto(file, token);
+      // Mesmo cuidado da nota fiscal: JPEG e tamanho razoável (HEIC/foto enorme falhavam).
+      const { recognized } = await api.recognizeVehiclePhoto(await prepareImageForAi(file), token);
       const data = recognized as RecognizedVehicleData;
       setAiResult(data);
       setVehicleMode("new");
@@ -137,7 +139,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
         toast.success(`Veículo identificado — ${data.visibleProblems.length} problema(s) visível(is) encontrado(s).`);
       }
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível analisar a foto.");
+      toast.error(err instanceof ApiError || err instanceof UnsupportedImageError ? err.message : "Não foi possível analisar a foto.");
     } finally {
       setAiBusy(false);
     }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Sparkles } from "lucide-react";
@@ -13,10 +13,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { SuggestInput } from "@/components/ui/suggest-input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
 import type { BankAccount, Client, ExpenseClassifications, Invoice, InvoiceStatus, InvoiceType, ServiceOrder, ServiceOrderStatus } from "@/lib/types";
 
 // "Em andamento" = mesma definição usada em MechanicProjectsPanel — qualquer OS que
@@ -232,7 +234,22 @@ const EMPTY_FORM = {
   bankAccountId: "",
   dueDate: "",
   installments: "1",
+  // Dias entre uma parcela e outra (30/60/90 por padrão).
+  intervalDays: "30",
 };
+
+/** Vencimentos das parcelas — mesma conta do backend (splitInstallments com intervalo em dias). */
+function installmentDueDates(firstDueDate: string, installments: string, intervalDays: string) {
+  if (!firstDueDate) return [];
+  const count = Math.min(60, Math.max(1, Number(installments) || 1));
+  const days = Math.max(1, Number(intervalDays) || 30);
+  const first = new Date(`${firstDueDate}T12:00:00`);
+  return Array.from({ length: count }, (_, i) => {
+    const date = new Date(first);
+    date.setDate(date.getDate() + i * days);
+    return date.toLocaleDateString("pt-BR");
+  });
+}
 
 function isBoleto(paymentMethod: string) {
   return paymentMethod.trim().toLowerCase().includes("boleto");
@@ -246,7 +263,6 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
   const [extracting, setExtracting] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [autoClientMessage, setAutoClientMessage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: clients } = useQuery({
     queryKey: ["clients-all"],
@@ -287,13 +303,13 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
     setOpen(next);
   }
 
-  async function handleExtract(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file || !token) return;
+  async function handleExtract(original: File | undefined) {
+    if (!original || !token) return;
     setExtracting(true);
     setAutoClientMessage(null);
     try {
+      // JPEG e tamanho razoável — foto HEIC ou de 10–20 MB falhava em alguns celulares.
+      const file = await prepareImageForAi(original);
       const { extracted, clientId, clientName, clientCreated } = await api.extractInvoice(file, token);
       setForm((f) => ({
         ...f,
@@ -319,7 +335,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
       }
       toast.success("Dados extraídos — confira antes de salvar.");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível ler a imagem.");
+      toast.error(err instanceof ApiError || err instanceof UnsupportedImageError ? err.message : "Não foi possível ler a imagem.");
     } finally {
       setExtracting(false);
     }
@@ -363,6 +379,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           bankAccountId: form.bankAccountId || undefined,
           dueDate: generatesPayables ? form.dueDate : undefined,
           installments: generatesPayables ? Number(form.installments) || 1 : undefined,
+          installmentIntervalDays: generatesPayables ? Number(form.intervalDays) || 30 : undefined,
         },
         token
       );
@@ -390,11 +407,11 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           {/* Só esta área rola (no celular a rolagem fica no formulário, não na página). */}
           <div className="grid min-h-0 gap-4 overflow-y-auto overscroll-contain pr-1">
             <div className="grid gap-1.5">
-              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleExtract} />
-              <Button type="button" variant="outline" size="sm" className="w-fit" disabled={extracting} onClick={() => fileInputRef.current?.click()}>
+              <span className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Sparkles className="size-4" />
                 {extracting ? "Lendo nota fiscal..." : "Ler nota fiscal por foto (IA)"}
-              </Button>
+              </span>
+              <CameraOrGalleryPicker disabled={extracting} onFiles={(files) => handleExtract(files[0])} />
               {autoClientMessage && <p className="text-xs text-muted-foreground">{autoClientMessage}</p>}
             </div>
 
@@ -511,7 +528,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             {generatesPayables && (
               <div className="grid grid-cols-1 gap-3 rounded-md border border-dashed p-3 sm:grid-cols-2">
                 <div className="col-span-full text-xs font-medium text-muted-foreground">
-                  Gera as parcelas em contas a pagar, vencendo mês a mês{form.bankAccountId ? ", previstas no banco escolhido" : ""}.
+                  Gera as parcelas em contas a pagar, a cada {Number(form.intervalDays) || 30} dias{form.bankAccountId ? ", previstas no banco escolhido" : ""}.
                 </div>
                 <div className="grid gap-1.5">
                   <Label htmlFor="inv-due-date">Vencimento da 1ª parcela *</Label>
@@ -529,6 +546,31 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
                     onChange={(e) => set("installments", e.target.value)}
                   />
                 </div>
+                {Number(form.installments) > 1 && (
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="inv-interval">Intervalo entre parcelas (dias) *</Label>
+                    <Input
+                      id="inv-interval"
+                      type="number"
+                      min="1"
+                      max="365"
+                      required
+                      list="inv-interval-options"
+                      value={form.intervalDays}
+                      onChange={(e) => set("intervalDays", e.target.value)}
+                    />
+                    <datalist id="inv-interval-options">
+                      {[7, 10, 14, 15, 21, 28, 30, 45, 60, 90].map((d) => (
+                        <option key={d} value={d} />
+                      ))}
+                    </datalist>
+                  </div>
+                )}
+                {form.dueDate && Number(form.installments) > 1 && (
+                  <p className="col-span-full text-xs text-muted-foreground">
+                    Vencimentos: {installmentDueDates(form.dueDate, form.installments, form.intervalDays).join(", ")}
+                  </p>
+                )}
               </div>
             )}
 
