@@ -1085,4 +1085,24 @@ export interface RecognizedVehicleData {
   plate: string | null;
   visibleProblems: DetectedVehicleProblem[];
   confidence: "LOW" | "MEDIUM" | "HIGH";
+  // Placa legível na foto → consultada em base externa; quando FOUND, marca/modelo/ano/cor
+  // acima já vêm de lá (não do palpite da IA).
+  plateLookupStatus?: PlateLookupStatus;
+  plateLookup?: PlateLookupResult | null;
+}
+
+export type PlateLookupStatus = "FOUND" | "NOT_FOUND" | "NOT_CONFIGURED" | "INVALID_PLATE" | "ERROR";
+
+export interface PlateLookupResult {
+  plate: string;
+  brand: string | null;
+  model: string | null;
+  version: string | null;
+  year: number | null;
+  modelYear: number | null;
+  color: string | null;
+  fuelType: string | null;
+  chassi: string | null;
+  city: string | null;
+  state: string | null;
 }

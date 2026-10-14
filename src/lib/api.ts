@@ -954,6 +954,9 @@ export const api = {
   vehicles: (token: string, params: { ownerId?: string } = {}) =>
     request<{ vehicles: unknown[] }>(`/api/vehicles${toQuery(params)}`, {}, token),
 
+  lookupPlate: (plate: string, token: string) =>
+    request<{ status: string; result: unknown }>(`/api/vehicles/plate/${encodeURIComponent(plate)}`, {}, token),
+
   createVehicle: (payload: Record<string, unknown>, token: string) =>
     request<{ vehicle: unknown }>("/api/vehicles", { method: "POST", body: JSON.stringify(payload) }, token),
 

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ExternalLink, Search, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,13 +11,34 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
+import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Client, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
+import type { Client, PlateLookupResult, PlateLookupStatus, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
 import { PRIORITY_LABELS, SERVICE_ORDER_PRIORITIES } from "@/lib/types";
 
 const EMPTY_NEW_CLIENT = { name: "", phone: "", email: "" };
-const EMPTY_NEW_VEHICLE = { brand: "", model: "", year: "", plate: "", mileage: "0" };
+// color/version/fuelType/chassi só são preenchidos pela consulta de placa (vão no cadastro).
+const EMPTY_NEW_VEHICLE = { brand: "", model: "", year: "", plate: "", mileage: "0", color: "", version: "", fuelType: "", chassi: "" };
+
+const PLATE_LOOKUP_MESSAGES: Partial<Record<PlateLookupStatus, string>> = {
+  NOT_FOUND: "Placa não encontrada na consulta — confira marca e modelo.",
+  NOT_CONFIGURED: "Consulta de placa não configurada (PLATE_API_TOKEN) — dados vêm só da foto.",
+  INVALID_PLATE: "Placa inválida — use o formato ABC1234 ou ABC1D23.",
+  ERROR: "Não foi possível consultar a placa agora — confira marca e modelo.",
+};
+
+function plateLookupSummary(r: PlateLookupResult) {
+  return [
+    [r.brand, r.model, r.version].filter(Boolean).join(" "),
+    r.year || r.modelYear ? `${r.year ?? "?"}/${r.modelYear ?? "?"}` : null,
+    r.color,
+    r.fuelType,
+    r.city && r.state ? `${r.city}/${r.state}` : r.state,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 const MAX_DAMAGE_PHOTOS = 7;
 // Enquanto não há integração com a Localiza: as fotos de avaria ficam salvas no aparelho e
 // o botão abaixo do campo abre o acompanhamento de carros do portal para anexá-las lá.
@@ -55,6 +76,8 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   const [aiBusy, setAiBusy] = useState(false);
   const [aiResult, setAiResult] = useState<RecognizedVehicleData | null>(null);
   const [includeAiProblems, setIncludeAiProblems] = useState(true);
+  const [plateBusy, setPlateBusy] = useState(false);
+  const [plateResult, setPlateResult] = useState<PlateLookupResult | null>(null);
 
   const [priority, setPriority] = useState<ServiceOrderPriority>("NORMAL");
   const [damagePhotos, setDamagePhotos] = useState<File[]>([]);
@@ -84,6 +107,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     setNewVehicle(EMPTY_NEW_VEHICLE);
     setAiResult(null);
     setIncludeAiProblems(true);
+    setPlateResult(null);
     setPriority("NORMAL");
     setDamagePhotos([]);
   }
@@ -107,7 +131,13 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
         model: data.model ?? prev.model,
         year: data.year ? String(data.year) : prev.year,
         plate: data.plate ?? prev.plate,
+        color: data.color ?? prev.color,
       }));
+      // Placa lida na foto já é consultada no backend — marca/modelo/ano acima vêm de lá.
+      if (data.plateLookup) applyPlateLookup(data.plateLookup);
+      else if (data.plate && data.plateLookupStatus && PLATE_LOOKUP_MESSAGES[data.plateLookupStatus]) {
+        toast.info(PLATE_LOOKUP_MESSAGES[data.plateLookupStatus]!);
+      }
       if (data.visibleProblems.length === 0) {
         toast.info("Veículo identificado — nenhum problema visível encontrado na foto.");
       } else {
@@ -117,6 +147,40 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
       toast.error(err instanceof ApiError ? err.message : "Não foi possível analisar a foto.");
     } finally {
       setAiBusy(false);
+    }
+  }
+
+  function applyPlateLookup(result: PlateLookupResult) {
+    setPlateResult(result);
+    setNewVehicle((prev) => ({
+      ...prev,
+      plate: result.plate,
+      brand: result.brand ?? prev.brand,
+      model: result.model ?? prev.model,
+      year: result.modelYear ?? result.year ? String(result.modelYear ?? result.year) : prev.year,
+      color: result.color ?? prev.color,
+      version: result.version ?? prev.version,
+      fuelType: result.fuelType ?? prev.fuelType,
+      chassi: result.chassi ?? prev.chassi,
+    }));
+  }
+
+  // Placa digitada à mão — mesma consulta que roda sozinha quando a foto mostra a placa.
+  async function handlePlateLookup() {
+    if (!token || !newVehicle.plate.trim()) return;
+    setPlateBusy(true);
+    try {
+      const { status, result } = await api.lookupPlate(newVehicle.plate.trim(), token);
+      if (status === "FOUND" && result) {
+        applyPlateLookup(result as PlateLookupResult);
+        toast.success("Placa encontrada — dados do veículo atualizados.");
+      } else {
+        toast.info(PLATE_LOOKUP_MESSAGES[status as PlateLookupStatus] ?? "Placa não encontrada.");
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível consultar a placa.");
+    } finally {
+      setPlateBusy(false);
     }
   }
 
@@ -164,6 +228,10 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
             year: Number(newVehicle.year),
             plate: newVehicle.plate || undefined,
             mileage: Number(newVehicle.mileage) || 0,
+            color: newVehicle.color || undefined,
+            version: newVehicle.version || undefined,
+            fuelType: newVehicle.fuelType || undefined,
+            chassi: newVehicle.chassi || undefined,
             ownerId,
           },
           token
@@ -306,11 +374,13 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
               </Select>
             ) : (
               <>
-                <label className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground">
-                  <Sparkles className="size-4" />
-                  {aiBusy ? "Analisando foto..." : "Tirar foto do carro (IA identifica veículo e problemas)"}
-                  <input type="file" accept="image/*" capture="environment" className="hidden" disabled={aiBusy} onChange={(e) => handleAiPhoto(e.target.files?.[0] ?? null)} />
-                </label>
+                <div className="grid gap-1.5 rounded-md border border-dashed px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Sparkles className="size-4" />
+                    {aiBusy ? "Analisando foto..." : "Foto do carro (IA identifica veículo e problemas)"}
+                  </span>
+                  <CameraOrGalleryPicker disabled={aiBusy} onFiles={(files) => handleAiPhoto(files[0] ?? null)} />
+                </div>
                 {aiResult && (
                   <div className="rounded-md border bg-muted/30 p-2.5 text-xs text-muted-foreground">
                     {aiResult.visibleProblems.length > 0 ? (
@@ -335,7 +405,33 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                   <Input placeholder="Marca *" value={newVehicle.brand} onChange={(e) => setNewVehicle((p) => ({ ...p, brand: e.target.value }))} />
                   <Input placeholder="Modelo *" value={newVehicle.model} onChange={(e) => setNewVehicle((p) => ({ ...p, model: e.target.value }))} />
                   <Input placeholder="Ano *" type="number" value={newVehicle.year} onChange={(e) => setNewVehicle((p) => ({ ...p, year: e.target.value }))} />
-                  <Input placeholder="Placa" value={newVehicle.plate} onChange={(e) => setNewVehicle((p) => ({ ...p, plate: e.target.value }))} />
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Placa"
+                      value={newVehicle.plate}
+                      onChange={(e) => {
+                        // Placa mudou: dados da consulta anterior não valem mais para este carro.
+                        setNewVehicle((p) => ({ ...p, plate: e.target.value, version: "", fuelType: "", chassi: "" }));
+                        setPlateResult(null);
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      title="Consultar placa"
+                      aria-label="Consultar placa"
+                      disabled={plateBusy || !newVehicle.plate.trim()}
+                      onClick={handlePlateLookup}
+                    >
+                      <Search className="size-4" />
+                    </Button>
+                  </div>
+                  {plateResult && (
+                    <div className="rounded-md border bg-muted/30 p-2.5 text-xs text-muted-foreground sm:col-span-2">
+                      <span className="font-medium text-foreground">Confirmado pela placa {plateResult.plate}:</span> {plateLookupSummary(plateResult)}
+                    </div>
+                  )}
                   <Input
                     className="sm:col-span-2"
                     placeholder="Quilometragem"
@@ -366,19 +462,16 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Fotos de avarias já existentes (até {MAX_DAMAGE_PHOTOS})
             </Label>
-            <Input
-              type="file"
-              accept="image/*"
+            <CameraOrGalleryPicker
               multiple
               disabled={damagePhotos.length >= MAX_DAMAGE_PHOTOS}
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? []).slice(0, MAX_DAMAGE_PHOTOS - damagePhotos.length);
+              onFiles={(selected) => {
+                const files = selected.slice(0, MAX_DAMAGE_PHOTOS - damagePhotos.length);
                 setDamagePhotos((prev) => [...prev, ...files].slice(0, MAX_DAMAGE_PHOTOS));
                 // Cópia no aparelho, para anexar também no portal da Localiza.
                 const vehiclePlate = vehicleMode === "new" ? newVehicle.plate : clientVehicles?.find((v) => v.id === selectedVehicleId)?.plate;
                 const plate = vehiclePlate?.replace(/[^a-z0-9]/gi, "").toUpperCase();
                 saveFilesToDevice(files, `avaria-${plate || new Date().toISOString().slice(0, 10)}`, damagePhotos.length);
-                e.target.value = "";
               }}
             />
             {damagePhotos.length > 0 && (
