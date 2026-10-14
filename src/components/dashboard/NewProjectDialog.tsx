@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
+import { ExternalLink, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +19,24 @@ import { PRIORITY_LABELS, SERVICE_ORDER_PRIORITIES } from "@/lib/types";
 const EMPTY_NEW_CLIENT = { name: "", phone: "", email: "" };
 const EMPTY_NEW_VEHICLE = { brand: "", model: "", year: "", plate: "", mileage: "0" };
 const MAX_DAMAGE_PHOTOS = 7;
+// Enquanto não há integração com a Localiza: as fotos de avaria ficam salvas no aparelho e
+// o botão abaixo do campo abre o acompanhamento de carros do portal para anexá-las lá.
+const LOCALIZA_TRACKING_URL = "https://fornecedor.localiza.com/portal/#/operacional/acompanhamento-carros";
+
+/** Baixa as fotos para o dispositivo (pasta de downloads / galeria, conforme o aparelho). */
+function saveFilesToDevice(files: File[], prefix: string, startIndex: number) {
+  files.forEach((file, i) => {
+    const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ".jpg";
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${prefix}-${startIndex + i + 1}${ext}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  });
+}
 
 export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactNode; onCreated: (orderId: string) => void }) {
   const { token } = useAuth();
@@ -354,8 +372,12 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
               multiple
               disabled={damagePhotos.length >= MAX_DAMAGE_PHOTOS}
               onChange={(e) => {
-                const files = Array.from(e.target.files ?? []);
+                const files = Array.from(e.target.files ?? []).slice(0, MAX_DAMAGE_PHOTOS - damagePhotos.length);
                 setDamagePhotos((prev) => [...prev, ...files].slice(0, MAX_DAMAGE_PHOTOS));
+                // Cópia no aparelho, para anexar também no portal da Localiza.
+                const vehiclePlate = vehicleMode === "new" ? newVehicle.plate : clientVehicles?.find((v) => v.id === selectedVehicleId)?.plate;
+                const plate = vehiclePlate?.replace(/[^a-z0-9]/gi, "").toUpperCase();
+                saveFilesToDevice(files, `avaria-${plate || new Date().toISOString().slice(0, 10)}`, damagePhotos.length);
                 e.target.value = "";
               }}
             />
@@ -375,6 +397,16 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                 ))}
               </div>
             )}
+            <p className="text-xs text-muted-foreground">
+              As fotos também são salvas neste aparelho. Para colocá-las na Localiza, abra o veículo em
+              &quot;Em serviço&quot;, clique em &quot;Imagens&quot; e anexe as fotos salvas.
+            </p>
+            <Button asChild variant="outline" size="sm" className="w-fit">
+              <a href={LOCALIZA_TRACKING_URL} target="_blank" rel="noreferrer">
+                <ExternalLink className="size-4" />
+                Enviar fotos também na Localiza
+              </a>
+            </Button>
           </section>
 
           {/* Assinatura do cliente no laudo de entrada — confirma o estado em que o carro
