@@ -35,7 +35,7 @@ function plateLookupSummary(r: PlateLookupResult) {
     .filter(Boolean)
     .join(" · ");
 }
-const MAX_DAMAGE_PHOTOS = 7;
+const MAX_DAMAGE_PHOTOS = 15;
 // Enquanto não há integração com a Localiza: as fotos de avaria ficam salvas no aparelho e
 // o botão abaixo do campo abre o acompanhamento de carros do portal para anexá-las lá.
 const LOCALIZA_TRACKING_URL = "https://fornecedor.localiza.com/portal/#/operacional/acompanhamento-carros";
