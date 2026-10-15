@@ -101,6 +101,10 @@ export interface Vehicle {
   engine?: string | null;
   plate?: string | null;
   chassi?: string | null;
+  renavam?: string | null;
+  color?: string | null;
+  fuelType?: string | null;
+  version?: string | null;
   mileage: number;
   owner?: { id: string; name: string; email?: string; phone?: string | null };
 }

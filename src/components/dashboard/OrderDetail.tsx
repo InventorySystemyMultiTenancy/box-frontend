@@ -16,6 +16,7 @@ import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
 import { ShareLinkDialog } from "@/components/dashboard/ShareLinkDialog";
 import OrderAssigneesPanel from "@/components/dashboard/OrderAssigneesPanel";
+import { EditVehicleDialog } from "@/components/dashboard/EditVehicleDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -784,6 +785,13 @@ export default function OrderDetail({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {isStaff && (
+            <EditVehicleDialog
+              vehicle={order.vehicle}
+              // Mantém o dono já carregado (a rota de veículo não devolve o owner).
+              onSaved={(vehicle) => setOrder((prev) => (prev ? { ...prev, vehicle: { ...prev.vehicle, ...vehicle, owner: prev.vehicle.owner } } : prev))}
+            />
+          )}
           {isStaff && <ShareLinkDialog orderId={order.id} />}
           <span className={styles.live}>
             <i /> ATUALIZANDO AO VIVO
