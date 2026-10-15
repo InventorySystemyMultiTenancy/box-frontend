@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { parsePartPosition, POSITION_REQUIRED_PARTS, stripLocalPrefix, withPosition as nameWithPosition } from "@/lib/part-position";
 import { API_URL } from "@/lib/api";
 import { Approval, InventoryPart, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/lib/types";
 import styles from "./dashboard.module.css";
@@ -102,6 +103,28 @@ function NewPartInlineForm({
   );
 }
 
+/**
+ * Situação do problema num selo só: concluído / em andamento, ou "Problema identificado"
+ * junto com a resposta do cliente (Pendente/Aprovado/Reprovado). Problema já resolvido com
+ * a aprovação ainda pendente aparece só como concluído (o reparo não espera aprovação).
+ */
+function problemStatus(part: VehiclePart, approval: Approval | undefined): { label: string; tone: string } {
+  if (part.status === "DONE") return { label: PART_STATUS_LABELS.DONE, tone: "tone-ok" };
+  if (part.status === "IN_PROGRESS") return { label: PART_STATUS_LABELS.IN_PROGRESS, tone: `tone-${PART_STATUS_TONE.IN_PROGRESS}` };
+  if (part.status === "NOT_INSPECTED") return { label: PART_STATUS_LABELS.NOT_INSPECTED, tone: `tone-${PART_STATUS_TONE.NOT_INSPECTED}` };
+  if (!approval) return { label: "Problema identificado", tone: "tone-crit" };
+  if (approval.status === "APPROVED") return { label: "Problema identificado · Aprovado", tone: "tone-ok" };
+  if (approval.status === "REJECTED") return { label: "Problema identificado · Reprovado", tone: "tone-crit" };
+  return { label: "Problema identificado · Pendente", tone: "tone-warn" };
+}
+
+/** Descrição sem repetir o nome ("Freios ...: ") nem o "Local: ..." que já está no nome. */
+function problemDescription(part: VehiclePart, approval: Approval | undefined) {
+  let text = approval?.description ?? part.note ?? "";
+  if (approval && text.startsWith(`${part.name}: `)) text = text.slice(part.name.length + 2);
+  return stripLocalPrefix(text);
+}
+
 function positionForPart(part: VehiclePart) {
   const base = HOTSPOT_POSITIONS[part.key] ?? HOTSPOT_POSITIONS.carroceria;
   const text = normalize(`${part.name} ${part.note ?? ""}`);
@@ -159,7 +182,7 @@ export default function VehicleSchematic({
   onCreatePart?: (data: { name: string; unitCost: string }) => Promise<InventoryPart>;
   onPriceProblem?: (
     approvalId: string,
-    data: { laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
+    data: { name?: string; description?: string; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
   ) => Promise<void>;
   onUpdateProblem?: (
     approvalId: string,
@@ -189,6 +212,10 @@ export default function VehicleSchematic({
   const [pricingBusy, setPricingBusy] = useState(false);
   const [priceLaborValue, setPriceLaborValue] = useState("");
   const [priceUsages, setPriceUsages] = useState<UsageRow[]>([]);
+  // Eixo/lado (freio, pneu, suspensão) — editáveis junto com o preço.
+  const hasPosition = Boolean(active && POSITION_REQUIRED_PARTS.has(active.key));
+  const [priceAxle, setPriceAxle] = useState("dianteiro");
+  const [priceSide, setPriceSide] = useState("esquerdo");
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsBusy, setDetailsBusy] = useState(false);
@@ -202,6 +229,11 @@ export default function VehicleSchematic({
     setPriceUsages(
       activeApproval?.partUsages?.map((usage) => ({ inventoryPartId: usage.inventoryPart.id, quantity: String(usage.quantity) })) ?? []
     );
+    if (active) {
+      const position = parsePartPosition(active.name);
+      setPriceAxle(position.axle);
+      setPriceSide(position.side);
+    }
     setDetailsOpen(false);
     setDetailNote(activeApproval?.note ?? "");
     setDetailUsages([]);
@@ -234,7 +266,12 @@ export default function VehicleSchematic({
     if (!activeApproval || !onPriceProblem) return;
     setPricingBusy(true);
     try {
+      // Só regrava nome/observação se o eixo ou o lado mudou — editar só o preço não mexe no texto.
+      const current = active ? parsePartPosition(active.name) : null;
+      const positionChanged = hasPosition && current && (current.axle !== priceAxle || current.side !== priceSide);
+      const position = positionChanged && active ? nameWithPosition(current.baseName, active.note ?? "", priceAxle, priceSide) : null;
       await onPriceProblem(activeApproval.id, {
+        ...(position ?? {}),
         laborValue: Number(priceLaborValue) || 0,
         partUsages: usagesToPayload(priceUsages),
       });
@@ -338,14 +375,24 @@ export default function VehicleSchematic({
 
       {active && (
         <div className={styles.partPanel}>
-          <div className={styles.partPanelHead}>
-            <h3>{active.name}</h3>
-            <span className={`${styles.badge} ${styles[`tone-${PART_STATUS_TONE[active.status]}`]}`}>
-              <i className={styles.dot} />
-              {PART_STATUS_LABELS[active.status]}
-            </span>
-          </div>
-          {active.note && <div className={styles.partNote}>{active.note}</div>}
+          {/* Um cabeçalho só (nome + situação) e uma descrição só — antes o mesmo problema
+              aparecia duas vezes: o do componente e o da aprovação ("Novo problema identificado"). */}
+          {(() => {
+            const { label, tone } = problemStatus(active, activeApproval);
+            const description = problemDescription(active, activeApproval);
+            return (
+              <>
+                <div className={styles.partPanelHead}>
+                  <h3>{active.name}</h3>
+                  <span className={`${styles.badge} ${styles[tone]}`}>
+                    <i className={styles.dot} />
+                    {label}
+                  </span>
+                </div>
+                {description && <div className={styles.partNote}>{description}</div>}
+              </>
+            );
+          })()}
           <div className={styles.partMeta}>
             <span>Atualizado {new Date(active.updatedAt).toLocaleString("pt-BR")}</span>
             {active.responsible && (
@@ -373,39 +420,6 @@ export default function VehicleSchematic({
           )}
           {activeApproval && (
             <div className={styles.problemApproval}>
-              {/* Problema já resolvido (peça DONE) mas a aprovação nunca chegou a ter uma
-                  resposta do cliente (ficou PENDING) — mecânico/admin podem concluir o
-                  reparo sem esperar aprovação (ver "Marcar problema concluído" abaixo).
-                  Mostrar "Pendente" aqui, embaixo de "Concluído", parecia contraditório —
-                  o rótulo reflete o que de fato aconteceu (resolvido, sem resposta do
-                  cliente) em vez do status bruto da aprovação. */}
-              {(() => {
-                const resolvedWithoutResponse = active.status === "DONE" && activeApproval.status === "PENDING";
-                const tone = resolvedWithoutResponse
-                  ? "tone-ok"
-                  : activeApproval.status === "APPROVED"
-                    ? "tone-ok"
-                    : activeApproval.status === "REJECTED"
-                      ? "tone-crit"
-                      : "tone-warn";
-                const label = resolvedWithoutResponse
-                  ? "Resolvido"
-                  : activeApproval.status === "APPROVED"
-                    ? "Aprovado"
-                    : activeApproval.status === "REJECTED"
-                      ? "Reprovado"
-                      : "Pendente";
-                return (
-                  <div className={styles.problemApprovalHead}>
-                    <strong>{activeApproval.title}</strong>
-                    <span className={`${styles.badge} ${styles[tone]}`}>
-                      <i className={styles.dot} />
-                      {label}
-                    </span>
-                  </div>
-                );
-              })()}
-              <p>{activeApproval.description}</p>
               {activeApproval.partUsages && activeApproval.partUsages.length > 0 && (
                 <div className={styles.partUsageList}>
                   {activeApproval.partUsages.map((usage) => (
@@ -447,10 +461,29 @@ export default function VehicleSchematic({
                 <div className={styles.approvalActions}>
                   {!editingPrice ? (
                     <button className={styles.actionButton} type="button" onClick={() => setEditingPrice(true)}>
-                      {activeApproval.estimatedValue != null ? "Editar preço" : "Precificar problema"}
+                      {activeApproval.estimatedValue != null ? (hasPosition ? "Editar preço e lado" : "Editar preço") : "Precificar problema"}
                     </button>
                   ) : (
                     <form className={styles.formGrid} onSubmit={savePrice}>
+                      {hasPosition && (
+                        <>
+                          <label>
+                            Eixo
+                            <select value={priceAxle} onChange={(e) => setPriceAxle(e.target.value)}>
+                              <option value="dianteiro">Dianteiro</option>
+                              <option value="traseiro">Traseiro</option>
+                            </select>
+                          </label>
+                          <label>
+                            Lado
+                            <select value={priceSide} onChange={(e) => setPriceSide(e.target.value)}>
+                              <option value="esquerdo">Esquerdo</option>
+                              <option value="direito">Direito</option>
+                              <option value="ambos">Ambos os lados</option>
+                            </select>
+                          </label>
+                        </>
+                      )}
                       <label>
                         Mão de obra
                         <input

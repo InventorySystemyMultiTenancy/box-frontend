@@ -8,6 +8,7 @@ import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, BankAccount, InventoryPart, PA
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { FINISHED_ORDER_WHATSAPP, finishedOrderMessage, statusUpdateMessage } from "@/lib/whatsapp-messages";
 import { PAID_ON_THE_SPOT, PAYMENT_METHODS } from "@/lib/payment-methods";
+import { POSITION_REQUIRED_PARTS, positionText as formatPosition } from "@/lib/part-position";
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { toast } from "sonner";
 import StatusStrip from "@/components/dashboard/StatusStrip";
@@ -37,18 +38,6 @@ const PART_OPTIONS = [
   { key: "carroceria", label: "Carroceria" },
 ];
 
-const POSITION_REQUIRED_PARTS = new Set(["pneus", "freios", "suspensao"]);
-
-const AXLE_LABEL: Record<string, string> = {
-  dianteiro: "dianteiro",
-  traseiro: "traseiro",
-};
-
-const SIDE_LABEL: Record<string, string> = {
-  esquerdo: "lado esquerdo",
-  direito: "lado direito",
-  ambos: "ambos os lados",
-};
 
 /** Painel completo de uma ordem de serviço — status, timeline, aprovação e esquema do
  * veículo. Usado tanto na área do cliente quanto no projeto selecionado pelo mecânico. */
@@ -258,7 +247,7 @@ export default function OrderDetail({
     e.preventDefault();
     if (!token || !order) return;
     const requiresPosition = POSITION_REQUIRED_PARTS.has(problemForm.key);
-    const positionText = requiresPosition ? `${AXLE_LABEL[problemForm.axle]} ${SIDE_LABEL[problemForm.side]}` : "";
+    const positionText = requiresPosition ? formatPosition(problemForm.axle, problemForm.side) : "";
     const displayName = positionText ? `${problemForm.name} ${positionText}` : problemForm.name;
     const description = positionText ? `Local: ${positionText}. ${problemForm.description}` : problemForm.description;
     setProblemBusy(true);
@@ -529,7 +518,10 @@ export default function OrderDetail({
   );
 
   const priceProblem = useCallback(
-    async (approvalId: string, data: { laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }) => {
+    async (
+      approvalId: string,
+      data: { name?: string; description?: string; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
+    ) => {
       if (!token || !order) return;
       const result = await api.priceProblem(order.id, approvalId, data, token);
       const approval = result.approval as Approval;
@@ -741,6 +733,8 @@ export default function OrderDetail({
   const hasResolvedProblem = order.parts.some((p) => p.status === "DONE");
   const canOfferPickup = !blockedForPickup && hasResolvedProblem;
   const isReady = order.status === "READY_FOR_PICKUP";
+  // Finalizado (ou com baixa): pode ser excluído mesmo com nota/comissão/contas (backend).
+  const isFinishedOrder = Boolean(order.archivedAt) || order.status === "FINISHED" || isReady;
   const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
   // Diferente de canRegisterProblems: o painel de finalização precisa continuar visível
   // em FINISHED, já que é exatamente esse status que precede "pronto para retirada" —
@@ -783,6 +777,7 @@ export default function OrderDetail({
           <h1>
             {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
             {order.vehicle.engine ? ` · ${order.vehicle.engine}` : ""}
+            {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""}
           </h1>
           <div className={styles.meta}>
             {order.code} · KM {order.vehicle.mileage.toLocaleString("pt-BR")}
@@ -827,9 +822,9 @@ export default function OrderDetail({
                   <DialogHeader>
                     <DialogTitle>Excluir projeto {order.code}?</DialogTitle>
                     <DialogDescription>
-                      Isso apaga definitivamente a timeline, os problemas, aprovações, fotos e mensagens deste
-                      projeto. Não pode ser desfeito. Se o projeto já tem nota fiscal, comissão ou lançamento
-                      financeiro, a exclusão será recusada — use &quot;Dar baixa&quot; nesse caso.
+                      {isFinishedOrder
+                        ? "Isso apaga definitivamente o projeto e tudo ligado a ele: timeline, problemas, fotos, mensagens, notas fiscais, comissões, contas a receber e lançamentos financeiros. Não pode ser desfeito."
+                        : "Isso apaga definitivamente a timeline, os problemas, aprovações, fotos e mensagens deste projeto. Não pode ser desfeito. Se o projeto em andamento já tem nota fiscal, comissão ou lançamento financeiro, a exclusão será recusada — use \"Dar baixa\" e exclua depois de finalizado."}
                     </DialogDescription>
                   </DialogHeader>
                   <DialogFooter>

@@ -10,6 +10,7 @@ import OrderDetail from "@/components/dashboard/OrderDetail";
 import KanbanBoard from "@/components/dashboard/KanbanBoard";
 import { NewProjectDialog } from "@/components/dashboard/NewProjectDialog";
 import { HomeKpis } from "@/components/dashboard/HomeKpis";
+import { DeleteFinishedOrderDialog } from "@/components/dashboard/DeleteFinishedOrderDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, ClipboardList, CheckCircle2, AlertTriangle, Wrench, Car, ArrowLeft, Archive, Search } from "lucide-react";
@@ -64,6 +65,7 @@ function ProjectsSummary({ orders }: { orders: ServiceOrder[] }) {
 /** Lista de todos os projetos (carros) em andamento — o mecânico escolhe um para gerenciar. */
 export default function MechanicProjectsPanel() {
   const { token, user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
   const searchParams = useSearchParams();
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(searchParams.get("order"));
@@ -112,8 +114,17 @@ export default function MechanicProjectsPanel() {
     setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
   }
 
+  // Excluído de dentro do projeto ou pela lixeira da lista de finalizados — some das duas listas.
+  function removeDeletedOrder(orderId: string) {
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    if (archivedOrders?.some((o) => o.id === orderId)) {
+      setArchivedOrders((prev) => (prev ? prev.filter((o) => o.id !== orderId) : prev));
+      setArchivedTotal((total) => Math.max(0, total - 1));
+    }
+  }
+
   function handleOrderDeleted() {
-    setOrders((prev) => prev.filter((o) => o.id !== selectedOrderId));
+    if (selectedOrderId) removeDeletedOrder(selectedOrderId);
     setSelectedOrderId(null);
   }
 
@@ -213,18 +224,22 @@ export default function MechanicProjectsPanel() {
         {filteredArchivedOrders.length > 0 && (
           <div className={styles.ordersList}>
             {filteredArchivedOrders.map((order) => (
-              <button key={order.id} className={styles.orderRow} onClick={() => setSelectedOrderId(order.id)}>
-                <div className={styles.orderRowInfo}>
-                  <strong>
-                    {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
-                  </strong>
-                  <span>{order.code}</span>
-                </div>
-                <span className={`${styles.badge} ${styles[`tone-${STATUS_TONE[order.status]}`]}`}>
-                  <i className={styles.dot} />
-                  {order.archivedAt ? "Baixa dada" : STATUS_LABELS[order.status]}
-                </span>
-              </button>
+              <div key={order.id} className="flex items-center gap-1">
+                <button className={`${styles.orderRow} min-w-0 flex-1`} onClick={() => setSelectedOrderId(order.id)}>
+                  <div className={styles.orderRowInfo}>
+                    <strong>
+                      {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
+                      {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""}
+                    </strong>
+                    <span>{order.code}</span>
+                  </div>
+                  <span className={`${styles.badge} ${styles[`tone-${STATUS_TONE[order.status]}`]}`}>
+                    <i className={styles.dot} />
+                    {order.archivedAt ? "Baixa dada" : STATUS_LABELS[order.status]}
+                  </span>
+                </button>
+                {isAdmin && <DeleteFinishedOrderDialog order={order} onDeleted={removeDeletedOrder} />}
+              </div>
             ))}
           </div>
         )}
