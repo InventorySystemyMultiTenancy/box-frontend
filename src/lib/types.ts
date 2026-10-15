@@ -144,6 +144,9 @@ export interface VehiclePart {
   warrantyExpiresAt?: string | null;
   updatedAt: string;
   responsible?: { name: string } | null;
+  // Posição da bolinha no modelo do veículo; quando definidos, valem mais que o texto.
+  axle?: "dianteiro" | "traseiro" | null;
+  side?: "esquerdo" | "direito" | "ambos" | null;
   media: Media[];
 }
 

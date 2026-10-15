@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { parsePartPosition, POSITION_REQUIRED_PARTS, stripLocalPrefix, withPosition as nameWithPosition } from "@/lib/part-position";
+import {
+  inferPosition,
+  parsePartPosition,
+  PartAxle,
+  PartSide,
+  POSITION_REQUIRED_PARTS,
+  stripLocalPrefix,
+  swapPositionWords,
+  withPosition as nameWithPosition,
+} from "@/lib/part-position";
 import { API_URL } from "@/lib/api";
 import { Approval, InventoryPart, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/lib/types";
 import styles from "./dashboard.module.css";
@@ -125,7 +134,27 @@ function problemDescription(part: VehiclePart, approval: Approval | undefined) {
   return stripLocalPrefix(text);
 }
 
+/** Eixo/lado atuais do problema: os campos próprios, ou o que dá para deduzir do texto. */
+function currentPosition(part: VehiclePart): { axle: PartAxle | ""; side: PartSide | "" } {
+  const inferred = inferPosition(`${part.name} ${part.note ?? ""}`);
+  return { axle: part.axle ?? inferred.axle, side: part.side ?? inferred.side };
+}
+
+function isWheelPart(part: VehiclePart) {
+  return ["pneus", "freios", "suspensao"].includes(part.key) || /roda|pneu|freio|suspensao/.test(normalize(`${part.name} ${part.note ?? ""}`));
+}
+
+// Eixo/lado definidos à mão ("Editar preço e lado") mandam na bolinha — o texto pode ter
+// sido cadastrado errado ("lateral dianteira" num amassado traseiro, por exemplo).
 function positionForPart(part: VehiclePart) {
+  const pos = textPositionForPart(part);
+  const wheel = isWheelPart(part);
+  if (part.axle) pos.y = wheel ? (part.axle === "dianteiro" ? 176 : 364) : part.axle === "dianteiro" ? 132 : 392;
+  if (part.side) pos.x = part.side === "ambos" ? 150 : wheel ? (part.side === "direito" ? 249 : 51) : part.side === "direito" ? 214 : 86;
+  return pos;
+}
+
+function textPositionForPart(part: VehiclePart) {
   const base = HOTSPOT_POSITIONS[part.key] ?? HOTSPOT_POSITIONS.carroceria;
   const text = normalize(`${part.name} ${part.note ?? ""}`);
   const pos = { ...base };
@@ -182,7 +211,7 @@ export default function VehicleSchematic({
   onCreatePart?: (data: { name: string; unitCost: string }) => Promise<InventoryPart>;
   onPriceProblem?: (
     approvalId: string,
-    data: { name?: string; description?: string; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
+    data: { name?: string; description?: string; axle?: string | null; side?: string | null; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
   ) => Promise<void>;
   onUpdateProblem?: (
     approvalId: string,
@@ -212,10 +241,9 @@ export default function VehicleSchematic({
   const [pricingBusy, setPricingBusy] = useState(false);
   const [priceLaborValue, setPriceLaborValue] = useState("");
   const [priceUsages, setPriceUsages] = useState<UsageRow[]>([]);
-  // Eixo/lado (freio, pneu, suspensão) — editáveis junto com o preço.
-  const hasPosition = Boolean(active && POSITION_REQUIRED_PARTS.has(active.key));
-  const [priceAxle, setPriceAxle] = useState("dianteiro");
-  const [priceSide, setPriceSide] = useState("esquerdo");
+  // Eixo/lado de qualquer problema (posição da bolinha) — editáveis junto com o preço.
+  const [priceAxle, setPriceAxle] = useState<PartAxle | "">("");
+  const [priceSide, setPriceSide] = useState<PartSide | "">("");
 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsBusy, setDetailsBusy] = useState(false);
@@ -230,7 +258,7 @@ export default function VehicleSchematic({
       activeApproval?.partUsages?.map((usage) => ({ inventoryPartId: usage.inventoryPart.id, quantity: String(usage.quantity) })) ?? []
     );
     if (active) {
-      const position = parsePartPosition(active.name);
+      const position = currentPosition(active);
       setPriceAxle(position.axle);
       setPriceSide(position.side);
     }
@@ -266,12 +294,23 @@ export default function VehicleSchematic({
     if (!activeApproval || !onPriceProblem) return;
     setPricingBusy(true);
     try {
-      // Só regrava nome/observação se o eixo ou o lado mudou — editar só o preço não mexe no texto.
-      const current = active ? parsePartPosition(active.name) : null;
-      const positionChanged = hasPosition && current && (current.axle !== priceAxle || current.side !== priceSide);
-      const position = positionChanged && active ? nameWithPosition(current.baseName, active.note ?? "", priceAxle, priceSide) : null;
+      // Só mexe na posição (e no texto) se o eixo ou o lado mudou — editar só o preço não muda nada.
+      const before = active ? currentPosition(active) : null;
+      const positionChanged = Boolean(active && before && (before.axle !== priceAxle || before.side !== priceSide));
+      let textUpdate: { name?: string; description?: string } = {};
+      if (positionChanged && active) {
+        if (POSITION_REQUIRED_PARTS.has(active.key) && priceAxle && priceSide) {
+          // Freio/pneu/suspensão: nome no formato do cadastro ("Freios traseiro lado direito").
+          textUpdate = nameWithPosition(parsePartPosition(active.name).baseName, active.note ?? "", priceAxle, priceSide);
+        } else if (active.note && active.note.trim().length >= 4) {
+          // Demais: troca as palavras de posição no nome e na observação ("dianteira" → "traseira").
+          const to = { axle: priceAxle, side: priceSide };
+          textUpdate = { name: swapPositionWords(active.name, to), description: swapPositionWords(active.note, to) };
+        }
+      }
       await onPriceProblem(activeApproval.id, {
-        ...(position ?? {}),
+        ...textUpdate,
+        ...(positionChanged ? { axle: priceAxle || null, side: priceSide || null } : {}),
         laborValue: Number(priceLaborValue) || 0,
         partUsages: usagesToPayload(priceUsages),
       });
@@ -461,29 +500,27 @@ export default function VehicleSchematic({
                 <div className={styles.approvalActions}>
                   {!editingPrice ? (
                     <button className={styles.actionButton} type="button" onClick={() => setEditingPrice(true)}>
-                      {activeApproval.estimatedValue != null ? (hasPosition ? "Editar preço e lado" : "Editar preço") : "Precificar problema"}
+                      {activeApproval.estimatedValue != null ? "Editar preço e lado" : "Precificar problema"}
                     </button>
                   ) : (
                     <form className={styles.formGrid} onSubmit={savePrice}>
-                      {hasPosition && (
-                        <>
-                          <label>
-                            Eixo
-                            <select value={priceAxle} onChange={(e) => setPriceAxle(e.target.value)}>
-                              <option value="dianteiro">Dianteiro</option>
-                              <option value="traseiro">Traseiro</option>
-                            </select>
-                          </label>
-                          <label>
-                            Lado
-                            <select value={priceSide} onChange={(e) => setPriceSide(e.target.value)}>
-                              <option value="esquerdo">Esquerdo</option>
-                              <option value="direito">Direito</option>
-                              <option value="ambos">Ambos os lados</option>
-                            </select>
-                          </label>
-                        </>
-                      )}
+                      <label>
+                        Posição (frente/trás)
+                        <select value={priceAxle} onChange={(e) => setPriceAxle(e.target.value as PartAxle | "")}>
+                          <option value="">Não definida</option>
+                          <option value="dianteiro">Dianteiro</option>
+                          <option value="traseiro">Traseiro</option>
+                        </select>
+                      </label>
+                      <label>
+                        Lado
+                        <select value={priceSide} onChange={(e) => setPriceSide(e.target.value as PartSide | "")}>
+                          <option value="">Não definido</option>
+                          <option value="esquerdo">Esquerdo</option>
+                          <option value="direito">Direito</option>
+                          <option value="ambos">Ambos os lados</option>
+                        </select>
+                      </label>
                       <label>
                         Mão de obra
                         <input

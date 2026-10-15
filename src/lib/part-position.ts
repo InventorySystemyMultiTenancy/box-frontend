@@ -41,3 +41,38 @@ export function withPosition(baseName: string, note: string, axle: string, side:
   const rest = stripLocalPrefix(note);
   return { name: `${baseName} ${position}`, description: `Local: ${position}.${rest ? ` ${rest}` : ""}` };
 }
+
+export type PartAxle = "dianteiro" | "traseiro";
+export type PartSide = "esquerdo" | "direito" | "ambos";
+
+function normalize(text: string) {
+  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/** Eixo/lado deduzidos do texto ("lado esquerdo dianteiro", "lateral traseira") — "" se não houver. */
+export function inferPosition(text: string): { axle: PartAxle | ""; side: PartSide | "" } {
+  const t = normalize(text);
+  const axle = /dianteir|frente/.test(t) ? "dianteiro" : /traseir|atras/.test(t) ? "traseiro" : "";
+  const side = /ambos os lados/.test(t) ? "ambos" : /esquerd|motorista/.test(t) ? "esquerdo" : /direit|passageiro/.test(t) ? "direito" : "";
+  return { axle, side };
+}
+
+const AXLE_WORD = { dianteiro: "dianteir", traseiro: "traseir" } as const;
+const SIDE_WORD = { esquerdo: "esquerd", direito: "direit" } as const;
+
+/**
+ * Troca as palavras de posição no texto (mantendo gênero/plural): "Amassado na lateral
+ * dianteira" → "Amassado na lateral traseira". Sem palavra de posição, devolve igual.
+ */
+export function swapPositionWords(text: string, to: { axle: PartAxle | ""; side: PartSide | "" }) {
+  let out = text;
+  if (to.axle) {
+    const target = AXLE_WORD[to.axle];
+    out = out.replace(/(dianteir|traseir)(?=[oa]s?\b)/gi, (match) => (match[0] === match[0].toUpperCase() ? target[0].toUpperCase() + target.slice(1) : target));
+  }
+  if (to.side === "esquerdo" || to.side === "direito") {
+    const target = SIDE_WORD[to.side];
+    out = out.replace(/(esquerd|direit)(?=[oa]s?\b)/gi, (match) => (match[0] === match[0].toUpperCase() ? target[0].toUpperCase() + target.slice(1) : target));
+  }
+  return out;
+}

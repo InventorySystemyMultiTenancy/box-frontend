@@ -286,7 +286,7 @@ export const api = {
   priceProblem: (
     orderId: string,
     approvalId: string,
-    payload: { name?: string; description?: string; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] },
+    payload: { name?: string; description?: string; axle?: string | null; side?: string | null; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] },
     token: string
   ) =>
     request<{ approval: unknown; part: unknown; event: unknown }>(

@@ -521,7 +521,7 @@ export default function OrderDetail({
   const priceProblem = useCallback(
     async (
       approvalId: string,
-      data: { name?: string; description?: string; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
+      data: { name?: string; description?: string; axle?: string | null; side?: string | null; laborValue: number; partUsages: { inventoryPartId: string; quantity: number }[] }
     ) => {
       if (!token || !order) return;
       const result = await api.priceProblem(order.id, approvalId, data, token);
