@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
 import { api } from "@/lib/api";
+import type { SettlementSummary } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import AdminFinancePanel from "@/components/dashboard/AdminFinancePanel";
 import BankAccountsPanel from "@/components/dashboard/finance/BankAccountsPanel";
@@ -24,20 +24,52 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
+type DueState = "overdue" | "pending" | null;
+
+/** Vermelho se há conta vencida; laranja se há pendente (sem nenhuma vencida). */
+function dueState(summary: SettlementSummary | undefined): DueState {
+  if (!summary) return null;
+  if (summary.overdue.count > 0) return "overdue";
+  return summary.open.count > summary.overdue.count ? "pending" : null;
+}
+
+function DueDot({ state }: { state: DueState }) {
+  if (!state) return null;
+  const label = state === "overdue" ? "Há contas vencidas" : "Há contas pendentes";
+  return (
+    <span
+      role="img"
+      aria-label={label}
+      title={label}
+      className={`inline-block size-2.5 rounded-full ${state === "overdue" ? "animate-alert-blink bg-red-600" : "bg-orange-500"}`}
+    />
+  );
+}
+
 export default function FinanceiroPage() {
   const { user, token, hasPermission } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState<TabKey>("resumo");
   const allowed = user?.role === "ADMIN" || hasPermission("finance", "view");
 
-  // Contas vencidas (vermelho) ou perto do vencimento (amarelo): a aba Contas a pagar pisca.
-  const { data: dueWarnings } = useQuery({
-    queryKey: ["payables", "due-warnings"],
-    queryFn: async () => (await api.payableDueWarnings(token!)).warnings,
+  // Bolinha nas abas Contas a pagar/receber: vermelha com algo vencido, laranja com pendente.
+  // Mesmos totais do topo de cada aba (sem filtros) — atualizam junto quando algo muda lá.
+  const { data: payablesSummary } = useQuery({
+    queryKey: ["payables", "summary", {}],
+    queryFn: async () => (await api.payablesSummary(token!, {})).summary,
     enabled: !!token && allowed,
     refetchInterval: 5 * 60 * 1000,
   });
-  const payablesAlert = dueWarnings?.overdue.count ? "overdue" : dueWarnings?.dueSoon.count ? "dueSoon" : null;
+  const { data: receivablesSummary } = useQuery({
+    queryKey: ["receivables", "summary"],
+    queryFn: async () => (await api.receivablesSummary(token!)).summary,
+    enabled: !!token && allowed,
+    refetchInterval: 5 * 60 * 1000,
+  });
+  const tabDue: Partial<Record<TabKey, DueState>> = {
+    payables: dueState(payablesSummary),
+    receivables: dueState(receivablesSummary),
+  };
 
   useEffect(() => {
     if (user && !allowed) router.replace("/dashboard");
@@ -63,12 +95,7 @@ export default function FinanceiroPage() {
           >
             <span className="inline-flex items-center gap-1.5">
               {t.label}
-              {t.key === "payables" && payablesAlert && (
-                <AlertTriangle
-                  aria-label={payablesAlert === "overdue" ? "Há contas vencidas" : "Há contas perto do vencimento"}
-                  className={`size-4 animate-alert-blink ${payablesAlert === "overdue" ? "text-red-600" : "text-amber-500"}`}
-                />
-              )}
+              <DueDot state={tabDue[t.key] ?? null} />
             </span>
           </button>
         ))}
