@@ -16,14 +16,16 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { AccountPayable, AccountReceivable, CashFlow, DRE, FinancialEntry } from "@/lib/types";
 import { openPrintableReport, escapeHtml, formatCurrencyBRL } from "@/lib/printable-report";
+import { toLocalDateInput } from "@/lib/dates";
 
 function firstDayOfMonth() {
   const d = new Date();
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
 }
 
+// No fuso local — o prazo das contas a receber fica gravado no fim do dia de Brasília.
 function toDateInput(value?: string | null) {
-  return value ? value.slice(0, 10) : "";
+  return toLocalDateInput(value);
 }
 
 type LedgerRow =
@@ -63,7 +65,7 @@ export default function CashFlowPanel() {
 
   const rows: LedgerRow[] = cashFlow
     ? [
-        ...cashFlow.receivables.map((record): LedgerRow => ({ kind: "receivable", date: record.receivedAt ?? record.dueDate, record })),
+        ...cashFlow.receivables.map((record): LedgerRow => ({ kind: "receivable", date: record.receivedAt ?? record.dueDate ?? "", record })),
         ...cashFlow.payables.map((record): LedgerRow => ({ kind: "payable", date: record.paidAt ?? record.dueDate, record })),
         ...cashFlow.entries.map((record): LedgerRow => ({ kind: "entry", date: record.occurredAt, record })),
       ].sort((a, b) => b.date.localeCompare(a.date))

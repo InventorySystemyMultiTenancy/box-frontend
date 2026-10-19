@@ -15,7 +15,7 @@ import { SettlementSummaryCards } from "@/components/dashboard/finance/Settlemen
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import { settlementDateParam, todayInputValue } from "@/lib/dates";
+import { settlementDateParam, todayInputValue, toLocalDateInput } from "@/lib/dates";
 import type { AccountReceivable, BankAccount, Client, ReceivableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<ReceivableStatus, string> = { PENDING: "Pendente", RECEIVED: "Recebido", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
@@ -55,6 +55,17 @@ export default function ReceivablesPanel() {
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["receivables"] });
     queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+  }
+
+  // Coluna "Prazo": salva ao escolher a data; vazio tira o prazo (a conta fica vencida).
+  async function handleDueDate(receivable: AccountReceivable, value: string) {
+    if (!token) return;
+    try {
+      await api.setReceivableDueDate(receivable.id, value || null, token);
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar o prazo.");
+    }
   }
 
   async function handleCancel(receivable: AccountReceivable) {
@@ -101,6 +112,7 @@ export default function ReceivablesPanel() {
               { header: "OS", value: (r) => r.serviceOrder?.code },
               { header: "Categoria", value: (r) => r.category },
               { header: "Valor", value: (r) => r.amount, type: "money" },
+              { header: "Prazo", value: (r) => r.dueDate, type: "date" },
               { header: "Faturado", value: (r) => r.receivedAt, type: "date" },
               { header: "Valor recebido", value: (r) => r.receivedAmount, type: "money" },
               { header: "Status", value: (r) => STATUS_LABELS[r.status as keyof typeof STATUS_LABELS] ?? r.status },
@@ -119,6 +131,7 @@ export default function ReceivablesPanel() {
               <TableHead>Cliente</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Valor</TableHead>
+              <TableHead>Prazo</TableHead>
               <TableHead>Faturado</TableHead>
               <TableHead>Valor recebido</TableHead>
               <TableHead>Status</TableHead>
@@ -127,10 +140,10 @@ export default function ReceivablesPanel() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             )}
             {!isLoading && (data ?? []).length === 0 && (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Nenhuma conta a receber.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Nenhuma conta a receber.</TableCell></TableRow>
             )}
             {(data ?? []).map((receivable) => (
               <TableRow key={receivable.id}>
@@ -145,6 +158,29 @@ export default function ReceivablesPanel() {
                 <TableCell className="text-muted-foreground">{receivable.client?.name || "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{receivable.category}</TableCell>
                 <TableCell>R$ {receivable.amount.toFixed(2)}</TableCell>
+                {/* Prazo: editável enquanto a conta está em aberto. Sem prazo = já vencida. */}
+                <TableCell>
+                  {canManage && (receivable.status === "PENDING" || receivable.status === "OVERDUE") ? (
+                    <Input
+                      type="date"
+                      className="h-8 w-36"
+                      aria-label="Prazo"
+                      title="Prazo — depois desta data a conta aparece vencida; sem data, já aparece vencida"
+                      defaultValue={toLocalDateInput(receivable.dueDate)}
+                      key={`${receivable.id}-${receivable.dueDate ?? ""}`}
+                      // Salva ao escolher a data (ano completo, para não gravar "0202" enquanto
+                      // digita o ano) ou ao limpar o campo.
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if ((value === "" || /^20\d{2}-\d{2}-\d{2}$/.test(value)) && value !== toLocalDateInput(receivable.dueDate)) {
+                          handleDueDate(receivable, value);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="text-muted-foreground">{receivable.dueDate ? new Date(receivable.dueDate).toLocaleDateString("pt-BR") : "—"}</span>
+                  )}
+                </TableCell>
                 {/* Faturado = data em que foi marcada como recebida; vazio enquanto pendente. */}
                 <TableCell className="text-muted-foreground">
                   {receivable.receivedAt ? new Date(receivable.receivedAt).toLocaleDateString("pt-BR") : "—"}

@@ -509,6 +509,10 @@ export const api = {
   receiveReceivable: (id: string, payload: Record<string, unknown>, token: string) =>
     request<{ receivable: unknown }>(`/api/finance/receivables/${id}/receive`, { method: "POST", body: JSON.stringify(payload) }, token),
 
+  // Coluna "Prazo": data (YYYY-MM-DD) ou null para tirar o prazo (a conta fica vencida).
+  setReceivableDueDate: (id: string, dueDate: string | null, token: string) =>
+    request<{ receivable: unknown }>(`/api/finance/receivables/${id}/due-date`, { method: "PATCH", body: JSON.stringify({ dueDate }) }, token),
+
   cancelReceivable: (id: string, token: string) =>
     request<{ receivable: unknown }>(`/api/finance/receivables/${id}/cancel`, { method: "POST" }, token),
 

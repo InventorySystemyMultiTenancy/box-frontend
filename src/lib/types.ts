@@ -680,7 +680,8 @@ export interface AccountReceivable {
   serviceOrderId?: string | null;
   serviceOrder?: { id: string; code: string } | null;
   amount: number;
-  dueDate: string;
+  // Prazo — null = sem prazo (já conta como vencida até alguém definir).
+  dueDate: string | null;
   receivedAt?: string | null;
   receivedAmount?: number | null;
   status: ReceivableStatus;

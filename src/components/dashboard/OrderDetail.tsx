@@ -51,11 +51,6 @@ function mediaUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
 }
 
-function todayInputValue() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
-
 function emptyFinalizeForm() {
   return {
     description: "",
@@ -63,7 +58,8 @@ function emptyFinalizeForm() {
     photo: null as File | null,
     paymentMethod: "PIX",
     installments: "1",
-    firstDueDate: todayInputValue(),
+    // Prazo opcional: sem prazo, a conta a receber já aparece vencida até alguém definir.
+    firstDueDate: "",
     bankAccountId: "",
   };
 }
@@ -1035,7 +1031,7 @@ export default function OrderDetail({
                     </select>
                   </label>
                   <label>
-                    {installmentsCount > 1 ? "Vencimento da 1ª parcela" : "Vencimento"}
+                    {installmentsCount > 1 ? "Prazo da 1ª parcela" : "Prazo (opcional)"}
                     <input
                       type="date"
                       value={finalizeForm.firstDueDate}
