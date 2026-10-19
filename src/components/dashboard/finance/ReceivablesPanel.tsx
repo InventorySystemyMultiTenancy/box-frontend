@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,13 @@ export default function ReceivablesPanel() {
   const queryClient = useQueryClient();
   const canManage = hasPermission("finance", "manage");
   const [status, setStatus] = useState<string>("");
+  // Busca por placa (descrição das contas de projeto), código da OS, cliente ou descrição.
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setQ(search.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Totais do topo (em aberto / vencido / já recebido) — não dependem do filtro de status.
   const { data: summary } = useQuery({
@@ -40,8 +47,8 @@ export default function ReceivablesPanel() {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["receivables", status],
-    queryFn: async () => (await api.receivables(token!, { status: status || undefined, pageSize: 50 })).items as AccountReceivable[],
+    queryKey: ["receivables", status, q],
+    queryFn: async () => (await api.receivables(token!, { status: status || undefined, q: q || undefined, pageSize: 50 })).items as AccountReceivable[],
     enabled: !!token,
   });
 
@@ -65,6 +72,11 @@ export default function ReceivablesPanel() {
     <div className="grid gap-4">
       <SettlementSummaryCards summary={summary} kind="receivable" filtered={false} />
       <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-64 max-w-full">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pl-8" placeholder="Buscar placa, OS ou cliente..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
         <Select value={status || "ALL"} onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="Todos os status" />
@@ -76,6 +88,7 @@ export default function ReceivablesPanel() {
             ))}
           </SelectContent>
         </Select>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
             title="Contas a receber"
@@ -87,12 +100,11 @@ export default function ReceivablesPanel() {
               { header: "Cliente", value: (r) => r.client?.name },
               { header: "OS", value: (r) => r.serviceOrder?.code },
               { header: "Categoria", value: (r) => r.category },
-              { header: "Vencimento", value: (r) => r.dueDate, type: "date" },
+              { header: "Valor", value: (r) => r.amount, type: "money" },
+              { header: "Faturado", value: (r) => r.receivedAt, type: "date" },
+              { header: "Valor recebido", value: (r) => r.receivedAmount, type: "money" },
               { header: "Status", value: (r) => STATUS_LABELS[r.status as keyof typeof STATUS_LABELS] ?? r.status },
               { header: "Forma", value: (r) => r.paymentMethod },
-              { header: "Valor", value: (r) => r.amount, type: "money" },
-              { header: "Recebido em", value: (r) => r.receivedAt, type: "date" },
-              { header: "Valor recebido", value: (r) => r.receivedAmount, type: "money" },
             ]}
           />
           {canManage && <ReceivableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a receber</Button>} />}
@@ -107,8 +119,8 @@ export default function ReceivablesPanel() {
               <TableHead>Cliente</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Valor</TableHead>
-              <TableHead>Vencimento</TableHead>
-              <TableHead>Recebido em</TableHead>
+              <TableHead>Faturado</TableHead>
+              <TableHead>Valor recebido</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-40" />
             </TableRow>
@@ -133,17 +145,23 @@ export default function ReceivablesPanel() {
                 <TableCell className="text-muted-foreground">{receivable.client?.name || "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{receivable.category}</TableCell>
                 <TableCell>R$ {receivable.amount.toFixed(2)}</TableCell>
-                <TableCell className="text-muted-foreground">{new Date(receivable.dueDate).toLocaleDateString("pt-BR")}</TableCell>
+                {/* Faturado = data em que foi marcada como recebida; vazio enquanto pendente. */}
                 <TableCell className="text-muted-foreground">
-                  {receivable.receivedAt ? (
+                  {receivable.receivedAt ? new Date(receivable.receivedAt).toLocaleDateString("pt-BR") : "—"}
+                </TableCell>
+                {/* Valor real recebido (com desconto, se houve) — é o que entra no caixa. */}
+                <TableCell>
+                  {receivable.status === "RECEIVED" ? (
                     <>
-                      {new Date(receivable.receivedAt).toLocaleDateString("pt-BR")}
-                      {receivable.receivedAmount != null && receivable.receivedAmount !== receivable.amount && (
-                        <span className="block text-xs">R$ {receivable.receivedAmount.toFixed(2)}</span>
+                      R$ {(receivable.receivedAmount ?? receivable.amount).toFixed(2)}
+                      {receivable.receivedAmount != null && receivable.receivedAmount < receivable.amount && (
+                        <span className="block text-xs text-muted-foreground">
+                          desconto R$ {(receivable.amount - receivable.receivedAmount).toFixed(2)}
+                        </span>
                       )}
                     </>
                   ) : (
-                    "—"
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
                 <TableCell><Badge variant={STATUS_VARIANTS[receivable.status]}>{STATUS_LABELS[receivable.status]}</Badge></TableCell>
@@ -272,13 +290,31 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [receivedAmount, setReceivedAmount] = useState(String(receivable.amount));
+  // Desconto (pagamento antecipado, negociação...) — o valor recebido é o original menos ele.
+  const [discount, setDiscount] = useState("");
+
+  function changeDiscount(value: string) {
+    setDiscount(value);
+    const amount = Math.max(0, receivable.amount - (Number(value) || 0));
+    setReceivedAmount(amount.toFixed(2));
+  }
+
+  function changeReceivedAmount(value: string) {
+    setReceivedAmount(value);
+    const diff = receivable.amount - (Number(value) || 0);
+    setDiscount(diff > 0 ? diff.toFixed(2) : "");
+  }
   const [bankAccountId, setBankAccountId] = useState(receivable.bankAccountId ?? "");
   const [paymentMethod, setPaymentMethod] = useState(receivable.paymentMethod ?? "");
   // Data em que foi recebido — começa em hoje, dá pra mudar (ex.: recebido ontem).
   const [receivedAt, setReceivedAt] = useState(todayInputValue);
 
   function handleOpenChange(next: boolean) {
-    if (next) setReceivedAt(todayInputValue());
+    if (next) {
+      setReceivedAt(todayInputValue());
+      setReceivedAmount(String(receivable.amount));
+      setDiscount("");
+    }
     setOpen(next);
   }
 
@@ -291,6 +327,10 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
+    if (!(Number(receivedAmount) > 0)) {
+      toast.error("Informe o valor recebido.");
+      return;
+    }
     setSaving(true);
     try {
       await api.receiveReceivable(
@@ -334,9 +374,33 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
               onChange={(e) => setReceivedAt(e.target.value)}
             />
           </div>
-          <div className="grid gap-1.5">
-            <Label>Valor recebido</Label>
-            <Input type="number" min="0" step="0.01" value={receivedAmount} onChange={(e) => setReceivedAmount(e.target.value)} />
+          <div className="text-sm text-muted-foreground">Valor da conta: R$ {receivable.amount.toFixed(2)}</div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor={`discount-${receivable.id}`}>Desconto (R$)</Label>
+              <Input
+                id={`discount-${receivable.id}`}
+                type="number"
+                min="0"
+                step="0.01"
+                max={receivable.amount}
+                placeholder="0,00"
+                value={discount}
+                onChange={(e) => changeDiscount(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor={`received-amount-${receivable.id}`}>Valor recebido *</Label>
+              <Input
+                id={`received-amount-${receivable.id}`}
+                type="number"
+                min="0.01"
+                step="0.01"
+                required
+                value={receivedAmount}
+                onChange={(e) => changeReceivedAmount(e.target.value)}
+              />
+            </div>
           </div>
           <div className="grid gap-1.5">
             <Label>Conta bancária</Label>

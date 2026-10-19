@@ -7,7 +7,7 @@ import { getSocket, joinOrderRoom } from "@/lib/socket";
 import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, BankAccount, InventoryPart, PART_STATUS_LABELS, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { FINISHED_ORDER_WHATSAPP, finishedOrderMessage, statusUpdateMessage } from "@/lib/whatsapp-messages";
-import { PAID_ON_THE_SPOT, PAYMENT_METHODS } from "@/lib/payment-methods";
+import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { POSITION_REQUIRED_PARTS, positionText as formatPosition } from "@/lib/part-position";
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { toast } from "sonner";
@@ -64,7 +64,6 @@ function emptyFinalizeForm() {
     paymentMethod: "PIX",
     installments: "1",
     firstDueDate: todayInputValue(),
-    receivedNow: true,
     bankAccountId: "",
   };
 }
@@ -350,6 +349,7 @@ export default function OrderDetail({
         };
       });
       if (event) setJustArrivedId(event.id);
+      if (nextStatus === "FINISHED" && isAdmin) toast.success("Projeto finalizado — o valor já está pendente em Financeiro > Contas a receber.");
       setAdvancePhoto(null);
       setNotifyPrompt(true);
     } catch {
@@ -438,7 +438,6 @@ export default function OrderDetail({
           paymentMethod: finalizeForm.paymentMethod || undefined,
           installments: Number(finalizeForm.installments) || 1,
           firstDueDate: finalizeForm.firstDueDate ? new Date(`${finalizeForm.firstDueDate}T12:00:00`).toISOString() : undefined,
-          receivedNow: finalizeForm.receivedNow,
           bankAccountId: finalizeForm.bankAccountId || undefined,
         },
         token
@@ -447,7 +446,7 @@ export default function OrderDetail({
       setFinalizing(false);
       setFinalizeForm(emptyFinalizeForm());
       setNotifyPrompt(true);
-      toast.success("Entrega confirmada — a cobrança foi lançada em Financeiro > Contas a receber.");
+      toast.success("Entrega confirmada — a cobrança está pendente em Financeiro > Contas a receber.");
 
       // PDF de finalização vai para o WhatsApp da oficina, com a mensagem já pronta.
       const link = buildWhatsAppLink(FINISHED_ORDER_WHATSAPP, finishedOrderMessage(order.vehicle, result.reportUrl ? mediaUrl(result.reportUrl) : null));
@@ -1015,7 +1014,7 @@ export default function OrderDetail({
                     <select
                       value={finalizeForm.paymentMethod}
                       onChange={(e) =>
-                        setFinalizeForm((prev) => ({ ...prev, paymentMethod: e.target.value, receivedNow: PAID_ON_THE_SPOT.has(e.target.value) }))
+                        setFinalizeForm((prev) => ({ ...prev, paymentMethod: e.target.value }))
                       }
                     >
                       {PAYMENT_METHODS.map((method) => (
@@ -1056,15 +1055,10 @@ export default function OrderDetail({
                       </select>
                     </label>
                   )}
-                  <label className={styles.fullField} style={{ flexDirection: "row", alignItems: "center", gap: "0.5rem", display: "flex" }}>
-                    <input
-                      type="checkbox"
-                      checked={finalizeForm.receivedNow}
-                      onChange={(e) => setFinalizeForm((prev) => ({ ...prev, receivedNow: e.target.checked }))}
-                      style={{ width: "auto" }}
-                    />
-                    {installmentsCount > 1 ? "Cliente já pagou a 1ª parcela agora" : "Cliente já pagou agora, na retirada"}
-                  </label>
+                  <div className={`${styles.fullField} ${styles.tlSub}`}>
+                    A cobrança fica pendente em Financeiro &gt; Contas a receber — marque como recebida lá (com a data e o
+                    valor real, podendo dar desconto).
+                  </div>
 
                   <div className={styles.fullField}>
                     <SignaturePad ref={deliverySignatureRef} label="Assinatura do cliente na retirada (opcional)" />

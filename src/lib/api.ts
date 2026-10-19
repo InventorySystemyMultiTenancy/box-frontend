@@ -230,7 +230,6 @@ export const api = {
       paymentMethod?: string;
       installments?: number;
       firstDueDate?: string;
-      receivedNow?: boolean;
       bankAccountId?: string;
     },
     token: string
@@ -243,7 +242,6 @@ export const api = {
     if (payload.paymentMethod) form.append("paymentMethod", payload.paymentMethod);
     if (payload.installments) form.append("installments", String(payload.installments));
     if (payload.firstDueDate) form.append("firstDueDate", payload.firstDueDate);
-    if (payload.receivedNow !== undefined) form.append("receivedNow", payload.receivedNow ? "true" : "false");
     if (payload.bankAccountId) form.append("bankAccountId", payload.bankAccountId);
 
     // reportUrl: PDF de finalização gerado no servidor (null se falhou) — vai no WhatsApp.
@@ -494,7 +492,8 @@ export const api = {
     request<{ payable: unknown }>(`/api/finance/payables/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
 
   // Financeiro — contas a receber
-  receivables: (token: string, params: { status?: string; category?: string; clientId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) =>
+  // q: busca por descrição (placa), código da OS, placa ou cliente.
+  receivables: (token: string, params: { status?: string; q?: string; category?: string; clientId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) =>
     request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/receivables${toQuery(params)}`, {}, token),
 
   // Totais do topo (em aberto / vencido / já recebido) — mesmos filtros da lista, sem status.
