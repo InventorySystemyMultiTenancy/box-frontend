@@ -945,7 +945,8 @@ export const api = {
   },
 
   quickCreateClient: (payload: Record<string, unknown>, token: string) =>
-    request<{ client: unknown; userId: string; generatedPassword: string }>(
+    // generatedPassword é null quando o cliente foi cadastrado sem e-mail (sem acesso ao portal).
+    request<{ client: unknown; userId: string; generatedPassword: string | null }>(
       "/api/clients/quick-create",
       { method: "POST", body: JSON.stringify(payload) },
       token

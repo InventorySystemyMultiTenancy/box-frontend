@@ -8,6 +8,7 @@ import { User, Role } from "@/lib/types";
 import { UserFormDialog } from "@/components/dashboard/users/UserFormDialog";
 import { ScrollX } from "@/components/ui/scroll-x";
 import styles from "./dashboard.module.css";
+import { displayEmail } from "@/lib/utils";
 
 export default function MechanicUsersPanel() {
   const { token, user: me } = useAuth();
@@ -211,7 +212,7 @@ export default function MechanicUsersPanel() {
                   )}
                 </td>
                 <td>
-                  <span>{user.email}</span>
+                  <span>{displayEmail(user.email)}</span>
                   {user.phone && <span> · {user.phone}</span>}
                 </td>
                 {/* Com cargo, mostra só o nome do cargo (ex.: "Motorista") — repetir o

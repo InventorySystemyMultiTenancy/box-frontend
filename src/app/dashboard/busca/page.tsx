@@ -22,6 +22,7 @@ import {
   Truck,
   InsuranceCompany,
 } from "@/lib/types";
+import { displayEmail } from "@/lib/utils";
 
 const ROLE_LABELS: Record<string, string> = { CUSTOMER: "Cliente", MECHANIC: "Mecânico", ADMIN: "Admin" };
 
@@ -285,7 +286,7 @@ export default function BuscaGlobalPage() {
                   >
                     <span>
                       <strong>{u.name}</strong>{" "}
-                      <span className="text-muted-foreground">{u.email}</span>
+                      <span className="text-muted-foreground">{displayEmail(u.email)}</span>
                       {u.phone && <span className="text-muted-foreground"> · {u.phone}</span>}
                     </span>
                     <Badge variant="outline">{ROLE_LABELS[u.role] ?? u.role}</Badge>

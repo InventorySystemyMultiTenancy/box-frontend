@@ -179,8 +179,8 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
       toast.error("Selecione um cliente.");
       return;
     }
-    if (clientMode === "new" && (!newClient.name.trim() || !newClient.email.trim())) {
-      toast.error("Informe nome e e-mail do novo cliente.");
+    if (clientMode === "new" && !newClient.name.trim()) {
+      toast.error("Informe o nome do novo cliente.");
       return;
     }
     if (vehicleMode === "existing" && !selectedVehicleId) {
@@ -198,12 +198,14 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
       if (clientMode === "existing") {
         ownerId = selectedClient!.userId!;
       } else {
+        // E-mail e telefone são opcionais — sem e-mail, o cliente fica sem acesso ao portal.
         const { userId, generatedPassword } = await api.quickCreateClient(
-          { name: newClient.name, phone: newClient.phone || undefined, email: newClient.email },
+          { name: newClient.name.trim(), phone: newClient.phone.trim() || undefined, email: newClient.email.trim() || undefined },
           token
         );
         ownerId = userId;
-        toast.success(`Cliente cadastrado — senha gerada: ${generatedPassword}`, { duration: 15000 });
+        if (generatedPassword) toast.success(`Cliente cadastrado — senha gerada: ${generatedPassword}`, { duration: 15000 });
+        else toast.success("Cliente cadastrado sem e-mail (sem acesso ao portal do cliente).");
       }
 
       let vehicleId: string;
@@ -320,10 +322,10 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
             ) : (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Input placeholder="Nome *" value={newClient.name} onChange={(e) => setNewClient((p) => ({ ...p, name: e.target.value }))} />
-                <Input placeholder="Telefone" value={newClient.phone} onChange={(e) => setNewClient((p) => ({ ...p, phone: e.target.value }))} />
+                <Input placeholder="Telefone (opcional)" value={newClient.phone} onChange={(e) => setNewClient((p) => ({ ...p, phone: e.target.value }))} />
                 <Input
                   className="sm:col-span-2"
-                  placeholder="E-mail *"
+                  placeholder="E-mail (opcional — para o cliente acessar o portal)"
                   type="email"
                   value={newClient.email}
                   onChange={(e) => setNewClient((p) => ({ ...p, email: e.target.value }))}

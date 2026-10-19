@@ -19,3 +19,16 @@ export function matchesSearch(query: string, fields: (string | null | undefined)
   const nq = normalize(q);
   return fields.some((f) => f && normalize(f).includes(nq));
 }
+
+// Cliente cadastrado sem e-mail no novo projeto ganha um e-mail técnico neste domínio
+// (ver createClientWithLogin no backend) — nunca deve aparecer como se fosse real.
+const PLACEHOLDER_EMAIL_DOMAIN = "@sem-email.reblind.invalid";
+
+export function isPlaceholderEmail(email: string | null | undefined) {
+  return Boolean(email?.toLowerCase().endsWith(PLACEHOLDER_EMAIL_DOMAIN));
+}
+
+/** E-mail para exibir: "sem e-mail" no lugar do e-mail técnico. */
+export function displayEmail(email: string | null | undefined) {
+  return !email || isPlaceholderEmail(email) ? "sem e-mail" : email;
+}
