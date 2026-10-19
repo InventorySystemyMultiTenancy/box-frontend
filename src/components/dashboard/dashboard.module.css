@@ -419,6 +419,14 @@
   .sidebarCollapsed .sidebar {
     margin-left: -220px;
   }
+  /* Menu recolhido: o conteúdo usa a largura liberada em vez de ficar do mesmo tamanho e
+     centralizado — tabelas cabem sem rolagem lateral e os botões do fim aparecem. Tira o
+     limite tanto do <main> das páginas (max-w-* do Tailwind, que fica numa camada de menor
+     prioridade) quanto do .content dos painéis de projeto. */
+  .mainAreaWide main,
+  .mainAreaWide .content {
+    max-width: none;
+  }
   .sidebarToggle {
     position: absolute;
     top: 0.9rem;

@@ -400,7 +400,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             </button>
           </div>
         )}
-        <div className={styles.mainArea}>{children}</div>
+        <div className={`${styles.mainArea} ${isStaff && sidebarCollapsed ? styles.mainAreaWide : ""}`}>{children}</div>
       </div>
 
       {isStaff && mobileNavOpen && (
