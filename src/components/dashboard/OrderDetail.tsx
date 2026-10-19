@@ -16,6 +16,7 @@ import Timeline from "@/components/dashboard/Timeline";
 import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
 import { ShareLinkDialog } from "@/components/dashboard/ShareLinkDialog";
 import OrderAssigneesPanel from "@/components/dashboard/OrderAssigneesPanel";
+import DamagePhotosPanel from "@/components/dashboard/DamagePhotosPanel";
 import { EditVehicleDialog } from "@/components/dashboard/EditVehicleDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,7 +133,6 @@ export default function OrderDetail({
   const [deleteCode, setDeleteCode] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [showDamagePhotos, setShowDamagePhotos] = useState(false);
 
   const isStaff = user?.role === "MECHANIC" || user?.role === "ADMIN";
   const isAdmin = user?.role === "ADMIN";
@@ -896,6 +896,14 @@ export default function OrderDetail({
         />
       )}
 
+      {/* Checklist de entrada: visível em qualquer etapa, não só depois de finalizado. */}
+      <DamagePhotosPanel
+        orderId={order.id}
+        photos={order.media.filter((m) => m.isDamagePhoto)}
+        canAdd={isStaff && !isReady}
+        onUploaded={(photos) => setOrder((prev) => (prev ? { ...prev, media: [...prev.media.filter((m) => !m.isDamagePhoto), ...photos] } : prev))}
+      />
+
       {isStaff && order.status === "SCHEDULED" && (
         <div className={`${styles.panel} ${styles.approval}`} style={{ marginBottom: "1.6rem" }}>
           <h2>Veículo agendado</h2>
@@ -917,32 +925,6 @@ export default function OrderDetail({
           <div className={`${styles.panel} ${isReady ? styles.panelReady : ""}`}>
             <h2>Modelo do veículo</h2>
             {isReady && <div className={styles.readyBanner}>Veículo pronto e em ótimo estado — pode retirar!</div>}
-            {(() => {
-              const damagePhotos = order.media.filter((m) => m.isDamagePhoto);
-              if (damagePhotos.length === 0) return null;
-              return (
-                <div style={{ marginBottom: "0.8rem" }}>
-                  <button
-                    type="button"
-                    className={styles.panelCloseBtn}
-                    style={{ width: "auto", padding: "0 0.6rem", fontSize: "0.78rem" }}
-                    onClick={() => setShowDamagePhotos((v) => !v)}
-                  >
-                    {showDamagePhotos ? "Ocultar" : "Ver"} fotos de chegada ({damagePhotos.length})
-                  </button>
-                  {showDamagePhotos && (
-                    <div className={styles.mediaGrid} style={{ marginTop: "0.6rem" }}>
-                      {damagePhotos.map((media) => (
-                        <a key={media.id} href={mediaUrl(media.url)} target="_blank" rel="noreferrer">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={mediaUrl(media.url)} alt={media.label ?? "Foto de avaria"} />
-                        </a>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
             {signatures.length > 0 && (
               <div style={{ marginBottom: "0.8rem" }}>
                 <div className={styles.tlSub} style={{ marginBottom: "0.4rem" }}>

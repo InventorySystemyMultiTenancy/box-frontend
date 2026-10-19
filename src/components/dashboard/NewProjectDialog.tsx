@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker";
 import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
+import { MAX_DAMAGE_PHOTOS, uploadDamagePhotosInBatches } from "@/lib/damage-photos";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { Client, PlateLookupResult, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
@@ -36,7 +37,6 @@ function plateLookupSummary(r: PlateLookupResult) {
     .filter(Boolean)
     .join(" · ");
 }
-const MAX_DAMAGE_PHOTOS = 20;
 // Enquanto não há integração com a Localiza: as fotos de avaria ficam salvas no aparelho e
 // o botão abaixo do campo abre o acompanhamento de carros do portal para anexá-las lá.
 const LOCALIZA_TRACKING_URL = "https://fornecedor.localiza.com/portal/#/operacional/acompanhamento-carros";
@@ -234,12 +234,11 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
       const orderId = (order as { id: string }).id;
 
       if (damagePhotos.length > 0) {
-        try {
-          await api.uploadDamagePhotos(orderId, damagePhotos, token);
-        } catch {
-          // Projeto já foi criado — não trava o fluxo se o upload das fotos falhar,
-          // staff pode reenviar depois (não há tela dedicada ainda, mas evita perder o projeto).
-          toast.error("Projeto criado, mas não foi possível enviar as fotos de avaria.");
+        // Comprimidas e em lotes — projeto já foi criado, então falha nas fotos não trava
+        // nada: dá para reenviar pelo quadro "Fotos do checklist de entrada" do projeto.
+        const { failed } = await uploadDamagePhotosInBatches(orderId, damagePhotos, token);
+        if (failed > 0) {
+          toast.error(`Projeto criado, mas ${failed} foto(s) de avaria não foram enviadas — adicione pelo projeto, em "Fotos do checklist de entrada".`, { duration: 10000 });
         }
       }
 
