@@ -1,24 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Clock, Plus } from "lucide-react";
+import { AlertTriangle, CheckCheck, Clock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
-import { SuggestInput } from "@/components/ui/suggest-input";
 import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDialog";
 import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { settlementDateParam, todayInputValue } from "@/lib/dates";
-import type { AccountPayable, BankAccount, ExpenseClassifications, PayableStatus } from "@/lib/types";
+import type { AccountPayable, BankAccount, PayableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<PayableStatus, string> = { PENDING: "Pendente", PAID: "Pago", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
 const STATUS_VARIANTS: Record<PayableStatus, "default" | "secondary" | "outline" | "destructive"> = {
@@ -39,6 +39,12 @@ const VIEW_LABELS: Record<PayableView, string> = {
 
 const brl = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateLabel = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—");
+// Data de emissão é gravada só como data (meia-noite UTC) — mostrar em UTC evita "um dia antes".
+const issueDateLabel = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "—");
+const isOpen = (p: AccountPayable) => p.status === "PENDING" || p.status === "OVERDUE";
+
+const EMPTY_FILTERS = { issueDate: "", invoiceNumber: "", payeeName: "", documentNumber: "", amount: "", paidDate: "", notes: "" };
+type Filters = typeof EMPTY_FILTERS;
 
 export default function PayablesPanel() {
   const { token, hasPermission } = useAuth();
@@ -46,35 +52,22 @@ export default function PayablesPanel() {
   const canManage = hasPermission("finance", "manage");
   // Separação principal: todas (padrão), a pagar (pendentes/vencidas), pagas ou canceladas.
   const [view, setView] = useState<PayableView>("all");
-  // Período, pelo vencimento ou pela data em que foi pago.
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [dateField, setDateField] = useState<"dueDate" | "paidAt">("dueDate");
-  const [payeeName, setPayeeName] = useState("");
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  // Despesas separadas por setor (origem) e por categoria/grupo.
-  const [sector, setSector] = useState("");
-  const [category, setCategory] = useState("");
-  const [group, setGroup] = useState("");
+  // Filtros: emissão da nota, nº da nota, fornecedor, duplicata, valor, data de pagamento e observação.
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  // Contas selecionadas para "Marcar como pagas" (só contas em aberto).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [payingMany, setPayingMany] = useState(false);
 
-  const { data: classifications } = useQuery({
-    queryKey: ["expense-classifications"],
-    queryFn: async () => (await api.expenseClassifications(token!)) as ExpenseClassifications,
-    enabled: !!token,
-  });
+  function setFilter(key: keyof Filters, value: string) {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  }
 
   // Filtros comuns à lista e aos totais do topo (os totais ignoram só a aba de situação).
-  const filterParams = {
-    from: from || undefined,
-    to: to || undefined,
-    dateField: from || to ? dateField : undefined,
-    payeeName: payeeName.trim() || undefined,
-    invoiceNumber: invoiceNumber.trim() || undefined,
-    sector: sector.trim() || undefined,
-    category: category.trim() || undefined,
-    group: group.trim() || undefined,
-  };
+  const filterParams = Object.fromEntries(
+    Object.entries(filters).map(([key, value]) => [key, value.trim() || undefined])
+  ) as Record<keyof Filters, string | undefined>;
   const hasFilters = Object.values(filterParams).some(Boolean);
+  const filterKey = JSON.stringify(filterParams);
 
   const { data: summary } = useQuery({
     queryKey: ["payables", "summary", filterParams],
@@ -82,25 +75,23 @@ export default function PayablesPanel() {
     enabled: !!token,
   });
 
-  const { data, isLoading, dataUpdatedAt } = useQuery({
-    queryKey: ["payables", view, from, to, dateField, payeeName, invoiceNumber, sector, category, group],
+  const { data: page, isLoading, dataUpdatedAt } = useQuery({
+    queryKey: ["payables", view, filterKey],
     queryFn: async () =>
-      (
-        await api.payables(token!, {
-          ...(view === "open" ? { situation: "open" as const } : view === "paid" ? { situation: "paid" as const } : view === "cancelled" ? { status: "CANCELLED" } : {}),
-          from: from || undefined,
-          to: to || undefined,
-          dateField: from || to ? dateField : undefined,
-          payeeName: payeeName.trim() || undefined,
-          invoiceNumber: invoiceNumber.trim() || undefined,
-          sector: sector.trim() || undefined,
-          category: category.trim() || undefined,
-          group: group.trim() || undefined,
-          pageSize: 100,
-        })
-      ).items as AccountPayable[],
+      api.payables(token!, {
+        ...(view === "open" ? { situation: "open" as const } : view === "paid" ? { situation: "paid" as const } : view === "cancelled" ? { status: "CANCELLED" } : {}),
+        ...filterParams,
+        pageSize: 100,
+      }),
     enabled: !!token,
   });
+  const data = page?.items as AccountPayable[] | undefined;
+  const total = page?.pagination.total ?? 0;
+
+  // Trocou de aba ou de filtro: a seleção antiga não vale mais.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [view, filterKey]);
 
   // Vencidas e que vencem em breve, sem filtros — mesmo dado do indicador da aba.
   const { data: dueWarnings } = useQuery({
@@ -113,14 +104,41 @@ export default function PayablesPanel() {
   const isDueSoon = (p: AccountPayable) =>
     p.status === "PENDING" && new Date(p.dueDate).getTime() - dataUpdatedAt <= dueSoonDays * 24 * 60 * 60 * 1000;
 
-  function showOpen() {
-    setView("open");
-    setDateField("dueDate");
+  const openRows = (data ?? []).filter(isOpen);
+  const allSelected = openRows.length > 0 && openRows.every((p) => selected.has(p.id));
+
+  function toggleOne(id: string, checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
+  function toggleAll(checked: boolean) {
+    setSelected(checked ? new Set(openRows.map((p) => p.id)) : new Set());
   }
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["payables"] });
     queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
+  }
+
+  async function payMany() {
+    if (!token || selected.size === 0) return;
+    if (!confirm(`Marcar ${selected.size} conta(s) como paga(s), com a data de hoje e o valor cheio de cada uma?`)) return;
+    setPayingMany(true);
+    try {
+      const { paid } = await api.payManyPayables([...selected], token);
+      toast.success(`${paid} conta(s) marcada(s) como paga(s).`);
+      setSelected(new Set());
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível marcar as contas como pagas.");
+    } finally {
+      setPayingMany(false);
+    }
   }
 
   async function handleCancel(payable: AccountPayable) {
@@ -134,12 +152,22 @@ export default function PayablesPanel() {
     }
   }
 
+  const filterFields: { key: keyof Filters; label: string; type?: string; placeholder?: string; className: string; inputMode?: "decimal" }[] = [
+    { key: "issueDate", label: "Emissão da nota", type: "date", className: "w-40" },
+    { key: "invoiceNumber", label: "Nº da nota", placeholder: "Número", className: "w-32" },
+    { key: "payeeName", label: "Fornecedor", placeholder: "Nome", className: "w-48" },
+    { key: "documentNumber", label: "Duplicata", placeholder: "Nº da duplicata", className: "w-36" },
+    { key: "amount", label: "Valor", placeholder: "0,00", className: "w-28", inputMode: "decimal" },
+    { key: "paidDate", label: "Data de pagamento", type: "date", className: "w-40" },
+    { key: "notes", label: "Observação", placeholder: "Contém...", className: "w-56" },
+  ];
+
   return (
     <div className="grid gap-4">
       {!!dueWarnings?.overdue.count && (
         <button
           type="button"
-          onClick={showOpen}
+          onClick={() => setView("open")}
           className="flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-left text-sm font-medium text-red-700"
         >
           <AlertTriangle className="size-5 shrink-0 animate-alert-blink text-red-600" />
@@ -153,7 +181,7 @@ export default function PayablesPanel() {
       {!!dueWarnings?.dueSoon.count && (
         <button
           type="button"
-          onClick={showOpen}
+          onClick={() => setView("open")}
           className="flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-left text-sm font-medium text-amber-800"
         >
           <Clock className="size-5 shrink-0 animate-alert-blink text-amber-500" />
@@ -171,13 +199,7 @@ export default function PayablesPanel() {
             key={key}
             type="button"
             className={`rounded px-3 py-1 ${view === key ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-            onClick={() => {
-              setView(key);
-              // Em "Pagas" o natural é procurar pela data em que foi pago; conta em aberto
-              // ainda não tem data de pagamento, então volta para o vencimento.
-              if (key === "paid") setDateField("paidAt");
-              if (key === "open") setDateField("dueDate");
-            }}
+            onClick={() => setView(key)}
           >
             {VIEW_LABELS[key]}
           </button>
@@ -185,75 +207,33 @@ export default function PayablesPanel() {
       </div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-2">
-          <div className="grid gap-1">
-            <Label className="text-xs text-muted-foreground">Período por</Label>
-            <Select value={dateField} onValueChange={(v) => setDateField(v as "dueDate" | "paidAt")}>
-              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="dueDate">Data de vencimento</SelectItem>
-                <SelectItem value="paidAt">Data de pagamento</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-1">
-            <Label htmlFor="p-filter-from" className="text-xs text-muted-foreground">De</Label>
-            <Input id="p-filter-from" type="date" className="w-40" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div className="grid gap-1">
-            <Label htmlFor="p-filter-to" className="text-xs text-muted-foreground">Até</Label>
-            <Input id="p-filter-to" type="date" className="w-40" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
-          {(from || to) && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); }}>
-              Limpar período
+          {filterFields.map((field) => (
+            <div key={field.key} className="grid gap-1">
+              <Label htmlFor={`p-filter-${field.key}`} className="text-xs text-muted-foreground">
+                {field.label}
+              </Label>
+              <Input
+                id={`p-filter-${field.key}`}
+                type={field.type ?? "text"}
+                inputMode={field.inputMode}
+                placeholder={field.placeholder}
+                className={field.className}
+                value={filters[field.key]}
+                onChange={(e) => setFilter(field.key, e.target.value)}
+              />
+            </div>
+          ))}
+          {hasFilters && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>
+              Limpar filtros
             </Button>
           )}
-          <div className="grid gap-1">
-            <Label htmlFor="p-filter-name" className="text-xs text-muted-foreground">Nome</Label>
-            <Input
-              id="p-filter-name"
-              placeholder="Fornecedor/beneficiário"
-              className="w-48"
-              value={payeeName}
-              onChange={(e) => setPayeeName(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-1">
-            <Label htmlFor="p-filter-invoice" className="text-xs text-muted-foreground">Nº da nota</Label>
-            <Input
-              id="p-filter-invoice"
-              placeholder="Número da nota fiscal"
-              className="w-40"
-              value={invoiceNumber}
-              onChange={(e) => setInvoiceNumber(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-1">
-            <Label htmlFor="p-filter-sector" className="text-xs text-muted-foreground">Setor</Label>
-            <SuggestInput id="p-filter-sector" className="w-40" options={classifications?.sectors ?? []} placeholder="Todos" value={sector} onChange={(e) => setSector(e.target.value)} />
-          </div>
-          <div className="grid gap-1">
-            <Label htmlFor="p-filter-category" className="text-xs text-muted-foreground">Categoria</Label>
-            <SuggestInput id="p-filter-category" className="w-44" options={classifications?.categories ?? []} placeholder="Todas" value={category} onChange={(e) => setCategory(e.target.value)} />
-          </div>
-          <div className="grid gap-1">
-            <Label htmlFor="p-filter-group" className="text-xs text-muted-foreground">Grupo</Label>
-            <SuggestInput id="p-filter-group" className="w-44" options={classifications?.groups ?? []} placeholder="Todos" value={group} onChange={(e) => setGroup(e.target.value)} />
-          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ExportButtons
             title="Contas a pagar"
             filename="contas-a-pagar"
-            subtitle={
-              [
-                `${VIEW_LABELS[view]}.`,
-                (from || to) &&
-                  `${dateField === "paidAt" ? "Pagamento" : "Vencimento"}${from ? ` de ${dateLabel(`${from}T12:00:00`)}` : ""}${to ? ` até ${dateLabel(`${to}T12:00:00`)}` : ""}.`,
-              ]
-                .filter(Boolean)
-                .join(" ") || undefined
-            }
+            subtitle={`${VIEW_LABELS[view]}.${hasFilters ? " Com filtros." : ""}`}
             rows={data ?? []}
             columns={[
               { header: "Descrição", value: (p) => (p.installmentTotal && p.installmentTotal > 1 ? `${p.description} (${p.installmentNumber}/${p.installmentTotal})` : p.description) },
@@ -263,26 +243,47 @@ export default function PayablesPanel() {
               { header: "Descr. despesa", value: (p) => p.expenseDescription },
               { header: "Setor", value: (p) => p.expenseSector },
               { header: "Nota fiscal", value: (p) => p.invoiceNumber ?? p.invoice?.number },
+              { header: "Duplicata", value: (p) => p.documentNumber },
+              { header: "Emissão", value: (p) => p.issueDate, type: "date" },
               { header: "Vencimento", value: (p) => p.dueDate, type: "date" },
               { header: "Status", value: (p) => STATUS_LABELS[p.status as PayableStatus] ?? p.status },
               { header: "Forma", value: (p) => p.paymentMethod },
               { header: "Valor", value: (p) => p.amount, type: "money" },
               { header: "Pago em", value: (p) => p.paidAt, type: "date" },
               { header: "Valor pago", value: (p) => p.paidAmount, type: "money" },
+              { header: "Observação", value: (p) => p.notes },
             ]}
           />
           {canManage && <PayableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a pagar</Button>} />}
         </div>
       </div>
 
+      {/* Seleção em lote: "Selecionar tudo" pega todas as contas em aberto da lista filtrada. */}
+      {canManage && openRows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm">
+          <label className="flex items-center gap-2">
+            <Checkbox checked={allSelected} onCheckedChange={(v) => toggleAll(v === true)} aria-label="Selecionar todas as contas em aberto" />
+            Selecionar tudo ({openRows.length} em aberto{hasFilters ? " no filtro" : ""})
+          </label>
+          <Button size="sm" disabled={selected.size === 0 || payingMany} onClick={payMany}>
+            <CheckCheck className="size-4" />
+            {payingMany ? "Marcando..." : `Marcar como pagas${selected.size ? ` (${selected.size})` : ""}`}
+          </Button>
+          {total > (data?.length ?? 0) && (
+            <span className="text-xs text-muted-foreground">
+              Mostrando {data?.length ?? 0} de {total} contas — refine o filtro para alcançar as demais.
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
+              {canManage && <TableHead className="w-8" />}
               <TableHead>Descrição</TableHead>
               <TableHead>Fornecedor/Beneficiário</TableHead>
-              <TableHead>Categoria / grupo</TableHead>
-              <TableHead>Setor</TableHead>
               <TableHead>Valor</TableHead>
               <TableHead>Vencimento</TableHead>
               <TableHead>Pago em</TableHead>
@@ -292,19 +293,31 @@ export default function PayablesPanel() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             )}
             {!isLoading && (data ?? []).length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   {view === "open" ? "Nenhuma conta a pagar em aberto." : view === "paid" ? "Nenhuma conta paga." : "Nenhuma conta encontrada."}
                 </TableCell>
               </TableRow>
             )}
             {(data ?? []).map((payable) => (
-              <TableRow key={payable.id}>
+              <TableRow key={payable.id} data-state={selected.has(payable.id) ? "selected" : undefined}>
+                {canManage && (
+                  <TableCell>
+                    {isOpen(payable) && (
+                      <Checkbox
+                        checked={selected.has(payable.id)}
+                        onCheckedChange={(v) => toggleOne(payable.id, v === true)}
+                        aria-label={`Selecionar ${payable.description}`}
+                      />
+                    )}
+                  </TableCell>
+                )}
                 <TableCell className="font-medium">
-                  {payable.description}
+                  {/* Clique no nome: detalhes completos (categoria, grupo, setor, nota, duplicata...). */}
+                  <PayableDetailsDialog payable={payable} />
                   {payable.installmentTotal && payable.installmentTotal > 1 && (
                     <span className="ml-1 text-xs text-muted-foreground">
                       ({payable.installmentNumber}/{payable.installmentTotal})
@@ -316,16 +329,8 @@ export default function PayablesPanel() {
                       {payable.documentNumber ? ` · dupl. ${payable.documentNumber}` : ""}
                     </span>
                   )}
-                  {payable.createdBy && <span className="block text-xs text-muted-foreground">Lançado por {payable.createdBy.name}</span>}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{payable.payeeName}</TableCell>
-                <TableCell className="text-muted-foreground">
-                  {payable.category}
-                  {(payable.expenseGroup || payable.expenseDescription) && (
-                    <span className="block text-xs">{[payable.expenseGroup, payable.expenseDescription].filter(Boolean).join(" › ")}</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-muted-foreground">{payable.expenseSector ?? "—"}</TableCell>
                 <TableCell>R$ {payable.amount.toFixed(2)}</TableCell>
                 <TableCell className="text-muted-foreground">{dateLabel(payable.dueDate)}</TableCell>
                 <TableCell className="text-muted-foreground">
@@ -351,7 +356,7 @@ export default function PayablesPanel() {
                   )}
                 </TableCell>
                 <TableCell>
-                  {canManage && (payable.status === "PENDING" || payable.status === "OVERDUE") && (
+                  {canManage && isOpen(payable) && (
                     <div className="flex justify-end gap-2">
                       <PayDialog payable={payable} onSaved={refetch} />
                       <Button size="sm" variant="ghost" className="text-destructive" onClick={() => handleCancel(payable)}>
@@ -366,6 +371,56 @@ export default function PayablesPanel() {
         </Table>
       </div>
     </div>
+  );
+}
+
+/** Detalhes completos da conta (o que saiu da tabela: categoria, grupo, setor...). */
+function PayableDetailsDialog({ payable }: { payable: AccountPayable }) {
+  const rows: [string, string | null | undefined][] = [
+    ["Fornecedor/beneficiário", payable.payeeName],
+    ["Status", STATUS_LABELS[payable.status]],
+    ["Valor", brl(payable.amount)],
+    ["Vencimento", dateLabel(payable.dueDate)],
+    ["Pago em", payable.paidAt ? dateLabel(payable.paidAt) : null],
+    ["Valor pago", payable.paidAmount != null ? brl(payable.paidAmount) : null],
+    ["Forma de pagamento", payable.paymentMethod],
+    ["Conta bancária", payable.bankAccount?.name],
+    ["Categoria", payable.category],
+    ["Grupo", payable.expenseGroup],
+    ["Descrição da despesa", payable.expenseDescription],
+    ["Setor", payable.expenseSector],
+    ["Nº da nota", payable.invoiceNumber || payable.invoice?.number],
+    ["Emissão da nota", payable.issueDate ? issueDateLabel(payable.issueDate) : null],
+    ["Duplicata", payable.documentNumber],
+    ["Parcela", payable.installmentTotal && payable.installmentTotal > 1 ? `${payable.installmentNumber}/${payable.installmentTotal}` : null],
+    ["Loja", payable.store?.name],
+    ["Lançado por", payable.createdBy?.name],
+    ["Observação", payable.notes],
+  ];
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button type="button" className="text-left underline-offset-2 hover:underline" title="Ver detalhes da conta">
+          {payable.description}
+        </button>
+      </DialogTrigger>
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{payable.description}</DialogTitle>
+        </DialogHeader>
+        <dl className="grid min-h-0 grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 overflow-y-auto text-sm">
+          {rows
+            .filter(([, value]) => value)
+            .map(([label, value]) => (
+              <div key={label} className="contents">
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="whitespace-pre-wrap break-words">{value}</dd>
+              </div>
+            ))}
+        </dl>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -459,6 +459,12 @@ export const api = {
       invoiceNumber?: string;
       sector?: string;
       group?: string;
+      // Filtros da tela: emissão da nota (dia), duplicata, valor, data de pagamento (dia), observação.
+      issueDate?: string;
+      documentNumber?: string;
+      amount?: string;
+      paidDate?: string;
+      notes?: string;
       // "open" = a pagar (pendente/vencida), "paid" = pagas.
       situation?: "open" | "paid";
       // Período (from/to) pelo vencimento (padrão) ou pela data em que foi pago.
@@ -484,6 +490,10 @@ export const api = {
 
   payPayable: (id: string, payload: Record<string, unknown>, token: string) =>
     request<{ payable: unknown }>(`/api/finance/payables/${id}/pay`, { method: "POST", body: JSON.stringify(payload) }, token),
+
+  // "Marcar como pagas": baixa várias contas em aberto com a data de hoje e o valor cheio.
+  payManyPayables: (ids: string[], token: string) =>
+    request<{ paid: number; skipped: number }>("/api/finance/payables/pay-many", { method: "POST", body: JSON.stringify({ ids }) }, token),
 
   cancelPayable: (id: string, token: string) =>
     request<{ payable: unknown }>(`/api/finance/payables/${id}/cancel`, { method: "POST" }, token),
