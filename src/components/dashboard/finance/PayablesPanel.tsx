@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDialog";
-import { PayManyDialog } from "@/components/dashboard/finance/PayManyDialog";
+import { SettleManyDialog } from "@/components/dashboard/finance/SettleManyDialog";
 import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
@@ -262,8 +262,9 @@ export default function PayablesPanel() {
             Selecionar tudo ({openRows.length} em aberto{hasFilters ? " no filtro" : ""})
           </label>
           {/* Pergunta se mantém a data de hoje; se não, uma data por conta. */}
-          <PayManyDialog
-            payables={openRows.filter((p) => selected.has(p.id))}
+          <SettleManyDialog
+            kind="payable"
+            rows={openRows.filter((p) => selected.has(p.id)).map((p) => ({ id: p.id, description: p.description, party: p.payeeName, amount: p.amount }))}
             onDone={() => {
               setSelected(new Set());
               refetch();

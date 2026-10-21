@@ -8,11 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
 import { SettledDateInput } from "@/components/dashboard/finance/PayablesPanel";
+import { SettleManyDialog } from "@/components/dashboard/finance/SettleManyDialog";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -47,11 +49,31 @@ export default function ReceivablesPanel() {
     enabled: !!token,
   });
 
-  const { data, isLoading } = useQuery({
+  const { data: page, isLoading } = useQuery({
     queryKey: ["receivables", status, q],
-    queryFn: async () => (await api.receivables(token!, { status: status || undefined, q: q || undefined, pageSize: 50 })).items as AccountReceivable[],
+    queryFn: async () => api.receivables(token!, { status: status || undefined, q: q || undefined, pageSize: 100 }),
     enabled: !!token,
   });
+  const data = page?.items as AccountReceivable[] | undefined;
+  const total = page?.pagination.total ?? 0;
+
+  // Seleção para "Marcar como recebidas" (só contas em aberto) — some ao trocar filtro/busca.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setSelected(new Set());
+  }, [status, q]);
+  const isOpen = (r: AccountReceivable) => r.status === "PENDING" || r.status === "OVERDUE";
+  const openRows = (data ?? []).filter(isOpen);
+  const allSelected = openRows.length > 0 && openRows.every((r) => selected.has(r.id));
+
+  function toggleOne(id: string, checked: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["receivables"] });
@@ -136,10 +158,39 @@ export default function ReceivablesPanel() {
         </div>
       </div>
 
+      {/* Seleção em lote: "Selecionar tudo" pega todas as contas em aberto da lista filtrada. */}
+      {canManage && openRows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm">
+          <label className="flex items-center gap-2">
+            <Checkbox
+              checked={allSelected}
+              onCheckedChange={(v) => setSelected(v === true ? new Set(openRows.map((r) => r.id)) : new Set())}
+              aria-label="Selecionar todas as contas em aberto"
+            />
+            Selecionar tudo ({openRows.length} em aberto{status || q ? " no filtro" : ""})
+          </label>
+          {/* Pergunta se mantém a data de hoje; se não, uma data por conta. */}
+          <SettleManyDialog
+            kind="receivable"
+            rows={openRows.filter((r) => selected.has(r.id)).map((r) => ({ id: r.id, description: r.description, party: r.client?.name, amount: r.amount }))}
+            onDone={() => {
+              setSelected(new Set());
+              refetch();
+            }}
+          />
+          {total > (data?.length ?? 0) && (
+            <span className="text-xs text-muted-foreground">
+              Mostrando {data?.length ?? 0} de {total} contas — refine a busca para alcançar as demais.
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="min-w-0 rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
+              {canManage && <TableHead className="w-8" />}
               <TableHead>Descrição</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Categoria</TableHead>
@@ -153,13 +204,24 @@ export default function ReceivablesPanel() {
           </TableHeader>
           <TableBody>
             {isLoading && (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">Carregando...</TableCell></TableRow>
             )}
             {!isLoading && (data ?? []).length === 0 && (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Nenhuma conta a receber.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground">Nenhuma conta a receber.</TableCell></TableRow>
             )}
             {(data ?? []).map((receivable) => (
-              <TableRow key={receivable.id}>
+              <TableRow key={receivable.id} data-state={selected.has(receivable.id) ? "selected" : undefined}>
+                {canManage && (
+                  <TableCell>
+                    {isOpen(receivable) && (
+                      <Checkbox
+                        checked={selected.has(receivable.id)}
+                        onCheckedChange={(v) => toggleOne(receivable.id, v === true)}
+                        aria-label={`Selecionar ${receivable.description}`}
+                      />
+                    )}
+                  </TableCell>
+                )}
                 <TableCell className="font-medium">
                   {receivable.description}
                   {receivable.installmentTotal && receivable.installmentTotal > 1 && (

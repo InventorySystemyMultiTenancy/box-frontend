@@ -524,6 +524,10 @@ export const api = {
   setReceivableDueDate: (id: string, dueDate: string | null, token: string) =>
     request<{ receivable: unknown }>(`/api/finance/receivables/${id}/due-date`, { method: "PATCH", body: JSON.stringify({ dueDate }) }, token),
 
+  // "Marcar como recebidas": data por conta (YYYY-MM-DD); sem receivedAt, data de hoje.
+  receiveManyReceivables: (items: { id: string; receivedAt?: string }[], token: string) =>
+    request<{ received: number; skipped: number }>("/api/finance/receivables/receive-many", { method: "POST", body: JSON.stringify({ items }) }, token),
+
   cancelReceivable: (id: string, token: string) =>
     request<{ receivable: unknown }>(`/api/finance/receivables/${id}/cancel`, { method: "POST" }, token),
 
