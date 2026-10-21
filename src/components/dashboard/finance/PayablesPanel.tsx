@@ -17,7 +17,7 @@ import { SettlementSummaryCards } from "@/components/dashboard/finance/Settlemen
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import { settlementDateParam, todayInputValue } from "@/lib/dates";
+import { settlementDateParam, todayInputValue, toLocalDateInput } from "@/lib/dates";
 import type { AccountPayable, BankAccount, PayableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<PayableStatus, string> = { PENDING: "Pendente", PAID: "Pago", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
@@ -138,6 +138,18 @@ export default function PayablesPanel() {
       toast.error(err instanceof ApiError ? err.message : "Não foi possível marcar as contas como pagas.");
     } finally {
       setPayingMany(false);
+    }
+  }
+
+  // Data de pagamento de uma conta já paga — corrigível direto na coluna "Pago em".
+  async function changePaidAt(payable: AccountPayable, value: string) {
+    if (!token) return;
+    try {
+      await api.updatePayable(payable.id, { paidAt: value }, token);
+      toast.success("Data de pagamento alterada.");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível alterar a data de pagamento.");
     }
   }
 
@@ -336,7 +348,11 @@ export default function PayablesPanel() {
                 <TableCell className="text-muted-foreground">
                   {payable.paidAt ? (
                     <>
-                      {dateLabel(payable.paidAt)}
+                      {canManage && payable.status === "PAID" ? (
+                        <SettledDateInput label="Data de pagamento" value={payable.paidAt} onSave={(value) => changePaidAt(payable, value)} />
+                      ) : (
+                        dateLabel(payable.paidAt)
+                      )}
                       {payable.paidAmount != null && payable.paidAmount !== payable.amount && (
                         <span className="block text-xs">R$ {payable.paidAmount.toFixed(2)}</span>
                       )}
@@ -371,6 +387,29 @@ export default function PayablesPanel() {
         </Table>
       </div>
     </div>
+  );
+}
+
+/**
+ * Data de pagamento/recebimento editável numa conta já baixada. Salva ao escolher a data
+ * (ano completo, para não gravar "0202" enquanto digita o ano); não aceita data futura.
+ */
+export function SettledDateInput({ label, value, onSave }: { label: string; value: string; onSave: (value: string) => void }) {
+  const current = toLocalDateInput(value);
+  return (
+    <Input
+      type="date"
+      className="h-8 w-36"
+      aria-label={label}
+      title={`${label} — clique para corrigir`}
+      max={todayInputValue()}
+      defaultValue={current}
+      key={value}
+      onChange={(e) => {
+        const next = e.target.value;
+        if (/^20\d{2}-\d{2}-\d{2}$/.test(next) && next !== current && next <= todayInputValue()) onSave(next);
+      }}
+    />
   );
 }
 

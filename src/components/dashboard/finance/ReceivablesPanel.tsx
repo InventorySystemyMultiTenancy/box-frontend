@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
+import { SettledDateInput } from "@/components/dashboard/finance/PayablesPanel";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -65,6 +66,18 @@ export default function ReceivablesPanel() {
       refetch();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar o prazo.");
+    }
+  }
+
+  // Data de recebimento (Faturado) de uma conta já recebida — corrigível direto na coluna.
+  async function changeReceivedAt(receivable: AccountReceivable, value: string) {
+    if (!token) return;
+    try {
+      await api.updateReceivable(receivable.id, { receivedAt: value }, token);
+      toast.success("Data de recebimento alterada.");
+      refetch();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível alterar a data de recebimento.");
     }
   }
 
@@ -183,7 +196,15 @@ export default function ReceivablesPanel() {
                 </TableCell>
                 {/* Faturado = data em que foi marcada como recebida; vazio enquanto pendente. */}
                 <TableCell className="text-muted-foreground">
-                  {receivable.receivedAt ? new Date(receivable.receivedAt).toLocaleDateString("pt-BR") : "—"}
+                  {receivable.receivedAt ? (
+                    canManage && receivable.status === "RECEIVED" ? (
+                      <SettledDateInput label="Data de recebimento" value={receivable.receivedAt} onSave={(value) => changeReceivedAt(receivable, value)} />
+                    ) : (
+                      new Date(receivable.receivedAt).toLocaleDateString("pt-BR")
+                    )
+                  ) : (
+                    "—"
+                  )}
                 </TableCell>
                 {/* Valor real recebido (com desconto, se houve) — é o que entra no caixa. */}
                 <TableCell>
