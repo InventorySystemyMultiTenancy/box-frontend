@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCheck, Clock, Plus } from "lucide-react";
+import { AlertTriangle, Clock, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDialog";
+import { PayManyDialog } from "@/components/dashboard/finance/PayManyDialog";
 import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
@@ -56,7 +57,6 @@ export default function PayablesPanel() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   // Contas selecionadas para "Marcar como pagas" (só contas em aberto).
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [payingMany, setPayingMany] = useState(false);
 
   function setFilter(key: keyof Filters, value: string) {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -123,22 +123,6 @@ export default function PayablesPanel() {
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["payables"] });
     queryClient.invalidateQueries({ queryKey: ["bank-accounts"] });
-  }
-
-  async function payMany() {
-    if (!token || selected.size === 0) return;
-    if (!confirm(`Marcar ${selected.size} conta(s) como paga(s), com a data de hoje e o valor cheio de cada uma?`)) return;
-    setPayingMany(true);
-    try {
-      const { paid } = await api.payManyPayables([...selected], token);
-      toast.success(`${paid} conta(s) marcada(s) como paga(s).`);
-      setSelected(new Set());
-      refetch();
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Não foi possível marcar as contas como pagas.");
-    } finally {
-      setPayingMany(false);
-    }
   }
 
   // Data de pagamento de uma conta já paga — corrigível direto na coluna "Pago em".
@@ -277,10 +261,14 @@ export default function PayablesPanel() {
             <Checkbox checked={allSelected} onCheckedChange={(v) => toggleAll(v === true)} aria-label="Selecionar todas as contas em aberto" />
             Selecionar tudo ({openRows.length} em aberto{hasFilters ? " no filtro" : ""})
           </label>
-          <Button size="sm" disabled={selected.size === 0 || payingMany} onClick={payMany}>
-            <CheckCheck className="size-4" />
-            {payingMany ? "Marcando..." : `Marcar como pagas${selected.size ? ` (${selected.size})` : ""}`}
-          </Button>
+          {/* Pergunta se mantém a data de hoje; se não, uma data por conta. */}
+          <PayManyDialog
+            payables={openRows.filter((p) => selected.has(p.id))}
+            onDone={() => {
+              setSelected(new Set());
+              refetch();
+            }}
+          />
           {total > (data?.length ?? 0) && (
             <span className="text-xs text-muted-foreground">
               Mostrando {data?.length ?? 0} de {total} contas — refine o filtro para alcançar as demais.

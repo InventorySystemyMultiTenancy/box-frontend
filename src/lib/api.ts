@@ -492,8 +492,9 @@ export const api = {
     request<{ payable: unknown }>(`/api/finance/payables/${id}/pay`, { method: "POST", body: JSON.stringify(payload) }, token),
 
   // "Marcar como pagas": baixa várias contas em aberto com a data de hoje e o valor cheio.
-  payManyPayables: (ids: string[], token: string) =>
-    request<{ paid: number; skipped: number }>("/api/finance/payables/pay-many", { method: "POST", body: JSON.stringify({ ids }) }, token),
+  // Data por conta (YYYY-MM-DD); sem paidAt, a conta é baixada com a data de hoje.
+  payManyPayables: (items: { id: string; paidAt?: string }[], token: string) =>
+    request<{ paid: number; skipped: number }>("/api/finance/payables/pay-many", { method: "POST", body: JSON.stringify({ items }) }, token),
 
   cancelPayable: (id: string, token: string) =>
     request<{ payable: unknown }>(`/api/finance/payables/${id}/cancel`, { method: "POST" }, token),
