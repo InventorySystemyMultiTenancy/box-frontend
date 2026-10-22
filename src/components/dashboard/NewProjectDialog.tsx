@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker";
 import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
-import { MAX_DAMAGE_PHOTOS, uploadDamagePhotosInBatches } from "@/lib/damage-photos";
+import { MAX_DAMAGE_PHOTOS, MAX_DAMAGE_VIDEOS, shareFilesToGallery, splitOversizedVideos, uploadDamageMediaInBatches } from "@/lib/damage-photos";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { Client, PlateLookupResult, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
@@ -77,6 +77,8 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
 
   const [priority, setPriority] = useState<ServiceOrderPriority>("NORMAL");
   const [damagePhotos, setDamagePhotos] = useState<File[]>([]);
+  // Vídeos do checklist de entrada (até 5) — enviados e salvos no aparelho como as fotos.
+  const [damageVideos, setDamageVideos] = useState<File[]>([]);
   const checkinSignatureRef = useRef<SignaturePadHandle>(null);
 
   const { data: clients } = useQuery({
@@ -106,6 +108,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     setPlateResult(null);
     setPriority("NORMAL");
     setDamagePhotos([]);
+    setDamageVideos([]);
   }
 
   function handleOpenChange(next: boolean) {
@@ -233,12 +236,12 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
       const { order } = await api.createServiceOrder({ vehicleId, priority }, token);
       const orderId = (order as { id: string }).id;
 
-      if (damagePhotos.length > 0) {
+      if (damagePhotos.length > 0 || damageVideos.length > 0) {
         // Comprimidas e em lotes — projeto já foi criado, então falha nas fotos não trava
         // nada: dá para reenviar pelo quadro "Fotos do checklist de entrada" do projeto.
-        const { failed } = await uploadDamagePhotosInBatches(orderId, damagePhotos, token);
+        const { failed } = await uploadDamageMediaInBatches(orderId, [...damagePhotos, ...damageVideos], token);
         if (failed > 0) {
-          toast.error(`Projeto criado, mas ${failed} foto(s) de avaria não foram enviadas — adicione pelo projeto, em "Fotos do checklist de entrada".`, { duration: 10000 });
+          toast.error(`Projeto criado, mas ${failed} foto(s)/vídeo(s) de avaria não foram enviados — adicione pelo projeto, em "Checklist de entrada".`, { duration: 10000 });
         }
       }
 
@@ -468,10 +471,61 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                 ))}
               </div>
             )}
+            <Label className="mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Vídeos de avarias (até {MAX_DAMAGE_VIDEOS}, máx. 100 MB cada)
+            </Label>
+            <CameraOrGalleryPicker
+              kind="video"
+              multiple
+              cameraLabel="Gravar vídeo"
+              galleryLabel="Vídeo da galeria"
+              disabled={damageVideos.length >= MAX_DAMAGE_VIDEOS}
+              onFiles={(selected) => {
+                const { ok, tooBig } = splitOversizedVideos(selected);
+                if (tooBig > 0) toast.error(`${tooBig} vídeo(s) acima de 100 MB foram ignorados — grave um vídeo mais curto.`);
+                const files = ok.slice(0, MAX_DAMAGE_VIDEOS - damageVideos.length);
+                setDamageVideos((prev) => [...prev, ...files].slice(0, MAX_DAMAGE_VIDEOS));
+                const vehiclePlate = vehicleMode === "new" ? newVehicle.plate : clientVehicles?.find((v) => v.id === selectedVehicleId)?.plate;
+                const plate = vehiclePlate?.replace(/[^a-z0-9]/gi, "").toUpperCase();
+                saveFilesToDevice(files, `avaria-${plate || new Date().toISOString().slice(0, 10)}-video`, damageVideos.length);
+              }}
+            />
+            {damageVideos.length > 0 && (
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {damageVideos.map((file, i) => (
+                  <span key={i} className="flex items-center gap-1 rounded-md border px-2 py-1">
+                    🎥 {file.name}
+                    <button
+                      type="button"
+                      className="text-destructive"
+                      onClick={() => setDamageVideos((prev) => prev.filter((_, idx) => idx !== i))}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
-              As fotos também são salvas neste aparelho. Para colocá-las na Localiza, abra o veículo em
-              &quot;Em serviço&quot;, clique em &quot;Imagens&quot; e anexe as fotos salvas.
+              Fotos e vídeos também são salvos neste aparelho. Para colocá-los na Localiza, abra o veículo em
+              &quot;Em serviço&quot;, clique em &quot;Imagens&quot; e anexe os arquivos salvos.
             </p>
+            {(damagePhotos.length > 0 || damageVideos.length > 0) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-fit"
+                // Download comum vai para Arquivos/Downloads; o "Compartilhar" do celular tem
+                // "Salvar imagem/vídeo", que grava na galeria.
+                onClick={async () => {
+                  const shared = await shareFilesToGallery([...damagePhotos, ...damageVideos]);
+                  if (!shared) toast.info("Este aparelho não permite salvar direto na galeria — os arquivos já foram baixados.");
+                }}
+              >
+                Salvar na galeria do celular
+              </Button>
+            )}
             <Button asChild variant="outline" size="sm" className="w-fit">
               <a href={LOCALIZA_TRACKING_URL} target="_blank" rel="noreferrer">
                 <ExternalLink className="size-4" />

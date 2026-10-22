@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { Camera, Images } from "lucide-react";
+import { Camera, Images, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface CameraOrGalleryPickerProps {
@@ -10,6 +10,8 @@ interface CameraOrGalleryPickerProps {
   disabled?: boolean;
   cameraLabel?: string;
   galleryLabel?: string;
+  /** "image" (padrão) ou "video" — com `capture`, o celular abre a câmera em modo vídeo. */
+  kind?: "image" | "video";
 }
 
 // Dois botões em vez de um seletor só: no celular, o input com `capture` abre direto a
@@ -21,7 +23,10 @@ export function CameraOrGalleryPicker({
   disabled,
   cameraLabel = "Tirar foto",
   galleryLabel = "Escolher da galeria",
+  kind = "image",
 }: CameraOrGalleryPickerProps) {
+  const accept = kind === "video" ? "video/*" : "image/*";
+  const CameraIcon = kind === "video" ? Video : Camera;
   const cameraRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -34,15 +39,15 @@ export function CameraOrGalleryPicker({
   return (
     <div className="flex flex-wrap gap-2">
       <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => cameraRef.current?.click()}>
-        <Camera className="size-4" />
+        <CameraIcon className="size-4" />
         {cameraLabel}
       </Button>
       <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => galleryRef.current?.click()}>
         <Images className="size-4" />
         {galleryLabel}
       </Button>
-      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleChange} />
-      <input ref={galleryRef} type="file" accept="image/*" multiple={multiple} className="hidden" onChange={handleChange} />
+      <input ref={cameraRef} type="file" accept={accept} capture="environment" className="hidden" onChange={handleChange} />
+      <input ref={galleryRef} type="file" accept={accept} multiple={multiple} className="hidden" onChange={handleChange} />
     </div>
   );
 }
