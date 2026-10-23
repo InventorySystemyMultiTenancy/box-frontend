@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Plus, Sparkles } from "lucide-react";
+import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,11 +19,10 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
-import type { BankAccount, Client, ExpenseClassifications, Invoice, InvoiceStatus, InvoiceType, ServiceOrder, ServiceOrderStatus } from "@/lib/types";
+import type { BankAccount, Client, ExpenseClassifications, Invoice, InvoiceStatus, InvoiceType } from "@/lib/types";
 
 // "Em andamento" = mesma definição usada em MechanicProjectsPanel — qualquer OS que
 // ainda não chegou em FINISHED/READY_FOR_PICKUP.
-const DONE_ORDER_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);
 
 const TYPE_LABELS: Record<InvoiceType, string> = { NFE: "NF-e", NFSE: "NFS-e", NFCE: "NFC-e" };
 const STATUS_LABELS: Record<InvoiceStatus, string> = { DRAFT: "Rascunho", PENDING: "Pendente", ISSUED: "Emitida", CANCELLED: "Cancelada", ERROR: "Erro" };
@@ -215,7 +214,6 @@ export default function InvoicesPanel() {
 const EMPTY_FORM = {
   type: "NFE" as InvoiceType,
   clientId: "",
-  serviceOrderId: "",
   number: "",
   series: "",
   operationNature: "",
@@ -232,24 +230,23 @@ const EMPTY_FORM = {
   expenseGroup: "",
   expenseDescription: "",
   bankAccountId: "",
-  dueDate: "",
+  // "Gerar parcelas": quantidade e vencimento da 1ª (as demais, mês a mês).
   installments: "1",
-  // Dias entre uma parcela e outra (30/60/90 por padrão).
-  intervalDays: "30",
+  firstDueDate: "",
 };
 
-/** Vencimentos das parcelas — mesma conta do backend (splitInstallments com intervalo em dias). */
-function installmentDueDates(firstDueDate: string, installments: string, intervalDays: string) {
-  if (!firstDueDate) return [];
-  const count = Math.min(60, Math.max(1, Number(installments) || 1));
-  const days = Math.max(1, Number(intervalDays) || 30);
-  const first = new Date(`${firstDueDate}T12:00:00`);
-  return Array.from({ length: count }, (_, i) => {
-    const date = new Date(first);
-    date.setDate(date.getDate() + i * days);
-    return date.toLocaleDateString("pt-BR");
-  });
+interface InstallmentRow {
+  dueDate: string; // YYYY-MM-DD
+  amount: number;
 }
+
+function addMonths(isoDate: string, months: number) {
+  const d = new Date(`${isoDate}T12:00:00`);
+  d.setMonth(d.getMonth() + months);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+const brlValue = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 function isBoleto(paymentMethod: string) {
   return paymentMethod.trim().toLowerCase().includes("boleto");
@@ -263,6 +260,10 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
   const [extracting, setExtracting] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [autoClientMessage, setAutoClientMessage] = useState<string | null>(null);
+  // Parcelas geradas (mesma ideia do "Gerar parcelas" da nova conta a pagar); a data de
+  // cada uma pode ser trocada clicando nela.
+  const [rows, setRows] = useState<InstallmentRow[]>([]);
+  const [editingRow, setEditingRow] = useState<number | null>(null);
 
   const { data: clients } = useQuery({
     queryKey: ["clients-all"],
@@ -282,15 +283,6 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
     enabled: !!token && open,
   });
 
-  const { data: openOrders } = useQuery({
-    queryKey: ["service-orders-open-for-invoice"],
-    queryFn: async () => {
-      const { orders } = await api.serviceOrders(token!);
-      return (orders as ServiceOrder[]).filter((o) => !DONE_ORDER_STATUSES.has(o.status));
-    },
-    enabled: !!token && open,
-  });
-
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -299,6 +291,8 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
     if (next) {
       setForm(EMPTY_FORM);
       setAutoClientMessage(null);
+      setRows([]);
+      setEditingRow(null);
     }
     setOpen(next);
   }
@@ -343,12 +337,34 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
 
   // Gera contas a pagar quando é nota de despesa ou quando é paga por boleto.
   const generatesPayables = form.isExpense || isBoleto(form.paymentMethod);
+  const rowsTotal = Math.round(rows.reduce((sum, r) => sum + r.amount, 0) * 100) / 100;
+
+  // Divide o valor total em N parcelas iguais (centavos na última), mês a mês a partir da 1ª.
+  function generateInstallments() {
+    const total = Number(form.totalAmount) || 0;
+    const count = Math.max(1, Math.min(60, Math.floor(Number(form.installments) || 1)));
+    if (!(total > 0)) return toast.error("Informe o valor total da nota antes de gerar as parcelas.");
+    if (!form.firstDueDate) return toast.error("Informe o vencimento da 1ª parcela.");
+    const cents = Math.round(total * 100);
+    const base = Math.floor(cents / count);
+    setRows(
+      Array.from({ length: count }, (_, i) => ({
+        dueDate: addMonths(form.firstDueDate, i),
+        amount: (i === count - 1 ? cents - base * (count - 1) : base) / 100,
+      }))
+    );
+    setEditingRow(null);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
-    if (generatesPayables && !form.dueDate) {
-      toast.error("Informe o vencimento da primeira parcela.");
+    if (generatesPayables && rows.length === 0) {
+      toast.error('Informe a quantidade e o 1º vencimento e clique em "Gerar parcelas".');
+      return;
+    }
+    if (generatesPayables && Math.abs(rowsTotal - (Number(form.totalAmount) || 0)) >= 0.01) {
+      toast.error("O valor total mudou depois de gerar as parcelas — clique em \"Gerar parcelas\" de novo.");
       return;
     }
     if (form.isExpense && !form.issuerName.trim()) {
@@ -361,7 +377,6 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
         {
           type: form.type,
           clientId: form.clientId || undefined,
-          serviceOrderId: form.serviceOrderId || undefined,
           totalAmount: Number(form.totalAmount),
           description: form.description.trim() || undefined,
           number: form.number || undefined,
@@ -377,9 +392,14 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
           expenseGroup: form.isExpense ? form.expenseGroup || undefined : undefined,
           expenseDescription: form.isExpense ? form.expenseDescription || undefined : undefined,
           bankAccountId: form.bankAccountId || undefined,
-          dueDate: generatesPayables ? form.dueDate : undefined,
-          installments: generatesPayables ? Number(form.installments) || 1 : undefined,
-          installmentIntervalDays: generatesPayables ? Number(form.intervalDays) || 30 : undefined,
+          // Parcelas geradas no formulário (data ao meio-dia local, para não cair no dia anterior).
+          duplicates: generatesPayables
+            ? rows.map((r, i) => ({
+                dueDate: new Date(`${r.dueDate}T12:00:00`).toISOString(),
+                amount: r.amount,
+                documentNumber: rows.length > 1 ? `${i + 1}/${rows.length}` : undefined,
+              }))
+            : undefined,
         },
         token
       );
@@ -439,7 +459,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
               </span>
             </label>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3">
               <div className="grid gap-1.5">
                 <Label>Cliente cadastrado</Label>
                 <Select value={form.clientId || "NONE"} onValueChange={(v) => set("clientId", v === "NONE" ? "" : v)}>
@@ -448,20 +468,6 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
                     <SelectItem value="NONE">—</SelectItem>
                     {(clients ?? []).map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Projeto em andamento (opcional)</Label>
-                <Select value={form.serviceOrderId || "NONE"} onValueChange={(v) => set("serviceOrderId", v === "NONE" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="NONE">—</SelectItem>
-                    {(openOrders ?? []).map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.code} — {o.vehicle.brand} {o.vehicle.model}
-                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -526,50 +532,78 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
             </div>
 
             {generatesPayables && (
-              <div className="grid grid-cols-1 gap-3 rounded-md border border-dashed p-3 sm:grid-cols-2">
-                <div className="col-span-full text-xs font-medium text-muted-foreground">
-                  Gera as parcelas em contas a pagar, a cada {Number(form.intervalDays) || 30} dias{form.bankAccountId ? ", previstas no banco escolhido" : ""}.
+              <div className="grid gap-2 rounded-md border border-dashed p-3">
+                <div className="text-xs font-medium text-muted-foreground">
+                  Parcelas em contas a pagar{form.bankAccountId ? " (previstas no banco escolhido)" : ""} — clique na data de uma parcela para mudar.
                 </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="inv-due-date">Vencimento da 1ª parcela *</Label>
-                  <Input id="inv-due-date" type="date" required value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
+                <div className="flex flex-wrap items-end gap-2 text-sm">
+                  <div className="grid gap-1">
+                    <Label htmlFor="inv-installments" className="text-xs">Parcelas</Label>
+                    <Input id="inv-installments" className="w-20" type="number" min="1" max="60" value={form.installments} onChange={(e) => set("installments", e.target.value)} />
+                  </div>
+                  <div className="grid gap-1">
+                    <Label htmlFor="inv-first-due" className="text-xs">1º vencimento</Label>
+                    <Input id="inv-first-due" className="w-40" type="date" value={form.firstDueDate} onChange={(e) => set("firstDueDate", e.target.value)} />
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={generateInstallments}>
+                    <Plus className="size-4" />
+                    Gerar parcelas
+                  </Button>
                 </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="inv-installments">Quantidade de parcelas *</Label>
-                  <Input
-                    id="inv-installments"
-                    type="number"
-                    min="1"
-                    max="60"
-                    required
-                    value={form.installments}
-                    onChange={(e) => set("installments", e.target.value)}
-                  />
-                </div>
-                {Number(form.installments) > 1 && (
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="inv-interval">Intervalo entre parcelas (dias) *</Label>
-                    <Input
-                      id="inv-interval"
-                      type="number"
-                      min="1"
-                      max="365"
-                      required
-                      list="inv-interval-options"
-                      value={form.intervalDays}
-                      onChange={(e) => set("intervalDays", e.target.value)}
-                    />
-                    <datalist id="inv-interval-options">
-                      {[7, 10, 14, 15, 21, 28, 30, 45, 60, 90].map((d) => (
-                        <option key={d} value={d} />
-                      ))}
-                    </datalist>
+                {rows.length > 0 && (
+                  <div className="min-w-0 overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Parcela</TableHead>
+                          <TableHead>Vencimento</TableHead>
+                          <TableHead>Valor</TableHead>
+                          <TableHead className="w-10" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rows.map((row, i) => (
+                          <TableRow key={i}>
+                            <TableCell>{i + 1}/{rows.length}</TableCell>
+                            <TableCell>
+                              {editingRow === i ? (
+                                <Input
+                                  type="date"
+                                  className="h-8 w-40"
+                                  autoFocus
+                                  value={row.dueDate}
+                                  aria-label={`Vencimento da parcela ${i + 1}`}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value) setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, dueDate: value } : r)));
+                                  }}
+                                  onBlur={() => setEditingRow(null)}
+                                />
+                              ) : (
+                                <button type="button" className="underline-offset-2 hover:underline" title="Clique para mudar a data" onClick={() => setEditingRow(i)}>
+                                  {new Date(`${row.dueDate}T12:00:00`).toLocaleDateString("pt-BR")}
+                                </button>
+                              )}
+                            </TableCell>
+                            <TableCell>{brlValue(row.amount)}</TableCell>
+                            <TableCell>
+                              <Button type="button" size="icon" variant="ghost" aria-label="Remover parcela" onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}>
+                                <Trash2 className="size-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
-                {form.dueDate && Number(form.installments) > 1 && (
-                  <p className="col-span-full text-xs text-muted-foreground">
-                    Vencimentos: {installmentDueDates(form.dueDate, form.installments, form.intervalDays).join(", ")}
-                  </p>
+                {rows.length > 0 && (
+                  <div className="flex flex-wrap justify-end gap-4 text-sm">
+                    <span>Total das parcelas: <strong>{brlValue(rowsTotal)}</strong></span>
+                    {Math.abs(rowsTotal - (Number(form.totalAmount) || 0)) >= 0.01 && (
+                      <span className="font-semibold text-destructive">Não bate com o valor total — gere de novo.</span>
+                    )}
+                  </div>
                 )}
               </div>
             )}
