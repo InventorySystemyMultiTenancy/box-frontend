@@ -559,7 +559,9 @@ export const api = {
   createInvoice: (payload: Record<string, unknown>, token: string) =>
     request<{ invoice: unknown }>("/api/invoices", { method: "POST", body: JSON.stringify(payload) }, token),
 
-  extractInvoice: (photo: File, token: string) => {
+  // matchClient: false = não procura/cadastra o destinatário como cliente (nota de compra
+  // lida dentro da conta a pagar — o destinatário é a própria oficina).
+  extractInvoice: (photo: File, token: string, options: { matchClient?: boolean } = {}) => {
     const form = new FormData();
     form.append("photo", photo);
     return request<{
@@ -583,7 +585,7 @@ export const api = {
       clientId: string | null;
       clientName: string | null;
       clientCreated: boolean;
-    }>("/api/invoices/extract", { method: "POST", body: form }, token);
+    }>(`/api/invoices/extract${options.matchClient === false ? "?matchClient=false" : ""}`, { method: "POST", body: form }, token);
   },
 
   issueInvoice: (id: string, token: string) =>

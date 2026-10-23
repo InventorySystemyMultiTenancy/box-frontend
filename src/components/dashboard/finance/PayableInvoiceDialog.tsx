@@ -77,7 +77,8 @@ export function PayableInvoiceDialog({
     if (!original || !token) return;
     setExtracting(true);
     try {
-      const { extracted } = await api.extractInvoice(await prepareImageForAi(original), token);
+      // Nota de compra: o destinatário é a oficina — não cadastra como cliente.
+      const { extracted } = await api.extractInvoice(await prepareImageForAi(original), token, { matchClient: false });
       setForm((f) => ({
         ...f,
         type: extracted.type ?? f.type,
