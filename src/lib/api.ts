@@ -559,6 +559,8 @@ export const api = {
       number?: string;
       orderCode?: string;
       date?: string;
+      // "true": só notas ainda livres para ligar a um recebimento (sem conta a receber/pagar).
+      unlinked?: string;
       page?: number;
       pageSize?: number;
     } = {}

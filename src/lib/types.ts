@@ -691,6 +691,8 @@ export interface AccountReceivable {
   installmentNumber?: number | null;
   installmentTotal?: number | null;
   notes?: string | null;
+  // Nota(s) fiscal(is) ligada(s) ao recebimento (coluna "Nota").
+  invoices?: { id: string; number?: string | null }[];
 }
 
 export interface CashFlowTimelinePoint {
