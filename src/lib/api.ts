@@ -467,8 +467,8 @@ export const api = {
       notes?: string;
       // "open" = a pagar (pendente/vencida), "paid" = pagas.
       situation?: "open" | "paid";
-      // Período (from/to) pelo vencimento (padrão) ou pela data em que foi pago.
-      dateField?: "dueDate" | "paidAt";
+      // Período (from/to) pelo vencimento (padrão), pela data em que foi pago ou pela emissão da nota.
+      dateField?: "dueDate" | "paidAt" | "issueDate";
       page?: number;
       pageSize?: number;
     } = {}

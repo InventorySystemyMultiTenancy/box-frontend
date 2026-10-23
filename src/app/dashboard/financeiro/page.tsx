@@ -11,7 +11,6 @@ import BankAccountsPanel from "@/components/dashboard/finance/BankAccountsPanel"
 import PayablesPanel from "@/components/dashboard/finance/PayablesPanel";
 import ReceivablesPanel from "@/components/dashboard/finance/ReceivablesPanel";
 import CashFlowPanel from "@/components/dashboard/finance/CashFlowPanel";
-import InvoicesPanel from "@/components/dashboard/finance/InvoicesPanel";
 
 const TABS = [
   { key: "resumo", label: "Resumo" },
@@ -19,7 +18,6 @@ const TABS = [
   { key: "receivables", label: "Contas a receber" },
   { key: "banks", label: "Contas bancárias" },
   { key: "cashflow", label: "Fluxo de caixa" },
-  { key: "invoices", label: "Notas fiscais" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -81,7 +79,7 @@ export default function FinanceiroPage() {
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Financeiro</h1>
-        <p className="text-sm text-muted-foreground">Contas a pagar/receber, contas bancárias, fluxo de caixa e notas fiscais.</p>
+        <p className="text-sm text-muted-foreground">Contas a pagar (e notas fiscais), contas a receber, contas bancárias e fluxo de caixa.</p>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-1 border-b">
@@ -106,7 +104,6 @@ export default function FinanceiroPage() {
       {tab === "receivables" && <ReceivablesPanel />}
       {tab === "banks" && <BankAccountsPanel />}
       {tab === "cashflow" && <CashFlowPanel />}
-      {tab === "invoices" && <InvoicesPanel />}
     </main>
   );
 }

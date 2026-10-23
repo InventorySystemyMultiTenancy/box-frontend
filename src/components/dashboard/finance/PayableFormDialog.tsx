@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import { PayableInvoiceDialog, type PayableInvoiceDetails, type PayableInvoiceResult } from "@/components/dashboard/finance/PayableInvoiceDialog";
 import type { BankAccount, ExpenseClassifications, Store, Supplier } from "@/lib/types";
 
 // Mesmo layout do "Cadastrar contas a Pagar" que a oficina já usava: cabeçalho com nota,
@@ -69,6 +70,8 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
   const [dup, setDup] = useState(EMPTY_DUPLICATE);
   const [rows, setRows] = useState<DuplicateRow[]>([]);
   const [split, setSplit] = useState({ count: "2", firstDueDate: "" });
+  // "Gerar nota fiscal": detalhes extras da nota cadastrada junto com a conta.
+  const [invoiceDetails, setInvoiceDetails] = useState<PayableInvoiceDetails | null>(null);
 
   const { data: classifications } = useQuery({
     queryKey: ["expense-classifications"],
@@ -114,6 +117,21 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
     setRows([]);
     setPlannedBankAccountId("");
     setSplit({ count: "2", firstDueDate: "" });
+    setInvoiceDetails(null);
+  }
+
+  // Dados do mini formulário de nota preenchem a conta (sem apagar o que já foi digitado).
+  function applyInvoice(result: PayableInvoiceResult) {
+    setHeader((h) => ({
+      ...h,
+      invoiceNumber: result.number,
+      payeeName: result.issuerName || h.payeeName,
+      issueDate: result.issueDate || h.issueDate,
+      totalAmount: result.totalAmount || h.totalAmount,
+      category: h.category || result.operationNature,
+    }));
+    setInvoiceDetails(result.details);
+    toast.success(`Nota ${result.number} preenchida — será cadastrada ao salvar a conta.`);
   }
 
   function handleOpenChange(next: boolean) {
@@ -176,6 +194,8 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
         {
           storeId: header.storeId || undefined,
           invoiceNumber: header.invoiceNumber || undefined,
+          // Só vale com número de nota — é a nota cadastrada junto com a conta.
+          invoiceDetails: header.invoiceNumber.trim() && invoiceDetails ? invoiceDetails : undefined,
           issueDate: header.issueDate ? new Date(`${header.issueDate}T12:00:00`).toISOString() : undefined,
           payeeName: header.payeeName.trim(),
           supplierId: supplier?.id,
@@ -249,6 +269,16 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
               <div className="grid gap-1.5 sm:col-span-3">
                 <Label htmlFor="ap-nf">Nota fiscal</Label>
                 <Input id="ap-nf" value={header.invoiceNumber} onChange={(e) => setH("invoiceNumber", e.target.value)} placeholder="Nº da nota (opcional)" />
+                <PayableInvoiceDialog
+                  initial={{ number: header.invoiceNumber, issuerName: header.payeeName, issueDate: header.issueDate, totalAmount: header.totalAmount }}
+                  onApply={applyInvoice}
+                />
+                {invoiceDetails && header.invoiceNumber.trim() && (
+                  <span className="text-xs text-muted-foreground">
+                    Nota {header.invoiceNumber.trim()}
+                    {invoiceDetails.series ? ` série ${invoiceDetails.series}` : ""} será cadastrada junto.
+                  </span>
+                )}
               </div>
               <div className="grid gap-1.5 sm:col-span-3">
                 <Label htmlFor="ap-issue">Data emissão</Label>

@@ -15,6 +15,7 @@ import { ExportButtons } from "@/components/ui/export-buttons";
 import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDialog";
 import { SettleManyDialog } from "@/components/dashboard/finance/SettleManyDialog";
 import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
+import InvoicesPanel from "@/components/dashboard/finance/InvoicesPanel";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -29,14 +30,20 @@ const STATUS_VARIANTS: Record<PayableStatus, "default" | "secondary" | "outline"
   CANCELLED: "secondary",
 };
 
-type PayableView = "open" | "paid" | "cancelled" | "all";
+type PayableView = "open" | "overdue" | "paid" | "cancelled" | "all";
 
 const VIEW_LABELS: Record<PayableView, string> = {
   open: "A pagar",
+  overdue: "Vencidas",
   paid: "Pagas",
   cancelled: "Canceladas",
   all: "Todas",
 };
+
+// Período (de/até) por qual data da conta — junta com a aba e os demais filtros
+// (ex.: "Pagas" + pagamento em outubro; "Vencidas" + vencimento na semana passada).
+type PeriodField = "dueDate" | "paidAt" | "issueDate";
+const PERIOD_LABELS: Record<PeriodField, string> = { dueDate: "Vencimento", paidAt: "Pagamento", issueDate: "Emissão da nota" };
 
 const brl = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const dateLabel = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : "—");
@@ -47,7 +54,34 @@ const isOpen = (p: AccountPayable) => p.status === "PENDING" || p.status === "OV
 const EMPTY_FILTERS = { issueDate: "", invoiceNumber: "", payeeName: "", documentNumber: "", amount: "", paidDate: "", notes: "" };
 type Filters = typeof EMPTY_FILTERS;
 
+// Aba Contas a pagar com a seção Notas fiscais dentro (lista + "Nova nota fiscal").
 export default function PayablesPanel() {
+  const [section, setSection] = useState<"payables" | "invoices">("payables");
+  return (
+    <div className="grid gap-4">
+      <div className="inline-flex w-fit rounded-md border p-0.5 text-sm">
+        {(
+          [
+            ["payables", "Contas a pagar"],
+            ["invoices", "Notas fiscais"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`rounded px-3 py-1 font-medium ${section === key ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+            onClick={() => setSection(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {section === "payables" ? <PayablesList /> : <InvoicesPanel />}
+    </div>
+  );
+}
+
+function PayablesList() {
   const { token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const canManage = hasPermission("finance", "manage");
@@ -55,6 +89,9 @@ export default function PayablesPanel() {
   const [view, setView] = useState<PayableView>("all");
   // Filtros: emissão da nota, nº da nota, fornecedor, duplicata, valor, data de pagamento e observação.
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [periodField, setPeriodField] = useState<PeriodField>("dueDate");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   // Contas selecionadas para "Marcar como pagas" (só contas em aberto).
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -63,9 +100,12 @@ export default function PayablesPanel() {
   }
 
   // Filtros comuns à lista e aos totais do topo (os totais ignoram só a aba de situação).
-  const filterParams = Object.fromEntries(
-    Object.entries(filters).map(([key, value]) => [key, value.trim() || undefined])
-  ) as Record<keyof Filters, string | undefined>;
+  const filterParams = {
+    ...(Object.fromEntries(Object.entries(filters).map(([key, value]) => [key, value.trim() || undefined])) as Record<keyof Filters, string | undefined>),
+    from: from || undefined,
+    to: to || undefined,
+    dateField: from || to ? periodField : undefined,
+  };
   const hasFilters = Object.values(filterParams).some(Boolean);
   const filterKey = JSON.stringify(filterParams);
 
@@ -79,7 +119,15 @@ export default function PayablesPanel() {
     queryKey: ["payables", view, filterKey],
     queryFn: async () =>
       api.payables(token!, {
-        ...(view === "open" ? { situation: "open" as const } : view === "paid" ? { situation: "paid" as const } : view === "cancelled" ? { status: "CANCELLED" } : {}),
+        ...(view === "open"
+          ? { situation: "open" as const }
+          : view === "paid"
+            ? { situation: "paid" as const }
+            : view === "overdue"
+              ? { status: "OVERDUE" }
+              : view === "cancelled"
+                ? { status: "CANCELLED" }
+                : {}),
         ...filterParams,
         pageSize: 100,
       }),
@@ -201,6 +249,33 @@ export default function PayablesPanel() {
           </button>
         ))}
       </div>
+      {/* Período: de/até pela data escolhida, somado à aba e aos filtros abaixo. */}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid gap-1">
+          <Label className="text-xs text-muted-foreground">Período por</Label>
+          <Select value={periodField} onValueChange={(v) => setPeriodField(v as PeriodField)}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {(Object.keys(PERIOD_LABELS) as PeriodField[]).map((key) => (
+                <SelectItem key={key} value={key}>{PERIOD_LABELS[key]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1">
+          <Label htmlFor="p-period-from" className="text-xs text-muted-foreground">De</Label>
+          <Input id="p-period-from" type="date" className="w-40" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div className="grid gap-1">
+          <Label htmlFor="p-period-to" className="text-xs text-muted-foreground">Até</Label>
+          <Input id="p-period-to" type="date" className="w-40" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        {(from || to) && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); }}>
+            Limpar período
+          </Button>
+        )}
+      </div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-2">
           {filterFields.map((field) => (
@@ -229,7 +304,14 @@ export default function PayablesPanel() {
           <ExportButtons
             title="Contas a pagar"
             filename="contas-a-pagar"
-            subtitle={`${VIEW_LABELS[view]}.${hasFilters ? " Com filtros." : ""}`}
+            subtitle={[
+              `${VIEW_LABELS[view]}.`,
+              (from || to) &&
+                `${PERIOD_LABELS[periodField]}${from ? ` de ${dateLabel(`${from}T12:00:00`)}` : ""}${to ? ` até ${dateLabel(`${to}T12:00:00`)}` : ""}.`,
+              hasFilters && !(from || to) ? "Com filtros." : null,
+            ]
+              .filter(Boolean)
+              .join(" ")}
             rows={data ?? []}
             columns={[
               { header: "Descrição", value: (p) => (p.installmentTotal && p.installmentTotal > 1 ? `${p.description} (${p.installmentNumber}/${p.installmentTotal})` : p.description) },
@@ -299,7 +381,13 @@ export default function PayablesPanel() {
             {!isLoading && (data ?? []).length === 0 && (
               <TableRow>
                 <TableCell colSpan={8} className="text-center text-muted-foreground">
-                  {view === "open" ? "Nenhuma conta a pagar em aberto." : view === "paid" ? "Nenhuma conta paga." : "Nenhuma conta encontrada."}
+                  {view === "open"
+                    ? "Nenhuma conta a pagar em aberto."
+                    : view === "overdue"
+                      ? "Nenhuma conta vencida."
+                      : view === "paid"
+                        ? "Nenhuma conta paga."
+                        : "Nenhuma conta encontrada."}
                 </TableCell>
               </TableRow>
             )}
