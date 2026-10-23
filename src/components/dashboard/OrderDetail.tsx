@@ -17,6 +17,7 @@ import VehicleSchematic from "@/components/dashboard/VehicleSchematic";
 import { ShareLinkDialog } from "@/components/dashboard/ShareLinkDialog";
 import OrderAssigneesPanel from "@/components/dashboard/OrderAssigneesPanel";
 import DamagePhotosPanel from "@/components/dashboard/DamagePhotosPanel";
+import ServicePartsPanel from "@/components/dashboard/ServicePartsPanel";
 import { EditVehicleDialog } from "@/components/dashboard/EditVehicleDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -513,6 +514,26 @@ export default function OrderDetail({
     [token, order]
   );
 
+  // "Peças do serviço": muda o valor de uma peça; o servidor recalcula os totais do problema.
+  const updatePartUsage = useCallback(
+    async (approvalId: string, usageId: string, data: { unitCost: number; quantity: number }) => {
+      if (!token || !order) return;
+      const result = await api.updatePartUsage(order.id, approvalId, usageId, data, token);
+      const approval = result.approval as Approval;
+      const event = result.event as TimelineEvent;
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              approvals: prev.approvals.map((a) => (a.id === approval.id ? approval : a)),
+              timelineEvents: prev.timelineEvents.some((t) => t.id === event.id) ? prev.timelineEvents : [...prev.timelineEvents, event],
+            }
+          : prev
+      );
+    },
+    [token, order]
+  );
+
   const priceProblem = useCallback(
     async (
       approvalId: string,
@@ -959,6 +980,15 @@ export default function OrderDetail({
               onCreatePart={isAdmin ? createInventoryPartRequest : undefined}
               onGeneratePdf={isAdmin ? generateServicePdf : undefined}
             />
+            {isStaff && (
+              <ServicePartsPanel
+                approvals={order.approvals}
+                parts={order.parts}
+                canViewPrices={canViewPrices}
+                canEdit={isAdmin}
+                onUpdateUsage={updatePartUsage}
+              />
+            )}
             {isAdmin && isStaff && canFinalize && canOfferPickup && finalizing && (
               <div className={styles.panel}>
                 <div className={styles.panelHeadRow}>

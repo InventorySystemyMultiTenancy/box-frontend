@@ -281,6 +281,14 @@ export const api = {
       token
     ),
 
+  // "Peças do serviço": valor unitário/quantidade de uma peça de um problema (só neste projeto).
+  updatePartUsage: (orderId: string, approvalId: string, usageId: string, payload: { unitCost: number; quantity?: number }, token: string) =>
+    request<{ approval: unknown; event: unknown }>(
+      `/api/service-orders/${orderId}/parts/problems/${approvalId}/usages/${usageId}`,
+      { method: "PATCH", body: JSON.stringify(payload) },
+      token
+    ),
+
   priceProblem: (
     orderId: string,
     approvalId: string,
