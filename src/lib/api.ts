@@ -975,6 +975,14 @@ export const api = {
   vehicles: (token: string, params: { ownerId?: string } = {}) =>
     request<{ vehicles: unknown[] }>(`/api/vehicles${toQuery(params)}`, {}, token),
 
+  // Veículo que já passou pela oficina (placa normalizada) + dono, cliente e último projeto.
+  vehicleByPlate: (plate: string, token: string) =>
+    request<{ vehicle: ExistingVehicle | null; lastOrder?: { id: string; code: string; status: string; createdAt: string; archivedAt: string | null } | null }>(
+      `/api/vehicles/by-plate/${encodeURIComponent(plate)}`,
+      {},
+      token
+    ),
+
   lookupPlate: (plate: string, token: string) =>
     request<{ status: string; result: unknown }>(`/api/vehicles/plate/${encodeURIComponent(plate)}`, {}, token),
 
@@ -1008,3 +1016,21 @@ function toQuery(params: Record<string, string | number | undefined>) {
 }
 
 export { API_URL };
+
+/** Veículo já cadastrado, achado pela placa no novo projeto. */
+export interface ExistingVehicle {
+  id: string;
+  brand: string;
+  model: string;
+  year: number;
+  plate: string | null;
+  color: string | null;
+  mileage: number;
+  owner: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+    client: { id: string; name: string; phone: string | null } | null;
+  };
+}

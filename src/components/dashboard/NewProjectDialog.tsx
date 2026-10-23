@@ -15,7 +15,7 @@ import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker"
 import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
 import { MAX_DAMAGE_PHOTOS, MAX_DAMAGE_VIDEOS, shareFilesToGallery, splitOversizedVideos, uploadDamageMediaInBatches } from "@/lib/damage-photos";
 import { useAuth } from "@/lib/auth-context";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type ExistingVehicle } from "@/lib/api";
 import type { Client, PlateLookupResult, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
 import { PRIORITY_LABELS, SERVICE_ORDER_PRIORITIES } from "@/lib/types";
 
@@ -74,6 +74,12 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   const [aiResult, setAiResult] = useState<RecognizedVehicleData | null>(null);
   const [includeAiProblems, setIncludeAiProblems] = useState(true);
   const [plateResult, setPlateResult] = useState<PlateLookupResult | null>(null);
+  // Veículo que já passou pela oficina (achado pela placa da foto ou digitada) — o projeto
+  // novo é aberto nele, com o cliente dele, sem cadastrar nada de novo.
+  const [existing, setExisting] = useState<{
+    vehicle: ExistingVehicle;
+    lastOrder: { code: string; status: string; createdAt: string; archivedAt: string | null } | null;
+  } | null>(null);
 
   const [priority, setPriority] = useState<ServiceOrderPriority>("NORMAL");
   const [damagePhotos, setDamagePhotos] = useState<File[]>([]);
@@ -106,6 +112,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     setAiResult(null);
     setIncludeAiProblems(true);
     setPlateResult(null);
+    setExisting(null);
     setPriority("NORMAL");
     setDamagePhotos([]);
     setDamageVideos([]);
@@ -136,6 +143,8 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
       // Placa lida na foto já é consultada no backend — marca/modelo/ano acima vêm de lá.
       // Se a consulta não funcionou (sem token, não achou, erro), segue só com a IA, sem aviso.
       if (data.plateLookup) applyPlateLookup(data.plateLookup);
+      // Já passou pela oficina? Puxa o veículo e o cliente dele.
+      if (data.plate) await checkExistingVehicle(data.plate);
       if (data.visibleProblems.length === 0) {
         toast.info("Veículo identificado — nenhum problema visível encontrado na foto.");
       } else {
@@ -163,11 +172,49 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     }));
   }
 
-  // Placa digitada à mão: consulta ao sair do campo. Silenciosa — se a consulta não
-  // estiver configurada, não achar ou falhar, o formulário só segue como está.
+  /**
+   * Procura o veículo pela placa entre os já atendidos. Achou: avisa "Veículo já cadastrado!"
+   * e pré-seleciona o cliente e o veículo dele. Devolve true se achou.
+   */
+  async function checkExistingVehicle(rawPlate: string) {
+    const plate = rawPlate.replace(/[^a-z0-9]/gi, "").toUpperCase();
+    if (!token || !PLATE_PATTERN.test(plate)) return false;
+    if (existing && existing.vehicle.plate?.replace(/[^a-z0-9]/gi, "").toUpperCase() === plate) return true;
+    try {
+      const { vehicle, lastOrder } = await api.vehicleByPlate(plate, token);
+      if (!vehicle) return false;
+      setExisting({ vehicle, lastOrder: lastOrder ?? null });
+      const client = vehicle.owner.client;
+      if (client) {
+        setClientMode("existing");
+        setClientSearch(client.name);
+        setSelectedClientId(client.id);
+      }
+      setVehicleMode("existing");
+      setSelectedVehicleId(vehicle.id);
+      toast.success(`Veículo já cadastrado! ${vehicle.brand} ${vehicle.model} de ${vehicle.owner.name}.`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function clearExistingVehicle() {
+    setExisting(null);
+    setClientMode("existing");
+    setSelectedClientId("");
+    setClientSearch("");
+    setVehicleMode("new");
+    setSelectedVehicleId("");
+  }
+
+  // Placa digitada à mão: ao sair do campo, primeiro vê se o veículo já foi atendido; senão,
+  // consulta a placa (silenciosa — sem configuração, sem achar ou com erro, segue como está).
   async function handlePlateBlur() {
     const plate = newVehicle.plate.replace(/[^a-z0-9]/gi, "").toUpperCase();
-    if (!token || !PLATE_PATTERN.test(plate) || plateResult?.plate === plate) return;
+    if (!token || !PLATE_PATTERN.test(plate)) return;
+    if (await checkExistingVehicle(plate)) return;
+    if (plateResult?.plate === plate) return;
     try {
       const { status, result } = await api.lookupPlate(plate, token);
       if (status === "FOUND" && result) applyPlateLookup(result as PlateLookupResult);
@@ -178,6 +225,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
 
   async function handleCreate() {
     if (!token) return;
+    if (existing) return createProject(existing.vehicle.id);
     if (clientMode === "existing" && !selectedClientId) {
       toast.error("Selecione um cliente.");
       return;
@@ -233,6 +281,18 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
         vehicleId = (vehicle as Vehicle).id;
       }
 
+      await createProject(vehicleId, true);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Não foi possível criar o projeto.");
+      setCreating(false);
+    }
+  }
+
+  /** Cria o projeto no veículo (novo ou já cadastrado) e envia checklist, assinatura e problemas da IA. */
+  async function createProject(vehicleId: string, alreadyCreating = false) {
+    if (!token) return;
+    if (!alreadyCreating) setCreating(true);
+    try {
       const { order } = await api.createServiceOrder({ vehicleId, priority }, token);
       const orderId = (order as { id: string }).id;
 
@@ -294,6 +354,33 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
         </DialogHeader>
 
         <div className="grid gap-5">
+          {existing ? (
+            <section className="grid gap-2 rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm dark:border-emerald-800 dark:bg-emerald-950/40">
+              <strong className="text-emerald-700 dark:text-emerald-300">Veículo já cadastrado!</strong>
+              <div>
+                {existing.vehicle.brand} {existing.vehicle.model} {existing.vehicle.year}
+                {existing.vehicle.plate ? ` · ${existing.vehicle.plate}` : ""}
+                {existing.vehicle.color ? ` · ${existing.vehicle.color}` : ""} · {existing.vehicle.mileage.toLocaleString("pt-BR")} km
+              </div>
+              <div className="text-muted-foreground">
+                Cliente: {existing.vehicle.owner.client?.name ?? existing.vehicle.owner.name}
+                {existing.vehicle.owner.client?.phone || existing.vehicle.owner.phone ? ` · ${existing.vehicle.owner.client?.phone ?? existing.vehicle.owner.phone}` : ""}
+              </div>
+              {existing.lastOrder && (
+                <div className="text-muted-foreground">
+                  Último projeto: {existing.lastOrder.code} ({new Date(existing.lastOrder.createdAt).toLocaleDateString("pt-BR")})
+                  {!existing.lastOrder.archivedAt && !["FINISHED", "READY_FOR_PICKUP"].includes(existing.lastOrder.status) && (
+                    <span className="block font-medium text-amber-700 dark:text-amber-300">Atenção: este veículo já tem um projeto em andamento.</span>
+                  )}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">O novo projeto será aberto neste veículo, com este cliente. Para corrigir dados, use &quot;Editar veículo&quot; dentro do projeto.</p>
+              <Button type="button" variant="outline" size="sm" className="w-fit" onClick={clearExistingVehicle}>
+                Não é este veículo
+              </Button>
+            </section>
+          ) : (
+            <>
           {/* Cliente */}
           <section className="grid gap-2">
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Cliente</Label>
@@ -425,6 +512,9 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
             )}
           </section>
 
+            </>
+          )}
+
           {/* Prioridade */}
           <section className="grid gap-2">
             <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prioridade</Label>
@@ -450,7 +540,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                 const files = selected.slice(0, MAX_DAMAGE_PHOTOS - damagePhotos.length);
                 setDamagePhotos((prev) => [...prev, ...files].slice(0, MAX_DAMAGE_PHOTOS));
                 // Cópia no aparelho, para anexar também no portal da Localiza.
-                const vehiclePlate = vehicleMode === "new" ? newVehicle.plate : clientVehicles?.find((v) => v.id === selectedVehicleId)?.plate;
+                const vehiclePlate = existing?.vehicle.plate ?? (vehicleMode === "new" ? newVehicle.plate : clientVehicles?.find((v) => v.id === selectedVehicleId)?.plate);
                 const plate = vehiclePlate?.replace(/[^a-z0-9]/gi, "").toUpperCase();
                 saveFilesToDevice(files, `avaria-${plate || new Date().toISOString().slice(0, 10)}`, damagePhotos.length);
               }}
@@ -485,7 +575,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                 if (tooBig > 0) toast.error(`${tooBig} vídeo(s) acima de 100 MB foram ignorados — grave um vídeo mais curto.`);
                 const files = ok.slice(0, MAX_DAMAGE_VIDEOS - damageVideos.length);
                 setDamageVideos((prev) => [...prev, ...files].slice(0, MAX_DAMAGE_VIDEOS));
-                const vehiclePlate = vehicleMode === "new" ? newVehicle.plate : clientVehicles?.find((v) => v.id === selectedVehicleId)?.plate;
+                const vehiclePlate = existing?.vehicle.plate ?? (vehicleMode === "new" ? newVehicle.plate : clientVehicles?.find((v) => v.id === selectedVehicleId)?.plate);
                 const plate = vehiclePlate?.replace(/[^a-z0-9]/gi, "").toUpperCase();
                 saveFilesToDevice(files, `avaria-${plate || new Date().toISOString().slice(0, 10)}-video`, damageVideos.length);
               }}
