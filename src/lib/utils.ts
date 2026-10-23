@@ -7,7 +7,9 @@ export function cn(...inputs: ClassValue[]) {
 
 // Busca simples client-side: normaliza (minúsculas, sem acento) e checa se algum dos
 // campos contém o termo — usado nas abas de Caminhões (lista, movimentações,
-// abastecimentos) para filtrar por placa, nome do caminhão, motorista ou data.
+// abastecimentos) e na lista de projetos, para filtrar por placa, nome, motorista ou data.
+// Também compara só letras e números: placa "ABC-1234" é achada digitando "abc1234" (e o
+// contrário) — ninguém digita o traço.
 export function matchesSearch(query: string, fields: (string | null | undefined)[]): boolean {
   const q = query.trim();
   if (!q) return true;
@@ -16,8 +18,10 @@ export function matchesSearch(query: string, fields: (string | null | undefined)
       .normalize("NFD")
       .replace(/\p{Diacritic}/gu, "")
       .toLowerCase();
+  const compact = (s: string) => normalize(s).replace(/[^a-z0-9]/g, "");
   const nq = normalize(q);
-  return fields.some((f) => f && normalize(f).includes(nq));
+  const cq = compact(q);
+  return fields.some((f) => f && (normalize(f).includes(nq) || (cq.length > 0 && compact(f).includes(cq))));
 }
 
 // Cliente cadastrado sem e-mail no novo projeto ganha um e-mail técnico neste domínio

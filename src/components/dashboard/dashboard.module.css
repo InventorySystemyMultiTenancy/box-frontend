@@ -150,6 +150,12 @@
   color: var(--shell-text-muted);
   flex-shrink: 0;
 }
+/* Celular bem estreito (iPhone SE, Androids de 320px): topo mais compacto pra caber. */
+@media (max-width: 360px) {
+  .topbar { gap: 0.5rem; padding-left: 0.75rem; padding-right: 0.75rem; }
+  .topbarRight { gap: 0.3rem; }
+  .brandLogo { height: 36px; }
+}
 /* Busca global embutida no header — ícone + campo de texto, encolhe para só o
    ícone no celular (o resultado ainda abre em /dashboard/busca ao tocar). */
 .headerSearch {
@@ -631,7 +637,9 @@
   flex: 1.1;
 }
 @media (max-width: 860px) {
-  .masonry { flex-direction: column; }
+  /* Em coluna, "flex-start" deixava cada coluna da largura do conteúdo mais largo (tabela
+     de peças, fileira de botões) — passava da tela e o que sobrava ficava cortado. */
+  .masonry { flex-direction: column; align-items: stretch; }
 }
 
 .panel {
@@ -651,6 +659,11 @@
 }
 .panel + .panel {
   margin-top: 1.6rem;
+}
+
+/* Seletor de arquivo nativo tem largura mínima própria — no celular passava da borda. */
+.panel input[type="file"] {
+  max-width: 100%;
 }
 
 .formGrid {
@@ -899,6 +912,7 @@
 }
 .approvalActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.6rem;
   margin-top: 0.9rem;
 }
@@ -1048,6 +1062,7 @@
 
 .partPanelHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.6rem;

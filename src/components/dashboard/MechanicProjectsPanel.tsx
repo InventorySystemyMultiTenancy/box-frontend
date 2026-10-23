@@ -329,6 +329,7 @@ export default function MechanicProjectsPanel() {
                 <div className={styles.orderRowInfo}>
                   <strong>
                     {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
+                    {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""}
                   </strong>
                   <span>{order.code}</span>
                 </div>

@@ -68,10 +68,78 @@ export default function ServicePartsPanel({
     }
   }
 
+  // Campos de edição — os mesmos na tabela (computador) e nos cartões (celular).
+  const editFields = (approvalId: string, usageId: string) => (
+    <div className="flex flex-wrap items-end gap-2">
+      <label className="grid gap-1 text-xs text-muted-foreground">
+        Qtd
+        <input
+          type="number"
+          min="1"
+          inputMode="numeric"
+          className="h-9 w-16 rounded-md border bg-background px-2 text-base text-foreground sm:h-8 sm:text-sm"
+          value={quantity}
+          onChange={(e) => setQuantity(e.target.value)}
+        />
+      </label>
+      <label className="grid gap-1 text-xs text-muted-foreground">
+        Valor unit.
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          className="h-9 w-28 rounded-md border bg-background px-2 text-base text-foreground sm:h-8 sm:text-sm"
+          autoFocus
+          value={unitCost}
+          onChange={(e) => setUnitCost(e.target.value)}
+        />
+      </label>
+      <span className="pb-2 text-sm text-muted-foreground">= {brl((Number(unitCost) || 0) * (Math.floor(Number(quantity)) || 0))}</span>
+      <div className="flex gap-2">
+        <button type="button" className={styles.btnApprove} disabled={busy} onClick={() => save(approvalId, usageId)}>
+          {busy ? "Salvando..." : "Salvar"}
+        </button>
+        <button type="button" className={styles.btnReject} disabled={busy} onClick={() => setEditing(null)}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className={styles.panel}>
       <h2>Peças do serviço</h2>
-      <div className="min-w-0 overflow-x-auto">
+      {/* Celular: um cartão por peça (a tabela não cabia e escondia o Subtotal/Editar). */}
+      <div className="grid gap-2 sm:hidden">
+        {rows.map(({ approval, usage, problem }) => (
+          <div key={usage.id} className="rounded-md border p-2.5 text-sm">
+            <div className="font-medium break-words">{usage.inventoryPart.name}</div>
+            <div className="text-xs text-muted-foreground break-words">{problem ?? approval.title}</div>
+            {editing === usage.id ? (
+              <div className="mt-2">{editFields(approval.id, usage.id)}</div>
+            ) : (
+              <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {usage.quantity}x
+                  {canViewPrices && (
+                    <>
+                      {" "}
+                      {brl(usage.unitCostSnapshot ?? 0)} = <strong>{brl((usage.unitCostSnapshot ?? 0) * usage.quantity)}</strong>
+                    </>
+                  )}
+                </span>
+                {canEdit && (
+                  <button type="button" className={styles.actionButton} onClick={() => startEdit(usage)}>
+                    Editar
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="hidden min-w-0 overflow-x-auto sm:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b text-left text-xs text-muted-foreground">
@@ -88,37 +156,8 @@ export default function ServicePartsPanel({
               editing === usage.id ? (
                 <tr key={usage.id} className="border-b last:border-0">
                   <td className="py-1.5 pr-2 font-medium">{usage.inventoryPart.name}</td>
-                  <td className="py-1.5 pr-2 text-muted-foreground">{problem ?? approval.title}</td>
-                  <td className="py-1.5 pr-2">
-                    <input
-                      type="number"
-                      min="1"
-                      className="h-8 w-16 rounded-md border bg-background px-2"
-                      aria-label="Quantidade"
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                    />
-                  </td>
-                  <td className="py-1.5 pr-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      className="h-8 w-24 rounded-md border bg-background px-2"
-                      aria-label="Valor unitário"
-                      autoFocus
-                      value={unitCost}
-                      onChange={(e) => setUnitCost(e.target.value)}
-                    />
-                  </td>
-                  <td className="py-1.5 pr-2 text-muted-foreground">{brl((Number(unitCost) || 0) * (Math.floor(Number(quantity)) || 0))}</td>
-                  <td className="py-1.5 text-right whitespace-nowrap">
-                    <button type="button" className={styles.btnApprove} disabled={busy} onClick={() => save(approval.id, usage.id)}>
-                      {busy ? "Salvando..." : "Salvar"}
-                    </button>{" "}
-                    <button type="button" className={styles.btnReject} disabled={busy} onClick={() => setEditing(null)}>
-                      Cancelar
-                    </button>
+                  <td className="py-1.5" colSpan={canEdit ? 5 : 4}>
+                    {editFields(approval.id, usage.id)}
                   </td>
                 </tr>
               ) : (
