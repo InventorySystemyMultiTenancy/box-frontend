@@ -32,6 +32,11 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
   const [reportFrom, setReportFrom] = useState(firstDayOfMonth());
   const [reportTo, setReportTo] = useState(new Date().toISOString().slice(0, 10));
   const [generatingReport, setGeneratingReport] = useState(false);
+  // Admin vê os gastos lançados por todo mundo; pode filtrar só os próprios.
+  const isAdmin = user?.role === "ADMIN";
+  const [onlyMine, setOnlyMine] = useState(false);
+  const scope = isAdmin && onlyMine ? ("mine" as const) : undefined;
+  const showAuthor = isAdmin && !onlyMine;
 
   useEffect(() => {
     if (!token) return;
@@ -42,7 +47,7 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
     if (!token) return;
     setGeneratingReport(true);
     try {
-      const { entries, total } = await api.myExpenses(token, { from: reportFrom, to: reportTo });
+      const { entries, total } = await api.myExpenses(token, { from: reportFrom, to: reportTo, scope });
       const rows = (entries as FinancialEntry[])
         .map(
           (entry) => `
@@ -50,6 +55,7 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
               <td>${new Date(entry.occurredAt).toLocaleDateString("pt-BR")}</td>
               <td>${escapeHtml(entry.description)}</td>
               <td>${escapeHtml(entry.category)}</td>
+              ${showAuthor ? `<td>${escapeHtml(entry.createdBy?.name ?? "—")}</td>` : ""}
               <td>${formatCurrencyBRL(entry.amount)}</td>
             </tr>
           `
@@ -60,12 +66,12 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
         `
           <h1>Relatório de gastos</h1>
           <div class="muted">
-            ${escapeHtml(user?.name ?? "")} · Período: ${new Date(reportFrom).toLocaleDateString("pt-BR")} a ${new Date(reportTo).toLocaleDateString("pt-BR")}
+            ${showAuthor ? "Todos os funcionários" : escapeHtml(user?.name ?? "")} · Período: ${new Date(reportFrom).toLocaleDateString("pt-BR")} a ${new Date(reportTo).toLocaleDateString("pt-BR")}
             · Gerado em ${new Date().toLocaleString("pt-BR")}
           </div>
           <table>
-            <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Valor</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="4">Nenhum gasto lançado no período.</td></tr>'}</tbody>
+            <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th>${showAuthor ? "<th>Lançado por</th>" : ""}<th>Valor</th></tr></thead>
+            <tbody>${rows || `<tr><td colspan="${showAuthor ? 5 : 4}">Nenhum gasto lançado no período.</td></tr>`}</tbody>
           </table>
           <div class="total">Total do período: ${formatCurrencyBRL(total)}</div>
         `
@@ -172,6 +178,25 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
 
       <div className={styles.panel}>
         <h2>Gastos lançados no período</h2>
+        {isAdmin && (
+          <div className="mb-3 inline-flex w-fit rounded-md border p-0.5 text-sm">
+            {(
+              [
+                [false, "Todos os funcionários"],
+                [true, "Só os meus"],
+              ] as const
+            ).map(([mine, label]) => (
+              <button
+                key={label}
+                type="button"
+                className={`rounded px-3 py-1 ${onlyMine === mine ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+                onClick={() => setOnlyMine(mine)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className={styles.formGrid}>
           <label>
             De
@@ -187,7 +212,7 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
             {generatingReport ? "Gerando..." : "Gerar PDF do período"}
           </button>
         </div>
-        <MyExpensesList from={reportFrom} to={reportTo} categories={categories} />
+        <MyExpensesList from={reportFrom} to={reportTo} categories={categories} scope={scope} showAuthor={showAuthor} />
       </div>
     </div>
   );
@@ -195,7 +220,19 @@ export default function GastosPanel({ backTo }: { backTo?: { href: string; label
 
 // Lista dos gastos que o próprio usuário lançou no período, com editar/excluir — o servidor
 // só deixa mexer nos próprios (admin mexe em qualquer um) e nunca em lançamento automático.
-function MyExpensesList({ from, to, categories }: { from: string; to: string; categories: string[] }) {
+function MyExpensesList({
+  from,
+  to,
+  categories,
+  scope,
+  showAuthor,
+}: {
+  from: string;
+  to: string;
+  categories: string[];
+  scope?: "mine";
+  showAuthor: boolean;
+}) {
   const { token } = useAuth();
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -203,9 +240,9 @@ function MyExpensesList({ from, to, categories }: { from: string; to: string; ca
   const [savingId, setSavingId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["my-expenses", from, to],
+    queryKey: ["my-expenses", from, to, scope ?? "all"],
     queryFn: async () => {
-      const res = await api.myExpenses(token!, { from, to });
+      const res = await api.myExpenses(token!, { from, to, scope });
       return { entries: res.entries as FinancialEntry[], total: res.total };
     },
     enabled: !!token && !!from && !!to,
@@ -272,7 +309,9 @@ function MyExpensesList({ from, to, categories }: { from: string; to: string; ca
   return (
     <ScrollX style={{ marginTop: "1rem" }}>
       {isLoading && <p className={styles.tlSub}>Carregando...</p>}
-      {!isLoading && entries.length === 0 && <p className={styles.tlSub}>Nenhum gasto lançado por você no período.</p>}
+      {!isLoading && entries.length === 0 && (
+        <p className={styles.tlSub}>{showAuthor ? "Nenhum gasto lançado no período." : "Nenhum gasto lançado por você no período."}</p>
+      )}
       {entries.length > 0 && (
         <table className={styles.usersTable}>
           <thead>
@@ -280,6 +319,7 @@ function MyExpensesList({ from, to, categories }: { from: string; to: string; ca
               <th>Data</th>
               <th>Categoria</th>
               <th>Descrição</th>
+              {showAuthor && <th>Lançado por</th>}
               <th>Valor</th>
               <th style={{ width: 150 }} />
             </tr>
@@ -302,6 +342,7 @@ function MyExpensesList({ from, to, categories }: { from: string; to: string; ca
                   <td>
                     <input value={edit.description} onChange={(e) => setEdit((p) => ({ ...p, description: e.target.value }))} />
                   </td>
+                  {showAuthor && <td>{entry.createdBy?.name ?? "—"}</td>}
                   <td>
                     <input type="number" min="0" step="0.01" value={edit.amount} onChange={(e) => setEdit((p) => ({ ...p, amount: e.target.value }))} style={{ width: 110 }} />
                   </td>
@@ -319,6 +360,7 @@ function MyExpensesList({ from, to, categories }: { from: string; to: string; ca
                   <td>{new Date(entry.occurredAt).toLocaleDateString("pt-BR")}</td>
                   <td>{entry.category}</td>
                   <td>{entry.description}</td>
+                  {showAuthor && <td>{entry.createdBy?.name ?? "—"}</td>}
                   <td>{formatCurrencyBRL(entry.amount)}</td>
                   <td>
                     <button type="button" className={styles.linkButton} onClick={() => startEdit(entry)} aria-label="Editar gasto">
@@ -341,7 +383,7 @@ function MyExpensesList({ from, to, categories }: { from: string; to: string; ca
           </tbody>
           <tfoot>
             <tr>
-              <th colSpan={3}>Total do período</th>
+              <th colSpan={showAuthor ? 4 : 3}>Total do período</th>
               <th>{formatCurrencyBRL(data?.total ?? 0)}</th>
               <th />
             </tr>

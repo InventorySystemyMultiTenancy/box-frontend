@@ -358,7 +358,8 @@ export const api = {
   deleteExpense: (id: string, token: string) =>
     request<void>(`/api/finance/expenses/${id}`, { method: "DELETE" }, token),
 
-  myExpenses: (token: string, params: { from?: string; to?: string } = {}) =>
+  // Admin: gastos de todo mundo (scope "mine" = só os dele). Funcionário: sempre os seus.
+  myExpenses: (token: string, params: { from?: string; to?: string; scope?: "mine" } = {}) =>
     request<{ entries: unknown[]; total: number }>(`/api/finance/my-expenses${toQuery(params)}`, {}, token),
 
   updateFinancialEntry: (id: string, payload: Record<string, unknown>, token: string) =>
