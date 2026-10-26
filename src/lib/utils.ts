@@ -5,15 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// Categorias sugeridas para o grupo de despesa escolhido (plano de contas). Grupo sem
-// categorias cadastradas (ou nenhum grupo) → todas as categorias.
+// Categorias sugeridas para o grupo de despesa escolhido (plano de contas): com grupo, só
+// as categorias dele; sem grupo → todas as categorias.
 export function categoriesForGroup(
   classifications: { categories: string[]; groupCategories?: { group: string; name: string }[] } | undefined,
   group: string
 ): string[] {
   const g = group.trim().toLowerCase();
-  const ofGroup = g ? (classifications?.groupCategories ?? []).filter((c) => c.group.toLowerCase() === g).map((c) => c.name) : [];
-  return ofGroup.length > 0 ? [...new Set(ofGroup)] : classifications?.categories ?? [];
+  if (!g) return classifications?.categories ?? [];
+  return [...new Set((classifications?.groupCategories ?? []).filter((c) => c.group.toLowerCase() === g).map((c) => c.name))];
 }
 
 // Busca simples client-side (Caminhões — lista, movimentações, abastecimentos — e lista de

@@ -299,7 +299,13 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
 
               <div className="grid gap-1.5 sm:col-span-3">
                 <Label htmlFor="ap-group">Grupo despesa</Label>
-                <SuggestInput id="ap-group" options={classifications?.groups ?? []} value={header.expenseGroup} onChange={(e) => setH("expenseGroup", e.target.value)} placeholder="Ex.: FOLHA DE PAGAMENTO" />
+                <SuggestInput id="ap-group" options={classifications?.groups ?? []} value={header.expenseGroup} onChange={(e) => {
+                    const group = e.target.value;
+                    setH("expenseGroup", group);
+                    // Trocou de grupo: categoria que não é do grupo novo sai do campo.
+                    const options = categoriesForGroup(classifications, group);
+                    if (group.trim() && header.category && !options.some((c) => c.toLowerCase() === header.category.trim().toLowerCase())) setH("category", "");
+                  }} placeholder="Ex.: FOLHA DE PAGAMENTO" />
               </div>
               <div className="grid gap-1.5 sm:col-span-3">
                 <Label htmlFor="ap-desc">Descr. despesa</Label>
