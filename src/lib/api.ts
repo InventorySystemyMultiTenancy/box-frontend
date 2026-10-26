@@ -20,6 +20,12 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     },
   });
 
+  // Sessão deslizante: o servidor manda um token novo enquanto a pessoa usa o sistema.
+  const renewed = res.headers.get("X-Renewed-Token");
+  if (renewed && token && typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(TOKEN_RENEWED_EVENT, { detail: renewed }));
+  }
+
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     // Token vencido/conta desativada no meio do uso: avisa o AuthProvider, que limpa a
@@ -33,6 +39,8 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
 }
 
 export const AUTH_EXPIRED_EVENT = "box:auth-expired";
+// Token renovado pelo servidor (cabeçalho X-Renewed-Token) — o AuthProvider troca o token.
+export const TOKEN_RENEWED_EVENT = "box:token-renewed";
 // Disparado ao marcar alerta como lido — o contador do sininho (dashboard/layout) recarrega.
 export const ALERTS_CHANGED_EVENT = "box:alerts-changed";
 
@@ -180,12 +188,17 @@ export const api = {
       estimatedValue?: string;
       laborValue?: string;
       partUsages?: { inventoryPartId: string; quantity: number }[];
+      // Freio/pneu/suspensão: eixo e lado (posição da bolinha no modelo do veículo).
+      axle?: string;
+      side?: string;
       files: File[];
     },
     token: string
   ) => {
     const form = new FormData();
     form.append("key", payload.key);
+    if (payload.axle) form.append("axle", payload.axle);
+    if (payload.side) form.append("side", payload.side);
     form.append("name", payload.name);
     form.append("description", payload.description);
     if (payload.wearLevel) form.append("wearLevel", payload.wearLevel);

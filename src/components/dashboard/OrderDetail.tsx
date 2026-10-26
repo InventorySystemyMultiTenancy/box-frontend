@@ -8,6 +8,7 @@ import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, BankAccount, InventoryPart, PA
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { FINISHED_ORDER_WHATSAPP, finishedOrderMessage, statusUpdateMessage } from "@/lib/whatsapp-messages";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import { printHtml } from "@/lib/printable-report";
 import { POSITION_REQUIRED_PARTS, positionText as formatPosition } from "@/lib/part-position";
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { toast } from "sonner";
@@ -94,13 +95,13 @@ export default function OrderDetail({
     description: "",
     wearLevel: "",
     laborValue: "",
-    inventoryPartId: "",
-    quantity: "1",
     axle: "dianteiro",
     side: "esquerdo",
     files: [] as File[],
   });
   const [priceForm, setPriceForm] = useState({ laborValue: "", inventoryPartId: "", quantity: "1" });
+  // Peças do problema novo — várias de uma vez, cada uma com quantidade (removíveis).
+  const [problemUsages, setProblemUsages] = useState([{ inventoryPartId: "", quantity: "1" }]);
   const [inventoryParts, setInventoryParts] = useState<InventoryPart[]>([]);
   const [newPartOpen, setNewPartOpen] = useState(false);
   const [newPartForm, setNewPartForm] = useState({ name: "", unitCost: "" });
@@ -256,9 +257,10 @@ export default function OrderDetail({
           ...problemForm,
           name: displayName,
           description,
-          partUsages: problemForm.inventoryPartId
-            ? [{ inventoryPartId: problemForm.inventoryPartId, quantity: Number(problemForm.quantity) || 1 }]
-            : [],
+          ...(requiresPosition ? { axle: problemForm.axle, side: problemForm.side } : {}),
+          partUsages: problemUsages
+            .filter((u) => u.inventoryPartId)
+            .map((u) => ({ inventoryPartId: u.inventoryPartId, quantity: Math.max(1, Math.floor(Number(u.quantity) || 1)) })),
         },
         token
       );
@@ -279,7 +281,8 @@ export default function OrderDetail({
         };
       });
       setJustArrivedId(event.id);
-      setProblemForm((prev) => ({ ...prev, description: "", wearLevel: "", laborValue: "", inventoryPartId: "", quantity: "1", files: [] }));
+      setProblemForm((prev) => ({ ...prev, description: "", wearLevel: "", laborValue: "", files: [] }));
+      setProblemUsages([{ inventoryPartId: "", quantity: "1" }]);
       setProblemMessage("Problema identificado cadastrado.");
     } catch {
       setProblemMessage("Não foi possível cadastrar o problema.");
@@ -309,7 +312,12 @@ export default function OrderDetail({
     setNewPartError(null);
     try {
       const part = await createInventoryPartRequest(newPartForm);
-      setProblemForm((prev) => ({ ...prev, inventoryPartId: part.id }));
+      // Peça recém-cadastrada entra na lista (na linha vazia, se houver).
+      setProblemUsages((prev) => {
+        const empty = prev.findIndex((u) => !u.inventoryPartId);
+        if (empty >= 0) return prev.map((u, i) => (i === empty ? { ...u, inventoryPartId: part.id } : u));
+        return [...prev, { inventoryPartId: part.id, quantity: "1" }];
+      });
       setNewPartForm({ name: "", unitCost: "" });
       setNewPartOpen(false);
     } catch {
@@ -615,10 +623,8 @@ export default function OrderDetail({
       .join("");
     const printedAt = new Date().toLocaleString("pt-BR");
     const vehicle = `${order.vehicle.brand} ${order.vehicle.model} ${order.vehicle.year}`;
-    const popup = window.open("", "_blank", "width=960,height=720");
-    if (!popup) return;
-
-    popup.document.write(`
+    // Na mesma aba (diálogo de impressão / salvar como PDF) — ver printHtml.
+    printHtml(`
       <!doctype html>
       <html lang="pt-BR">
         <head>
@@ -687,19 +693,6 @@ export default function OrderDetail({
         </body>
       </html>
     `);
-    popup.document.close();
-    // Espera a logo carregar antes de imprimir — chamar print() logo em seguida (sem
-    // esperar) tira a imagem do PDF na maioria das vezes, já que ela ainda não terminou
-    // de carregar. Timeout como rede de segurança caso o load nunca dispare.
-    let printed = false;
-    const doPrint = () => {
-      if (printed) return;
-      printed = true;
-      popup.focus();
-      popup.print();
-    };
-    popup.onload = doPrint;
-    setTimeout(doPrint, 1200);
   }
 
   async function pricePendingProblem(e: React.FormEvent) {
@@ -1222,20 +1215,57 @@ export default function OrderDetail({
                         onChange={(e) => setProblemForm((prev) => ({ ...prev, laborValue: e.target.value }))}
                       />
                     </label>
-                    <label>
-                      Peça utilizada
-                      <select
-                        value={problemForm.inventoryPartId}
-                        onChange={(e) => setProblemForm((prev) => ({ ...prev, inventoryPartId: e.target.value }))}
+                    {/* Várias peças no mesmo problema — cada linha com quantidade e "×" para tirar. */}
+                    <div className={styles.fullField} style={{ display: "grid", gap: "0.5rem" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)" }}>
+                        Peças utilizadas
+                      </span>
+                      {problemUsages.map((usage, index) => (
+                        <div key={index} style={{ display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" }}>
+                          <select
+                            aria-label={`Peça ${index + 1}`}
+                            style={{ flex: "1 1 12rem", minWidth: 0 }}
+                            value={usage.inventoryPartId}
+                            onChange={(e) =>
+                              setProblemUsages((prev) => prev.map((u, i) => (i === index ? { ...u, inventoryPartId: e.target.value } : u)))
+                            }
+                          >
+                            <option value="">Nenhuma peça</option>
+                            {inventoryParts.filter((part) => part.active).map((part) => (
+                              <option key={part.id} value={part.id}>
+                                {part.name} · R$ {part.unitCost.toFixed(2)}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="number"
+                            min="1"
+                            aria-label={`Quantidade da peça ${index + 1}`}
+                            style={{ width: "4.5rem" }}
+                            value={usage.quantity}
+                            onChange={(e) => setProblemUsages((prev) => prev.map((u, i) => (i === index ? { ...u, quantity: e.target.value } : u)))}
+                          />
+                          <button
+                            type="button"
+                            className={styles.btnReject}
+                            aria-label={`Remover peça ${index + 1}`}
+                            onClick={() =>
+                              setProblemUsages((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== index) : [{ inventoryPartId: "", quantity: "1" }]))
+                            }
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        className={styles.linkButton}
+                        style={{ justifySelf: "start" }}
+                        onClick={() => setProblemUsages((prev) => [...prev, { inventoryPartId: "", quantity: "1" }])}
                       >
-                        <option value="">Nenhuma peça</option>
-                        {inventoryParts.filter((part) => part.active).map((part) => (
-                          <option key={part.id} value={part.id}>
-                            {part.name} · R$ {part.unitCost.toFixed(2)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        + Adicionar outra peça
+                      </button>
+                    </div>
                     <button
                       type="button"
                       className={styles.linkButton}
@@ -1276,15 +1306,6 @@ export default function OrderDetail({
                         </button>
                       </div>
                     )}
-                    <label>
-                      Quantidade
-                      <input
-                        type="number"
-                        min="1"
-                        value={problemForm.quantity}
-                        onChange={(e) => setProblemForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                      />
-                    </label>
                   </>
                 )}
                 <label className={styles.fullField}>

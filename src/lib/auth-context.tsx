@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { api, AUTH_EXPIRED_EVENT } from "@/lib/api";
+import { api, AUTH_EXPIRED_EVENT, TOKEN_RENEWED_EVENT } from "@/lib/api";
 import { FULL_ACCESS, ReportAccess } from "@/lib/access";
 
 interface AuthUser {
@@ -47,8 +47,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(() => readStoredToken() !== null);
   const router = useRouter();
 
+  // Troca de token por renovação (sessão deslizante) não precisa recarregar o usuário.
+  const renewingRef = useRef(false);
+
   useEffect(() => {
     if (!token) return;
+    if (renewingRef.current) {
+      renewingRef.current = false;
+      return;
+    }
     Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [] as string[], allowedTabs: [] as string[], reportAccess: FULL_ACCESS }))])
       .then(([{ user }, { permissions, allowedTabs, reportAccess }]) => {
         setUser(user as AuthUser);
@@ -79,6 +86,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
   }, [router]);
+
+  // Token renovado pelo servidor enquanto a pessoa usa o sistema: guarda e passa a usar.
+  useEffect(() => {
+    function onRenewed(event: Event) {
+      const next = (event as CustomEvent<string>).detail;
+      if (!next || !window.localStorage.getItem(STORAGE_KEY)) return;
+      window.localStorage.setItem(STORAGE_KEY, next);
+      renewingRef.current = true;
+      setToken(next);
+    }
+    window.addEventListener(TOKEN_RENEWED_EVENT, onRenewed);
+    return () => window.removeEventListener(TOKEN_RENEWED_EVENT, onRenewed);
+  }, []);
 
   const hasPermission = useCallback(
     (resource: string, action: string) => permissions.has(`${resource}.${action}`),

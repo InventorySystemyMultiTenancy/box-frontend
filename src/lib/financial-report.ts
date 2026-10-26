@@ -28,8 +28,7 @@ function totalsTable(title: string, rows: { name: string; total: number }[], lab
 const paidValue = (p: AccountPayable) => p.paidAmount ?? p.amount;
 const receivedValue = (r: AccountReceivable) => r.receivedAmount ?? r.amount;
 
-/** `popup`: janela aberta já no clique (openReportWindow) — evita o bloqueio de pop-up. */
-export async function generateFinancialReportPdf(token: string, from: string, to: string, popup: Window | null) {
+export async function generateFinancialReportPdf(token: string, from: string, to: string) {
   // Já vem recortado pelo cargo: com setores restritos, só as despesas desses setores.
   const { report } = await api.financialReport(token, { from, to });
   const { cashFlow, dre, openPayables, openReceivables, restrictedSectors } = report;
@@ -128,5 +127,5 @@ export async function generateFinancialReportPdf(token: string, from: string, to
 
     <div class="total">Resultado líquido do período: ${formatCurrencyBRL(dre.netResult)}</div>
   `;
-  openPrintableReport(restricted ? `Despesas ${restrictedSectors!.join(", ")} ${period}` : `Relatório financeiro ${period}`, body, popup);
+  openPrintableReport(restricted ? `Despesas ${restrictedSectors!.join(", ")} ${period}` : `Relatório financeiro ${period}`, body);
 }

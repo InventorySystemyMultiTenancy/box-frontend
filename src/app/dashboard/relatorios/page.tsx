@@ -15,7 +15,6 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { canSeeSection } from "@/lib/access";
 import { generateFinancialReportPdf } from "@/lib/financial-report";
-import { openReportWindow } from "@/lib/printable-report";
 import type { DashboardReport, RevisionAlert } from "@/lib/types";
 
 function firstDayOfMonth() {
@@ -63,17 +62,11 @@ export default function RelatoriosPage() {
 
   async function handleFinancialPdf() {
     if (!token) return;
-    // Abre a janela já no clique (depois do await o navegador bloquearia como pop-up).
-    const popup = openReportWindow();
-    if (!popup) {
-      toast.error("O navegador bloqueou a janela do relatório. Permita pop-ups para este site e tente de novo.");
-      return;
-    }
+    // Abre na mesma aba (diálogo de impressão), sem pop-up — ver printHtml.
     setFinancialBusy(true);
     try {
-      await generateFinancialReportPdf(token, from, to, popup);
+      await generateFinancialReportPdf(token, from, to);
     } catch (err) {
-      popup.close();
       toast.error(err instanceof ApiError ? err.message : "Não foi possível gerar o relatório financeiro.");
     } finally {
       setFinancialBusy(false);

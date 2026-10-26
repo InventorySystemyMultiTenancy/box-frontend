@@ -1,24 +1,47 @@
-// Mesmo padrão já usado em OrderDetail.tsx (generateServicePdf): monta um HTML simples,
-// abre um popup e chama window.print() — o usuário salva como PDF pelo diálogo de
-// impressão do navegador. Não há nenhuma lib de PDF no projeto, então esse é o único
-// mecanismo usado — aqui só uma versão compartilhada pras telas novas do financeiro.
-/**
- * Quando o conteúdo depende de buscar dados antes, abra a janela já no clique com
- * openReportWindow() e passe-a aqui — window.open depois de um await costuma ser
- * bloqueado como pop-up pelo navegador.
- */
-export function openReportWindow() {
-  const popup = window.open("", "_blank", "width=960,height=720");
-  popup?.document.write('<p style="font-family: Arial, sans-serif; margin: 32px">Gerando relatório...</p>');
-  return popup;
+// PDFs do sistema (projeto, relatórios, exportações): monta um HTML simples e abre o
+// diálogo de impressão do navegador, onde o usuário salva como PDF. Não há lib de PDF no
+// projeto, então esse é o único mecanismo.
+//
+// Tudo acontece NA MESMA ABA, num quadro invisível: antes abria uma aba nova, e no app
+// instalado no celular (atalho na tela inicial) essa aba abria no navegador comum, sem o
+// login — voltar não levava de volta ao site logado. Também não sofre bloqueio de pop-up.
+export function printHtml(fullHtmlDocument: string) {
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+  document.body.appendChild(frame);
+
+  const win = frame.contentWindow;
+  const doc = frame.contentDocument ?? win?.document;
+  if (!win || !doc) {
+    frame.remove();
+    return;
+  }
+  doc.open();
+  doc.write(fullHtmlDocument);
+  doc.close();
+
+  // Espera a logo carregar antes de imprimir — chamar print() logo em seguida tira a imagem
+  // do PDF na maioria das vezes. Timeout como rede de segurança caso o load nunca dispare.
+  let printed = false;
+  const doPrint = () => {
+    if (printed) return;
+    printed = true;
+    win.focus();
+    win.print();
+    // O quadro some depois da impressão (ou, se o evento não vier, depois de um tempo).
+    const cleanup = () => setTimeout(() => frame.remove(), 1000);
+    win.addEventListener("afterprint", cleanup, { once: true });
+    setTimeout(() => frame.remove(), 5 * 60 * 1000);
+  };
+  const images = Array.from(doc.images);
+  if (images.length === 0 || images.every((img) => img.complete)) setTimeout(doPrint, 50);
+  else images.forEach((img) => img.addEventListener("load", () => images.every((i) => i.complete) && doPrint()));
+  setTimeout(doPrint, 1500);
 }
 
-export function openPrintableReport(title: string, bodyHtml: string, existingPopup?: Window | null) {
-  const popup = existingPopup ?? window.open("", "_blank", "width=960,height=720");
-  if (!popup) return;
-  popup.document.open();
-
-  popup.document.write(`
+export function openPrintableReport(title: string, bodyHtml: string) {
+  printHtml(`
     <!doctype html>
     <html lang="pt-BR">
       <head>
@@ -45,19 +68,6 @@ export function openPrintableReport(title: string, bodyHtml: string, existingPop
       </body>
     </html>
   `);
-  popup.document.close();
-  // Espera a logo carregar antes de imprimir — chamar print() logo em seguida (sem
-  // esperar) tira a imagem do PDF na maioria das vezes, já que ela ainda não terminou
-  // de carregar. Timeout como rede de segurança caso o load nunca dispare.
-  let printed = false;
-  const doPrint = () => {
-    if (printed) return;
-    printed = true;
-    popup.focus();
-    popup.print();
-  };
-  popup.onload = doPrint;
-  setTimeout(doPrint, 1200);
 }
 
 export function escapeHtml(value: string) {
