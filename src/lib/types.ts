@@ -669,6 +669,7 @@ export interface ExpenseClassifications {
   groups: string[];
   sectors: string[];
   descriptions: { group: string; name: string }[];
+  groupCategories: { group: string; name: string }[];
 }
 
 export interface AccountReceivable {

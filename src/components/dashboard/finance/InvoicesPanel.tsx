@@ -20,6 +20,7 @@ import { api, ApiError } from "@/lib/api";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
 import type { BankAccount, Client, ExpenseClassifications, Invoice, InvoiceStatus, InvoiceType } from "@/lib/types";
+import { categoriesForGroup } from "@/lib/utils";
 
 // "Em andamento" = mesma definição usada em MechanicProjectsPanel — qualquer OS que
 // ainda não chegou em FINISHED/READY_FOR_PICKUP.
@@ -478,7 +479,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
                 <Label htmlFor="inv-operation">Categoria (natureza da operação)</Label>
                 <SuggestInput
                   id="inv-operation"
-                  options={classifications?.categories ?? []}
+                  options={categoriesForGroup(classifications, form.isExpense ? form.expenseGroup : "")}
                   value={form.operationNature}
                   onChange={(e) => set("operationNature", e.target.value)}
                   placeholder="Ex.: Compra de peças"

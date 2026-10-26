@@ -16,6 +16,7 @@ import { api, ApiError } from "@/lib/api";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { PayableInvoiceDialog, type PayableInvoiceDetails, type PayableInvoiceResult } from "@/components/dashboard/finance/PayableInvoiceDialog";
 import type { BankAccount, ExpenseClassifications, Store, Supplier } from "@/lib/types";
+import { categoriesForGroup } from "@/lib/utils";
 
 // Mesmo layout do "Cadastrar contas a Pagar" que a oficina já usava: cabeçalho com nota,
 // fornecedor e classificação da despesa, e "Condições de pagamento" com as duplicatas
@@ -307,7 +308,7 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
 
               <div className="grid gap-1.5 sm:col-span-3">
                 <Label htmlFor="ap-category">Categoria (natureza da operação) *</Label>
-                <SuggestInput id="ap-category" options={classifications?.categories ?? []} value={header.category} onChange={(e) => setH("category", e.target.value)} placeholder="Ex.: Despesas administrativas" />
+                <SuggestInput id="ap-category" options={categoriesForGroup(classifications, header.expenseGroup)} value={header.category} onChange={(e) => setH("category", e.target.value)} placeholder="Ex.: Despesas administrativas" />
               </div>
               <div className="grid gap-1.5 sm:col-span-3">
                 <Label htmlFor="ap-sector">Origem despesa (setor)</Label>
