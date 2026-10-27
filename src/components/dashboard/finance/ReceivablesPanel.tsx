@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { settlementDateParam, todayInputValue, toLocalDateInput } from "@/lib/dates";
-import type { AccountReceivable, BankAccount, Client, Invoice, ReceivableStatus } from "@/lib/types";
+import type { AccountReceivable, BankAccount, Client, ReceivableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<ReceivableStatus, string> = { PENDING: "Pendente", RECEIVED: "Recebido", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
 const STATUS_VARIANTS: Record<ReceivableStatus, "default" | "secondary" | "outline" | "destructive"> = {
@@ -438,33 +438,18 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
   const [paymentMethod, setPaymentMethod] = useState(receivable.paymentMethod ?? "");
   // Data em que foi recebido — começa em hoje, dá pra mudar (ex.: recebido ontem).
   const [receivedAt, setReceivedAt] = useState(todayInputValue);
-  // Nota fiscal do recebimento: nenhuma, associar uma já cadastrada ou criar ali mesmo.
-  const [invoiceMode, setInvoiceMode] = useState<"none" | "existing" | "new">("none");
-  const [invoiceId, setInvoiceId] = useState("");
-  const [newInvoice, setNewInvoice] = useState({ number: "", series: "", type: "NFSE", issueDate: todayInputValue() });
+  // Nota fiscal criada ali mesmo (opcional) — só é criada se o número for preenchido.
+  const [newInvoice, setNewInvoice] = useState({ number: "", issueDate: todayInputValue() });
 
   function handleOpenChange(next: boolean) {
     if (next) {
       setReceivedAt(todayInputValue());
       setReceivedAmount(String(receivable.amount));
       setDiscount("");
-      setInvoiceMode("none");
-      setInvoiceId("");
-      setNewInvoice({ number: "", series: "", type: "NFSE", issueDate: todayInputValue() });
+      setNewInvoice({ number: "", issueDate: todayInputValue() });
     }
     setOpen(next);
   }
-
-  // Notas ainda livres (sem conta a receber/pagar); as do mesmo cliente/OS primeiro.
-  const { data: freeInvoices } = useQuery({
-    queryKey: ["invoices", "unlinked"],
-    queryFn: async () => (await api.invoices(token!, { unlinked: "true", pageSize: 100 })).items as Invoice[],
-    enabled: !!token && open && invoiceMode === "existing",
-  });
-  const sortedInvoices = [...(freeInvoices ?? [])].sort((a, b) => {
-    const score = (i: Invoice) => (i.serviceOrder?.id && i.serviceOrder.id === receivable.serviceOrderId ? 2 : 0) + (i.client?.id && i.client.id === receivable.clientId ? 1 : 0);
-    return score(b) - score(a);
-  });
 
   const { data: accounts } = useQuery({
     queryKey: ["bank-accounts"],
@@ -479,14 +464,7 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
       toast.error("Informe o valor recebido.");
       return;
     }
-    if (invoiceMode === "existing" && !invoiceId) {
-      toast.error("Escolha a nota fiscal para associar.");
-      return;
-    }
-    if (invoiceMode === "new" && !newInvoice.number.trim()) {
-      toast.error("Informe o número da nota fiscal.");
-      return;
-    }
+    const invoiceNumber = newInvoice.number.trim();
     setSaving(true);
     try {
       await api.receiveReceivable(
@@ -496,15 +474,11 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
           receivedAt: settlementDateParam(receivedAt),
           bankAccountId: bankAccountId || undefined,
           paymentMethod: paymentMethod || undefined,
-          invoiceId: invoiceMode === "existing" ? invoiceId : undefined,
-          newInvoice:
-            invoiceMode === "new"
-              ? { number: newInvoice.number.trim(), series: newInvoice.series.trim() || undefined, type: newInvoice.type, issueDate: newInvoice.issueDate || undefined }
-              : undefined,
+          newInvoice: invoiceNumber ? { number: invoiceNumber, type: "NFSE", issueDate: newInvoice.issueDate || undefined } : undefined,
         },
         token
       );
-      toast.success(invoiceMode === "none" ? "Recebimento confirmado." : "Recebimento confirmado e nota fiscal associada.");
+      toast.success(invoiceNumber ? "Recebimento confirmado e nota fiscal criada." : "Recebimento confirmado.");
       setOpen(false);
       onSaved();
     } catch (err) {
@@ -579,74 +553,22 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
             <Label>Forma de pagamento</Label>
             <Input value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="PIX" />
           </div>
-          {/* Nota fiscal do recebimento — associar uma já cadastrada ou criar aqui mesmo. */}
+          {/* Nota fiscal do recebimento — criada aqui mesmo se o número for preenchido. */}
           <div className="grid gap-2 rounded-md border p-3">
             <Label>Nota fiscal (opcional)</Label>
-            <div className="inline-flex w-fit flex-wrap rounded-md border p-0.5 text-xs">
-              {(
-                [
-                  ["none", "Sem nota"],
-                  ["existing", "Associar existente"],
-                  ["new", "Criar nova"],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={`rounded px-2.5 py-1 ${invoiceMode === key ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-                  onClick={() => setInvoiceMode(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            {invoiceMode === "existing" && (
-              <Select value={invoiceId || "NONE"} onValueChange={(v) => setInvoiceId(v === "NONE" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="Escolha a nota..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NONE">{freeInvoices ? "Escolha a nota..." : "Carregando notas..."}</SelectItem>
-                  {sortedInvoices.map((i) => (
-                    <SelectItem key={i.id} value={i.id}>
-                      {i.number ? `NF ${i.number}` : "Nota s/ nº"} — {i.client?.name ?? i.recipientName ?? "sem cliente"} — R$ {i.totalAmount.toFixed(2)}
-                      {i.serviceOrder?.code ? ` — ${i.serviceOrder.code}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {invoiceMode === "existing" && freeInvoices && freeInvoices.length === 0 && (
-              <p className="text-xs text-muted-foreground">Nenhuma nota livre para associar — use &quot;Criar nova&quot;.</p>
-            )}
-            {invoiceMode === "new" && (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="grid gap-1">
-                  <Label htmlFor={`ni-number-${receivable.id}`} className="text-xs">Número *</Label>
-                  <Input id={`ni-number-${receivable.id}`} value={newInvoice.number} onChange={(e) => setNewInvoice((n) => ({ ...n, number: e.target.value }))} />
-                </div>
-                <div className="grid gap-1">
-                  <Label htmlFor={`ni-series-${receivable.id}`} className="text-xs">Série</Label>
-                  <Input id={`ni-series-${receivable.id}`} value={newInvoice.series} onChange={(e) => setNewInvoice((n) => ({ ...n, series: e.target.value }))} />
-                </div>
-                <div className="grid gap-1">
-                  <Label className="text-xs">Tipo</Label>
-                  <Select value={newInvoice.type} onValueChange={(v) => setNewInvoice((n) => ({ ...n, type: v }))}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="NFSE">NFS-e (serviço)</SelectItem>
-                      <SelectItem value="NFE">NF-e (produto)</SelectItem>
-                      <SelectItem value="NFCE">NFC-e (cupom)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-1">
-                  <Label htmlFor={`ni-date-${receivable.id}`} className="text-xs">Emissão</Label>
-                  <Input id={`ni-date-${receivable.id}`} type="date" value={newInvoice.issueDate} onChange={(e) => setNewInvoice((n) => ({ ...n, issueDate: e.target.value }))} />
-                </div>
-                <p className="col-span-2 text-xs text-muted-foreground">
-                  A nota é cadastrada em Notas fiscais com o valor recebido, ligada a esta conta{receivable.serviceOrder?.code ? ` e à ${receivable.serviceOrder.code}` : ""}.
-                </p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="grid gap-1">
+                <Label htmlFor={`ni-number-${receivable.id}`} className="text-xs">Número da nota</Label>
+                <Input id={`ni-number-${receivable.id}`} value={newInvoice.number} onChange={(e) => setNewInvoice((n) => ({ ...n, number: e.target.value }))} />
               </div>
-            )}
+              <div className="grid gap-1">
+                <Label htmlFor={`ni-date-${receivable.id}`} className="text-xs">Data de emissão</Label>
+                <Input id={`ni-date-${receivable.id}`} type="date" value={newInvoice.issueDate} onChange={(e) => setNewInvoice((n) => ({ ...n, issueDate: e.target.value }))} />
+              </div>
+              <p className="col-span-2 text-xs text-muted-foreground">
+                A nota é cadastrada em Notas fiscais com o valor recebido, ligada a esta conta{receivable.serviceOrder?.code ? ` e à ${receivable.serviceOrder.code}` : ""}.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={saving}>{saving ? "Salvando..." : "Confirmar recebimento"}</Button>
