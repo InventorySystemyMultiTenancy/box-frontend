@@ -20,6 +20,7 @@ import OrderAssigneesPanel from "@/components/dashboard/OrderAssigneesPanel";
 import DamagePhotosPanel from "@/components/dashboard/DamagePhotosPanel";
 import ServicePartsPanel from "@/components/dashboard/ServicePartsPanel";
 import { EditVehicleDialog } from "@/components/dashboard/EditVehicleDialog";
+import { EditSsNumberDialog } from "@/components/dashboard/EditSsNumberDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -790,7 +791,8 @@ export default function OrderDetail({
             {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""}
           </h1>
           <div className={styles.meta}>
-            {order.code} · KM {order.vehicle.mileage.toLocaleString("pt-BR")}
+            {order.code}
+            {order.ssNumber ? ` · SS ${order.ssNumber}` : ""} · KM {order.vehicle.mileage.toLocaleString("pt-BR")}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -800,6 +802,9 @@ export default function OrderDetail({
               // Mantém o dono já carregado (a rota de veículo não devolve o owner).
               onSaved={(vehicle) => setOrder((prev) => (prev ? { ...prev, vehicle: { ...prev.vehicle, ...vehicle, owner: prev.vehicle.owner } } : prev))}
             />
+          )}
+          {isStaff && (
+            <EditSsNumberDialog orderId={order.id} ssNumber={order.ssNumber} onSaved={(ssNumber) => setOrder((prev) => (prev ? { ...prev, ssNumber } : prev))} />
           )}
           {isStaff && <ShareLinkDialog orderId={order.id} />}
           <span className={styles.live}>

@@ -22,6 +22,15 @@ import { settlementDateParam, todayInputValue, toLocalDateInput } from "@/lib/da
 import type { AccountReceivable, BankAccount, Client, ReceivableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<ReceivableStatus, string> = { PENDING: "Pendente", RECEIVED: "Recebido", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
+// Coluna "Data": quando a OS foi finalizada e a conta entrou em Contas a receber.
+function finishedAt(r: AccountReceivable) {
+  return r.serviceOrder?.completedAt ?? r.createdAt ?? null;
+}
+
+function formatDate(value?: string | null) {
+  return value ? new Date(value).toLocaleDateString("pt-BR") : "—";
+}
+
 const STATUS_VARIANTS: Record<ReceivableStatus, "default" | "secondary" | "outline" | "destructive"> = {
   PENDING: "outline",
   RECEIVED: "default",
@@ -34,7 +43,7 @@ export default function ReceivablesPanel() {
   const queryClient = useQueryClient();
   const canManage = hasPermission("finance", "manage");
   const [status, setStatus] = useState<string>("");
-  // Busca por placa (descrição das contas de projeto), código da OS, cliente ou descrição.
+  // Busca por placa (descrição das contas de projeto), código/SS da OS, cliente ou descrição.
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
   useEffect(() => {
@@ -65,6 +74,9 @@ export default function ReceivablesPanel() {
   const isOpen = (r: AccountReceivable) => r.status === "PENDING" || r.status === "OVERDUE";
   const openRows = (data ?? []).filter(isOpen);
   const allSelected = openRows.length > 0 && openRows.every((r) => selected.has(r.id));
+  // Conta aberta no detalhe (clique no nome) — lida da lista para refletir o refetch.
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = (data ?? []).find((r) => r.id === detailId) ?? null;
 
   function toggleOne(id: string, checked: boolean) {
     setSelected((prev) => {
@@ -82,7 +94,7 @@ export default function ReceivablesPanel() {
     queryClient.invalidateQueries({ queryKey: ["invoices"] });
   }
 
-  // Coluna "Prazo": salva ao escolher a data; vazio tira o prazo (a conta fica vencida).
+  // Prazo (no detalhe da conta): salva ao escolher a data; vazio tira o prazo (a conta fica vencida).
   async function handleDueDate(receivable: AccountReceivable, value: string) {
     if (!token) return;
     try {
@@ -123,7 +135,7 @@ export default function ReceivablesPanel() {
         <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-64 max-w-full">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Buscar placa, OS ou cliente..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input className="pl-8" placeholder="Buscar placa, OS, SS ou cliente..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={status || "ALL"} onValueChange={(v) => setStatus(v === "ALL" ? "" : v)}>
           <SelectTrigger className="w-48">
@@ -144,6 +156,8 @@ export default function ReceivablesPanel() {
             subtitle={status ? `Status: ${STATUS_LABELS[status as keyof typeof STATUS_LABELS] ?? status}.` : undefined}
             rows={data ?? []}
             columns={[
+              { header: "Data", value: (r) => finishedAt(r), type: "date" },
+              { header: "SS", value: (r) => r.serviceOrder?.ssNumber },
               { header: "Descrição", value: (r) => (r.installmentTotal && r.installmentTotal > 1 ? `${r.description} (${r.installmentNumber}/${r.installmentTotal})` : r.description) },
               { header: "Cliente", value: (r) => r.client?.name },
               { header: "OS", value: (r) => r.serviceOrder?.code },
@@ -194,12 +208,12 @@ export default function ReceivablesPanel() {
           <TableHeader>
             <TableRow>
               {canManage && <TableHead className="w-8" />}
+              <TableHead>Data</TableHead>
+              <TableHead>SS</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead>OS</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead>Categoria</TableHead>
               <TableHead>Valor</TableHead>
-              <TableHead>Prazo</TableHead>
               <TableHead>Faturado</TableHead>
               <TableHead>Valor recebido</TableHead>
               <TableHead>Nota</TableHead>
@@ -227,8 +241,13 @@ export default function ReceivablesPanel() {
                     )}
                   </TableCell>
                 )}
+                <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(finishedAt(receivable))}</TableCell>
+                <TableCell className="whitespace-nowrap font-mono text-xs">{receivable.serviceOrder?.ssNumber || "—"}</TableCell>
+                {/* Clique no nome abre o detalhe (categoria, prazo e demais informações). */}
                 <TableCell className="font-medium">
-                  {receivable.description}
+                  <button type="button" className="text-left hover:underline" onClick={() => setDetailId(receivable.id)}>
+                    {receivable.description}
+                  </button>
                   {receivable.installmentTotal && receivable.installmentTotal > 1 && (
                     <span className="ml-1 text-xs text-muted-foreground">
                       ({receivable.installmentNumber}/{receivable.installmentTotal})
@@ -238,31 +257,7 @@ export default function ReceivablesPanel() {
                 {/* OS do projeto que gerou a cobrança (contas de Serviços). */}
                 <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">{receivable.serviceOrder?.code ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{receivable.client?.name || "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{receivable.category}</TableCell>
                 <TableCell>R$ {receivable.amount.toFixed(2)}</TableCell>
-                {/* Prazo: editável enquanto a conta está em aberto. Sem prazo = já vencida. */}
-                <TableCell>
-                  {canManage && (receivable.status === "PENDING" || receivable.status === "OVERDUE") ? (
-                    <Input
-                      type="date"
-                      className="h-8 w-36"
-                      aria-label="Prazo"
-                      title="Prazo — depois desta data a conta aparece vencida; sem data, já aparece vencida"
-                      defaultValue={toLocalDateInput(receivable.dueDate)}
-                      key={`${receivable.id}-${receivable.dueDate ?? ""}`}
-                      // Salva ao escolher a data (ano completo, para não gravar "0202" enquanto
-                      // digita o ano) ou ao limpar o campo.
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if ((value === "" || /^20\d{2}-\d{2}-\d{2}$/.test(value)) && value !== toLocalDateInput(receivable.dueDate)) {
-                          handleDueDate(receivable, value);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="text-muted-foreground">{receivable.dueDate ? new Date(receivable.dueDate).toLocaleDateString("pt-BR") : "—"}</span>
-                  )}
-                </TableCell>
                 {/* Faturado = data em que foi marcada como recebida; vazio enquanto pendente. */}
                 <TableCell className="text-muted-foreground">
                   {receivable.receivedAt ? (
@@ -310,6 +305,82 @@ export default function ReceivablesPanel() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={!!detail} onOpenChange={(next) => !next && setDetailId(null)}>
+        <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-lg">
+          {detail && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{detail.description}</DialogTitle>
+              </DialogHeader>
+              <div className="grid min-h-0 gap-4 overflow-y-auto overscroll-contain pr-1 text-sm">
+                <div className="flex items-center gap-2">
+                  <Badge variant={STATUS_VARIANTS[detail.status]}>{STATUS_LABELS[detail.status]}</Badge>
+                  {detail.installmentTotal && detail.installmentTotal > 1 && (
+                    <span className="text-muted-foreground">Parcela {detail.installmentNumber}/{detail.installmentTotal}</span>
+                  )}
+                </div>
+                {/* Prazo: editável enquanto a conta está em aberto. Sem prazo = já vencida. */}
+                <div className="grid gap-1.5">
+                  <Label htmlFor={`due-${detail.id}`}>Prazo</Label>
+                  {canManage && isOpen(detail) ? (
+                    <Input
+                      id={`due-${detail.id}`}
+                      type="date"
+                      className="w-44"
+                      title="Prazo — depois desta data a conta aparece vencida; sem data, já aparece vencida"
+                      defaultValue={toLocalDateInput(detail.dueDate)}
+                      key={`${detail.id}-${detail.dueDate ?? ""}`}
+                      // Salva ao escolher a data (ano completo, para não gravar "0202" enquanto
+                      // digita o ano) ou ao limpar o campo.
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if ((value === "" || /^20\d{2}-\d{2}-\d{2}$/.test(value)) && value !== toLocalDateInput(detail.dueDate)) {
+                          handleDueDate(detail, value);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="text-muted-foreground">{formatDate(detail.dueDate)}</span>
+                  )}
+                  {canManage && isOpen(detail) && !detail.dueDate && (
+                    <span className="text-xs text-muted-foreground">Sem prazo a conta já aparece como vencida.</span>
+                  )}
+                </div>
+                <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {(
+                    [
+                      ["Categoria", detail.category],
+                      ["Data", formatDate(finishedAt(detail))],
+                      ["SS", detail.serviceOrder?.ssNumber],
+                      ["OS", detail.serviceOrder?.code],
+                      ["Cliente", detail.client?.name],
+                      ["Valor", `R$ ${detail.amount.toFixed(2)}`],
+                      ["Faturado", detail.receivedAt ? formatDate(detail.receivedAt) : null],
+                      ["Valor recebido", detail.status === "RECEIVED" ? `R$ ${(detail.receivedAmount ?? detail.amount).toFixed(2)}` : null],
+                      ["Forma de pagamento", detail.paymentMethod],
+                      ["Conta bancária", detail.bankAccount?.name],
+                      ["Nota fiscal", (detail.invoices ?? []).map((i) => (i.number ? `NF ${i.number}` : "Nota s/ nº")).join(", ")],
+                      ["Criada em", detail.createdAt ? formatDate(detail.createdAt) : null],
+                    ] as const
+                  ).map(([label, value]) => (
+                    <div key={label} className="grid gap-0.5">
+                      <dt className="text-xs text-muted-foreground">{label}</dt>
+                      <dd>{value || "—"}</dd>
+                    </div>
+                  ))}
+                </dl>
+                {detail.notes && (
+                  <div className="grid gap-0.5">
+                    <span className="text-xs text-muted-foreground">Observações</span>
+                    <p className="whitespace-pre-wrap">{detail.notes}</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

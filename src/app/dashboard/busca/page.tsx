@@ -246,7 +246,7 @@ export default function BuscaGlobalPage() {
                   >
                     <span>
                       <strong>{order.vehicle.brand} {order.vehicle.model}</strong>{" "}
-                      <span className="font-mono text-xs text-muted-foreground">{order.code}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{order.code}{order.ssNumber ? ` · SS ${order.ssNumber}` : ""}</span>
                       {order.vehicle.plate && <span className="text-muted-foreground"> · {order.vehicle.plate}</span>}
                     </span>
                     <Badge variant="outline">{STATUS_LABELS[order.status]}</Badge>

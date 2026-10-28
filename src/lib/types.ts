@@ -234,6 +234,8 @@ export interface PublicServiceOrder {
 export interface ServiceOrder {
   id: string;
   code: string;
+  // SS (solicitação de serviço) — opcional, informado na abertura do projeto.
+  ssNumber?: string | null;
   status: ServiceOrderStatus;
   progress: number;
   estimatedMin?: number | null;
@@ -679,7 +681,8 @@ export interface AccountReceivable {
   clientId?: string | null;
   client?: { id: string; name: string } | null;
   serviceOrderId?: string | null;
-  serviceOrder?: { id: string; code: string } | null;
+  // SS e data de finalização da OS (colunas "SS" e "Data").
+  serviceOrder?: { id: string; code: string; ssNumber?: string | null; completedAt?: string | null } | null;
   amount: number;
   // Prazo — null = sem prazo (já conta como vencida até alguém definir).
   dueDate: string | null;
@@ -694,6 +697,7 @@ export interface AccountReceivable {
   notes?: string | null;
   // Nota(s) fiscal(is) ligada(s) ao recebimento (coluna "Nota").
   invoices?: { id: string; number?: string | null }[];
+  createdAt?: string;
 }
 
 export interface CashFlowTimelinePoint {

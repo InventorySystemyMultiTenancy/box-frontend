@@ -82,6 +82,8 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   } | null>(null);
 
   const [priority, setPriority] = useState<ServiceOrderPriority>("NORMAL");
+  // SS (solicitação de serviço) — opcional, letras e números.
+  const [ssNumber, setSsNumber] = useState("");
   const [damagePhotos, setDamagePhotos] = useState<File[]>([]);
   // Vídeos do checklist de entrada (até 5) — enviados e salvos no aparelho como as fotos.
   const [damageVideos, setDamageVideos] = useState<File[]>([]);
@@ -114,6 +116,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     setPlateResult(null);
     setExisting(null);
     setPriority("NORMAL");
+    setSsNumber("");
     setDamagePhotos([]);
     setDamageVideos([]);
   }
@@ -293,7 +296,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     if (!token) return;
     if (!alreadyCreating) setCreating(true);
     try {
-      const { order } = await api.createServiceOrder({ vehicleId, priority }, token);
+      const { order } = await api.createServiceOrder({ vehicleId, priority, ssNumber: ssNumber.trim() || undefined }, token);
       const orderId = (order as { id: string }).id;
 
       if (damagePhotos.length > 0 || damageVideos.length > 0) {
@@ -526,6 +529,12 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
                 ))}
               </SelectContent>
             </Select>
+          </section>
+
+          {/* SS */}
+          <section className="grid gap-2">
+            <Label htmlFor="new-project-ss" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SS (opcional)</Label>
+            <Input id="new-project-ss" maxLength={50} placeholder="Ex.: SS12345A" value={ssNumber} onChange={(e) => setSsNumber(e.target.value)} />
           </section>
 
           {/* Checklist de fotos de avaria pré-existente */}

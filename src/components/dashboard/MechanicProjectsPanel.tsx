@@ -18,7 +18,7 @@ import { matchesSearch } from "@/lib/utils";
 import styles from "./dashboard.module.css";
 
 function orderSearchFields(order: ServiceOrder): (string | null | undefined)[] {
-  return [order.vehicle.brand, order.vehicle.model, order.vehicle.plate, order.vehicle.owner?.name, order.code, ...(order.assignees ?? []).map((a) => a.user.name)];
+  return [order.vehicle.brand, order.vehicle.model, order.vehicle.plate, order.vehicle.owner?.name, order.code, order.ssNumber, ...(order.assignees ?? []).map((a) => a.user.name)];
 }
 
 const DONE_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);
@@ -231,7 +231,7 @@ export default function MechanicProjectsPanel() {
                       {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
                       {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""}
                     </strong>
-                    <span>{order.code}</span>
+                    <span>{order.code}{order.ssNumber ? ` · SS ${order.ssNumber}` : ""}</span>
                   </div>
                   <span className={`${styles.badge} ${styles[`tone-${STATUS_TONE[order.status]}`]}`}>
                     <i className={styles.dot} />
@@ -331,7 +331,7 @@ export default function MechanicProjectsPanel() {
                     {order.vehicle.brand} {order.vehicle.model} {order.vehicle.year}
                     {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""}
                   </strong>
-                  <span>{order.code}</span>
+                  <span>{order.code}{order.ssNumber ? ` · SS ${order.ssNumber}` : ""}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {priority !== "NORMAL" && (
