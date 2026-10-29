@@ -59,6 +59,13 @@ export const api = {
 
   users: (token: string) => request<{ users: unknown[] }>("/api/auth/users", {}, token),
 
+  // Número enviador dos avisos automáticos no WhatsApp (aba Usuários, só admin).
+  whatsappConnection: (token: string) =>
+    request<{ configured: boolean; state: string | null; number: string | null; error?: string }>("/api/whatsapp/connection", {}, token),
+  whatsappConnect: (token: string) =>
+    request<{ state: string; qrBase64: string | null; pairingCode: string | null }>("/api/whatsapp/connect", { method: "POST" }, token),
+  whatsappDisconnect: (token: string) => request<{ state: string }>("/api/whatsapp/disconnect", { method: "POST" }, token),
+
   createUser: (
     payload: {
       name: string;

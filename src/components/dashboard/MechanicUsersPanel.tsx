@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { User, Role } from "@/lib/types";
 import { UserFormDialog } from "@/components/dashboard/users/UserFormDialog";
+import { WhatsappConnectionPanel } from "@/components/dashboard/users/WhatsappConnectionPanel";
 import { ScrollX } from "@/components/ui/scroll-x";
 import styles from "./dashboard.module.css";
 import { displayEmail } from "@/lib/utils";
@@ -87,6 +88,8 @@ export default function MechanicUsersPanel() {
   return (
     <div className={styles.content}>
       <div className={styles.sectionTitle}>Administração de usuários</div>
+      {/* Novo usuário e, ao lado, o WhatsApp que envia os avisos automáticos. */}
+      <div className="mb-6 grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className={styles.panel}>
         <form className={styles.formGrid} onSubmit={createUser}>
           <label>
@@ -186,6 +189,8 @@ export default function MechanicUsersPanel() {
             {busy ? "Criando..." : "Criar usuário"}
           </button>
         </form>
+      </div>
+      <WhatsappConnectionPanel />
       </div>
 
       <div className={styles.sectionTitle}>Usuários existentes ({users.length})</div>
