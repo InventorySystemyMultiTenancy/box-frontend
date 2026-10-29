@@ -19,6 +19,8 @@ import { ShareLinkDialog } from "@/components/dashboard/ShareLinkDialog";
 import OrderAssigneesPanel from "@/components/dashboard/OrderAssigneesPanel";
 import DamagePhotosPanel from "@/components/dashboard/DamagePhotosPanel";
 import ServicePartsPanel from "@/components/dashboard/ServicePartsPanel";
+import ProjectValuesPanel from "@/components/dashboard/ProjectValuesPanel";
+import { projectValues } from "@/lib/order-values";
 import { EditVehicleDialog } from "@/components/dashboard/EditVehicleDialog";
 import { EditSsNumberDialog } from "@/components/dashboard/EditSsNumberDialog";
 import { Button } from "@/components/ui/button";
@@ -576,10 +578,10 @@ export default function OrderDetail({
     // O PDF reflete o projeto como ele está agora, não só o que já foi concluído — todo
     // problema/valor/peça cadastrado entra assim que é registrado, sem esperar a baixa.
     // "Serviços realizados" continua restrito ao que de fato já tem peça com status DONE;
-    // já a lista de valores e o total consideram todas as aprovações já lançadas.
+    // já a lista de valores mostra todas as aprovações lançadas, e o total soma todas menos
+    // as recusadas pelo cliente (mesma conta do quadro "Valores do projeto").
     const completedParts = order.parts.filter((part) => part.status === "DONE");
-    const servicesTotal = order.approvals.reduce((sum, approval) => sum + (approval.estimatedValue ?? 0), 0) || order.estimatedMin || 0;
-    const total = servicesTotal + (order.deliveryExtraValue ?? 0);
+    const values = projectValues(order);
     const partsRows = order.parts
       .map(
         (part) => `
@@ -594,13 +596,14 @@ export default function OrderDetail({
     const rows = order.approvals
       .map((approval) => {
         const part = approval.partId ? order.parts.find((p) => p.id === approval.partId) : undefined;
-        const statusLabel = part
-          ? PART_STATUS_LABELS[part.status]
-          : approval.status === "APPROVED"
-            ? "Aprovado"
-            : approval.status === "REJECTED"
-              ? "Recusado"
-              : "Pendente";
+        const statusLabel =
+          approval.status === "REJECTED"
+            ? "Recusado (não soma)"
+            : part
+              ? PART_STATUS_LABELS[part.status]
+              : approval.status === "APPROVED"
+                ? "Aprovado"
+                : "Pendente";
         const parts = approval.partUsages?.length
           ? approval.partUsages.map((usage) => `${usage.quantity}x ${usage.inventoryPart.name}`).join(", ")
           : "Sem peça vinculada";
@@ -686,11 +689,21 @@ export default function OrderDetail({
             <tbody>${rows || '<tr><td colspan="6">Nenhum valor de serviço registrado.</td></tr>'}</tbody>
           </table>
           ${
-            order.deliveryExtraValue
-              ? `<div class="muted" style="margin-top: 8px; text-align: right;">Valor extra na entrega: ${formatCurrency(order.deliveryExtraValue)}</div>`
+            values.rows.length
+              ? `<div class="muted" style="margin-top: 8px; text-align: right;">Mão de obra: ${formatCurrency(values.laborTotal)} · Peças: ${formatCurrency(values.partsTotal)}</div>`
               : ""
           }
-          <div class="total">Valor final: ${formatCurrency(total)}</div>
+          ${
+            values.estimate
+              ? `<div class="muted" style="margin-top: 4px; text-align: right;">Valor estimado na abertura: ${formatCurrency(values.estimate)}</div>`
+              : ""
+          }
+          ${
+            values.extra
+              ? `<div class="muted" style="margin-top: 4px; text-align: right;">Valor extra na entrega: ${formatCurrency(values.extra)}</div>`
+              : ""
+          }
+          <div class="total">Valor final: ${formatCurrency(values.total)}</div>
         </body>
       </html>
     `);
@@ -978,6 +991,14 @@ export default function OrderDetail({
               onCreatePart={isAdmin ? createInventoryPartRequest : undefined}
               onGeneratePdf={isAdmin ? generateServicePdf : undefined}
             />
+            {canViewPrices && (
+              <ProjectValuesPanel
+                approvals={order.approvals}
+                parts={order.parts}
+                estimatedMin={order.estimatedMin}
+                deliveryExtraValue={order.deliveryExtraValue}
+              />
+            )}
             {isStaff && (
               <ServicePartsPanel
                 approvals={order.approvals}
