@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
+import { SupplierFormDialog } from "@/components/dashboard/suppliers/SupplierFormDialog";
 import { PayableInvoiceDialog, type PayableInvoiceDetails, type PayableInvoiceResult } from "@/components/dashboard/finance/PayableInvoiceDialog";
 import type { BankAccount, ExpenseClassifications, Store, Supplier } from "@/lib/types";
 import { categoriesForGroup } from "@/lib/utils";
@@ -287,7 +288,23 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
               </div>
 
               <div className="grid gap-1.5 sm:col-span-6">
-                <Label htmlFor="ap-supplier">Fornecedor *</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="ap-supplier">Fornecedor *</Label>
+                  {/* Fornecedor novo cadastrado aqui mesmo, sem sair da conta a pagar. */}
+                  <SupplierFormDialog
+                    initialName={suppliers?.some((s) => s.name.trim().toLowerCase() === header.payeeName.trim().toLowerCase()) ? "" : header.payeeName}
+                    trigger={
+                      <Button type="button" variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                        <Plus className="size-3.5" /> Novo fornecedor
+                      </Button>
+                    }
+                    onSaved={(saved) => {
+                      setH("payeeName", saved.name);
+                      void queryClient.invalidateQueries({ queryKey: ["suppliers-all"] });
+                      void queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+                    }}
+                  />
+                </div>
                 <SuggestInput
                   id="ap-supplier"
                   options={(suppliers ?? []).filter((s) => s.active !== false).map((s) => s.name)}

@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { settlementDateParam, todayInputValue, toLocalDateInput } from "@/lib/dates";
-import type { AccountReceivable, BankAccount, Client, ReceivableStatus } from "@/lib/types";
+import { RECEIVABLE_PAYER_LABELS, type AccountReceivable, type BankAccount, type Client, type ReceivableStatus } from "@/lib/types";
 
 const STATUS_LABELS: Record<ReceivableStatus, string> = { PENDING: "Pendente", RECEIVED: "Recebido", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
 // Coluna "Data": quando a OS foi finalizada e a conta entrou em Contas a receber.
@@ -169,6 +169,7 @@ export default function ReceivablesPanel() {
               { header: "Valor recebido", value: (r) => r.receivedAmount, type: "money" },
               { header: "Status", value: (r) => STATUS_LABELS[r.status as keyof typeof STATUS_LABELS] ?? r.status },
               { header: "Forma", value: (r) => r.paymentMethod },
+              { header: "Pagador", value: (r) => (r.payer ? RECEIVABLE_PAYER_LABELS[r.payer] ?? r.payer : "") },
             ]}
           />
           {canManage && <ReceivableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a receber</Button>} />}
@@ -359,6 +360,7 @@ export default function ReceivablesPanel() {
                       ["Faturado", detail.receivedAt ? formatDate(detail.receivedAt) : null],
                       ["Valor recebido", detail.status === "RECEIVED" ? `R$ ${(detail.receivedAmount ?? detail.amount).toFixed(2)}` : null],
                       ["Forma de pagamento", detail.paymentMethod],
+                      ["Pagador", detail.payer ? RECEIVABLE_PAYER_LABELS[detail.payer] ?? detail.payer : null],
                       ["Conta bancária", detail.bankAccount?.name],
                       ["Nota fiscal", (detail.invoices ?? []).map((i) => (i.number ? `NF ${i.number}` : "Nota s/ nº")).join(", ")],
                       ["Criada em", detail.createdAt ? formatDate(detail.createdAt) : null],
@@ -507,6 +509,7 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
   }
   const [bankAccountId, setBankAccountId] = useState(receivable.bankAccountId ?? "");
   const [paymentMethod, setPaymentMethod] = useState(receivable.paymentMethod ?? "");
+  const [payer, setPayer] = useState(receivable.payer ?? "");
   // Data em que foi recebido — começa em hoje, dá pra mudar (ex.: recebido ontem).
   const [receivedAt, setReceivedAt] = useState(todayInputValue);
   // Nota fiscal criada ali mesmo (opcional) — só é criada se o número for preenchido.
@@ -545,6 +548,7 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
           receivedAt: settlementDateParam(receivedAt),
           bankAccountId: bankAccountId || undefined,
           paymentMethod: paymentMethod || undefined,
+          payer: payer || undefined,
           newInvoice: invoiceNumber ? { number: invoiceNumber, type: "NFSE", issueDate: newInvoice.issueDate || undefined } : undefined,
         },
         token
@@ -623,6 +627,18 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
           <div className="grid gap-1.5">
             <Label>Forma de pagamento</Label>
             <Input value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="PIX" />
+          </div>
+          <div className="grid gap-1.5">
+            <Label>Pagador</Label>
+            <Select value={payer || "NONE"} onValueChange={(v) => setPayer(v === "NONE" ? "" : v)}>
+              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="NONE">—</SelectItem>
+                {Object.entries(RECEIVABLE_PAYER_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {/* Nota fiscal do recebimento — criada aqui mesmo se o número for preenchido. */}
           <div className="grid gap-2 rounded-md border p-3">

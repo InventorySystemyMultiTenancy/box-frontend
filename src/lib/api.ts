@@ -309,6 +309,14 @@ export const api = {
       token
     ),
 
+  // "Valores do projeto": corrige só a mão de obra de um problema (qualquer status).
+  updateProblemLabor: (orderId: string, approvalId: string, laborValue: number, token: string) =>
+    request<{ approval: unknown; event: unknown }>(
+      `/api/service-orders/${orderId}/parts/problems/${approvalId}/labor`,
+      { method: "PATCH", body: JSON.stringify({ laborValue }) },
+      token
+    ),
+
   priceProblem: (
     orderId: string,
     approvalId: string,

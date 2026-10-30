@@ -545,6 +545,26 @@ export default function OrderDetail({
     [token, order]
   );
 
+  // "Valores do projeto": muda a mão de obra; o servidor recalcula o total do problema.
+  const updateProblemLabor = useCallback(
+    async (approvalId: string, laborValue: number) => {
+      if (!token || !order) return;
+      const result = await api.updateProblemLabor(order.id, approvalId, laborValue, token);
+      const approval = result.approval as Approval;
+      const event = result.event as TimelineEvent;
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              approvals: prev.approvals.map((a) => (a.id === approval.id ? approval : a)),
+              timelineEvents: prev.timelineEvents.some((t) => t.id === event.id) ? prev.timelineEvents : [...prev.timelineEvents, event],
+            }
+          : prev
+      );
+    },
+    [token, order]
+  );
+
   const priceProblem = useCallback(
     async (
       approvalId: string,
@@ -997,6 +1017,7 @@ export default function OrderDetail({
                 parts={order.parts}
                 estimatedMin={order.estimatedMin}
                 deliveryExtraValue={order.deliveryExtraValue}
+                onUpdateLabor={isAdmin ? updateProblemLabor : undefined}
               />
             )}
             {isStaff && (

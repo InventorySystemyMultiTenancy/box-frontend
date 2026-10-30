@@ -55,7 +55,7 @@ export default function FornecedoresPage() {
         </div>
         {hasPermission("suppliers", "manage") && (
           <SupplierFormDialog
-            onSaved={refetch}
+            onSaved={() => void refetch()}
             trigger={
               <Button>
                 <Plus className="size-4" />
@@ -110,7 +110,7 @@ export default function FornecedoresPage() {
                   {hasPermission("suppliers", "manage") ? (
                     <SupplierFormDialog
                       supplier={supplier}
-                      onSaved={refetch}
+                      onSaved={() => void refetch()}
                       trigger={<button className="hover:underline">{supplier.name}</button>}
                     />
                   ) : (

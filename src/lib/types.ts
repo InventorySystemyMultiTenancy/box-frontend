@@ -690,6 +690,7 @@ export interface AccountReceivable {
   receivedAmount?: number | null;
   status: ReceivableStatus;
   paymentMethod?: string | null;
+  payer?: string | null;
   bankAccountId?: string | null;
   bankAccount?: BankAccount | null;
   installmentNumber?: number | null;
@@ -1121,3 +1122,12 @@ export interface PlateLookupResult {
   city: string | null;
   state: string | null;
 }
+
+// Quem pagou a conta a receber (informado em "Receber").
+export const RECEIVABLE_PAYER_LABELS: Record<string, string> = {
+  LOCALIZA: "Localiza",
+  PESSOA_JURIDICA: "Pessoa jurídica",
+  EDENRED: "Edenred",
+  PLATAFORMA: "Plataforma",
+  SEGURADORA: "Seguradora",
+};

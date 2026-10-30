@@ -13,7 +13,9 @@ import type { Supplier } from "@/lib/types";
 interface SupplierFormDialogProps {
   supplier?: Supplier;
   trigger: React.ReactNode;
-  onSaved: () => void;
+  // Novo fornecedor já com o nome digitado (ex.: cadastrado de dentro da conta a pagar).
+  initialName?: string;
+  onSaved: (saved: Supplier) => void;
 }
 
 const EMPTY_FORM = {
@@ -29,7 +31,7 @@ const EMPTY_FORM = {
   notes: "",
 };
 
-export function SupplierFormDialog({ supplier, trigger, onSaved }: SupplierFormDialogProps) {
+export function SupplierFormDialog({ supplier, trigger, initialName, onSaved }: SupplierFormDialogProps) {
   const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,7 +53,7 @@ export function SupplierFormDialog({ supplier, trigger, onSaved }: SupplierFormD
   }
 
   function handleOpenChange(next: boolean) {
-    if (next) setForm(buildForm(supplier));
+    if (next) setForm(supplier ? buildForm(supplier) : { ...EMPTY_FORM, name: initialName?.trim() ?? "" });
     setOpen(next);
   }
 
@@ -61,19 +63,22 @@ export function SupplierFormDialog({ supplier, trigger, onSaved }: SupplierFormD
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Aberto de dentro de outro form (conta a pagar): o submit não pode subir até ele.
+    e.stopPropagation();
     if (!token || !form.name.trim()) return;
     setSaving(true);
     try {
       const payload = Object.fromEntries(Object.entries(form).filter(([, v]) => v !== ""));
+      let saved: Supplier;
       if (supplier) {
-        await api.updateSupplier(supplier.id, payload, token);
+        saved = (await api.updateSupplier(supplier.id, payload, token)).supplier as Supplier;
         toast.success("Fornecedor atualizado.");
       } else {
-        await api.createSupplier(payload, token);
+        saved = (await api.createSupplier(payload, token)).supplier as Supplier;
         toast.success("Fornecedor cadastrado.");
       }
       setOpen(false);
-      onSaved();
+      onSaved(saved);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Não foi possível salvar o fornecedor.");
     } finally {
