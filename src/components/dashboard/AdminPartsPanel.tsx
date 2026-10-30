@@ -10,6 +10,7 @@ import { matchesSearch } from "@/lib/utils";
 import { PurchaseOrderFormDialog } from "@/components/dashboard/purchases/PurchaseOrderFormDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import styles from "./dashboard.module.css";
 
 function photoUrl(url?: string | null) {
@@ -95,6 +96,8 @@ export default function AdminPartsPanel() {
   }
 
   const visibleParts = parts.filter((p) => matchesSearch(search, [p.name, p.sku, p.description]));
+  // O cadastro vem inteiro (abastece os selects de peça); na tela, 10 cards e "Ver mais".
+  const shownParts = useVisibleItems(visibleParts, search);
 
   return (
     <div className={styles.content}>
@@ -154,7 +157,7 @@ export default function AdminPartsPanel() {
         className="mb-3 max-w-sm"
       />
       <div className={styles.queueGrid}>
-        {visibleParts.map((part) => (
+        {shownParts.visible.map((part) => (
           <div key={part.id} className={styles.queueCard} style={part.active ? undefined : { opacity: 0.55 }}>
             {part.photoUrl && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -191,6 +194,7 @@ export default function AdminPartsPanel() {
         ))}
         {visibleParts.length === 0 && <p className={styles.tlSub}>{parts.length === 0 ? "Nenhuma peça cadastrada ainda." : "Nenhuma peça encontrada."}</p>}
       </div>
+      <ShowMoreButton shown={shownParts.shown} total={shownParts.total} onClick={shownParts.showMore} noun="peças" />
     </div>
   );
 }

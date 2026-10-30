@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { Appointment, AppointmentStatus, AppointmentType } from "@/lib/types";
@@ -55,6 +56,8 @@ export default function AgendaReportPanel() {
       ).appointments as Appointment[],
     enabled: !!token,
   });
+  // Totais e impressão usam o período inteiro; a tabela desenha 10 por vez.
+  const shownAppointments = useVisibleItems(appointments, `${from}|${to}|${status}|${type}`);
 
   const byType = useMemo(() => {
     const map = new Map<string, number>();
@@ -157,7 +160,7 @@ export default function AgendaReportPanel() {
             {(appointments ?? []).length === 0 && (
               <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum agendamento no período.</TableCell></TableRow>
             )}
-            {(appointments ?? []).map((a) => (
+            {shownAppointments.visible.map((a) => (
               <TableRow key={a.id}>
                 <TableCell>{new Date(a.startAt).toLocaleString("pt-BR")}</TableCell>
                 <TableCell>{TYPE_LABELS[a.type]}</TableCell>
@@ -169,6 +172,7 @@ export default function AgendaReportPanel() {
             ))}
           </TableBody>
         </Table>
+        <ShowMoreButton shown={shownAppointments.shown} total={shownAppointments.total} onClick={shownAppointments.showMore} noun="agendamentos" />
       </div>
     </div>
   );

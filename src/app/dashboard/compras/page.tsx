@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PurchaseOrderFormDialog } from "@/components/dashboard/purchases/PurchaseOrderFormDialog";
 import { ReceivePurchaseOrderDialog } from "@/components/dashboard/purchases/ReceivePurchaseOrderDialog";
 import { useAuth } from "@/lib/auth-context";
+import { ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { api, ApiError } from "@/lib/api";
 import type { PurchaseOrder, PurchaseOrderStatus } from "@/lib/types";
 
@@ -33,11 +34,18 @@ export default function ComprasPage() {
   const queryClient = useQueryClient();
   const canManage = hasPermission("purchases", "manage");
 
-  const { data: orders, isLoading } = useQuery({
-    queryKey: ["purchase-orders"],
-    queryFn: async () => (await api.purchaseOrders(token!, { pageSize: 50 })).items as PurchaseOrder[],
+  // 10 pedidos; "Ver mais" busca o resto.
+  const { pageSize, showMore } = useShowMore();
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["purchase-orders", pageSize],
+    queryFn: async () => {
+      const res = await api.purchaseOrders(token!, { pageSize });
+      return { items: res.items as PurchaseOrder[], total: res.pagination.total };
+    },
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
+  const orders = data?.items;
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
@@ -157,6 +165,13 @@ export default function ComprasPage() {
           </TableBody>
         </Table>
       </div>
+      <ShowMoreButton
+        shown={orders?.length ?? 0}
+        total={data?.total ?? 0}
+        loading={isFetching && !isLoading}
+        onClick={showMore}
+        noun="pedidos"
+      />
     </main>
   );
 }

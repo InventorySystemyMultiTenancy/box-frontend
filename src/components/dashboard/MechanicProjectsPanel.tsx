@@ -13,6 +13,7 @@ import { HomeKpis } from "@/components/dashboard/HomeKpis";
 import { DeleteFinishedOrderDialog } from "@/components/dashboard/DeleteFinishedOrderDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ALL_PAGE_SIZE, LIST_PAGE_SIZE, ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import { Plus, ClipboardList, CheckCircle2, AlertTriangle, Wrench, Car, ArrowLeft, Archive, Search } from "lucide-react";
 import { matchesSearch } from "@/lib/utils";
 import styles from "./dashboard.module.css";
@@ -22,7 +23,6 @@ function orderSearchFields(order: ServiceOrder): (string | null | undefined)[] {
 }
 
 const DONE_STATUSES = new Set<ServiceOrderStatus>(["FINISHED", "READY_FOR_PICKUP"]);
-const ARCHIVED_PAGE_SIZE = 30;
 
 function sortByPriority(orders: ServiceOrder[]) {
   return [...orders].sort((a, b) => PRIORITY_RANK[b.priority ?? "NORMAL"] - PRIORITY_RANK[a.priority ?? "NORMAL"]);
@@ -75,7 +75,6 @@ export default function MechanicProjectsPanel() {
   const [loadingArchived, setLoadingArchived] = useState(false);
   const [listSearch, setListSearch] = useState("");
   const [archivedSearch, setArchivedSearch] = useState("");
-  const [archivedPage, setArchivedPage] = useState(1);
   const [archivedTotal, setArchivedTotal] = useState(0);
 
   useEffect(() => {
@@ -140,17 +139,16 @@ export default function MechanicProjectsPanel() {
   }
 
   // Finalizados/com baixa: busca e paginação no servidor (o histórico só cresce — carregar
-  // tudo de uma vez deixava a tela lenta). Página 1 ao abrir ou mudar a busca; "Carregar
-  // mais" acrescenta a próxima.
+  // tudo de uma vez deixava a tela lenta). Os 10 mais recentes ao abrir ou mudar a busca;
+  // "Ver mais" busca todos.
   const loadArchived = useCallback(
-    (page: number) => {
+    (all: boolean) => {
       if (!token) return;
       setLoadingArchived(true);
       api
-        .serviceOrderHistory(token, { q: archivedSearch.trim() || undefined, page, pageSize: ARCHIVED_PAGE_SIZE })
+        .serviceOrderHistory(token, { q: archivedSearch.trim() || undefined, page: 1, pageSize: all ? ALL_PAGE_SIZE : LIST_PAGE_SIZE })
         .then(({ orders: items, pagination }) => {
-          setArchivedOrders((prev) => (page === 1 || !prev ? (items as ServiceOrder[]) : [...prev, ...(items as ServiceOrder[])]));
-          setArchivedPage(pagination.page);
+          setArchivedOrders(items as ServiceOrder[]);
           setArchivedTotal(pagination.total);
         })
         .finally(() => setLoadingArchived(false));
@@ -160,7 +158,7 @@ export default function MechanicProjectsPanel() {
 
   useEffect(() => {
     if (!showArchived) return;
-    const timer = setTimeout(() => loadArchived(1), 300);
+    const timer = setTimeout(() => loadArchived(false), 300);
     return () => clearTimeout(timer);
   }, [showArchived, loadArchived]);
 
@@ -170,6 +168,8 @@ export default function MechanicProjectsPanel() {
     [sortedActiveOrders, listSearch]
   );
   const filteredArchivedOrders = archivedOrders ?? [];
+  // Lista (não o kanban, que precisa de todos para as colunas): desenha 10 por vez.
+  const listOrders = useVisibleItems(filteredListOrders, listSearch);
 
   if (selectedOrderId) {
     return (
@@ -216,11 +216,6 @@ export default function MechanicProjectsPanel() {
         {archivedOrders !== null && archivedOrders.length === 0 && (
           <p className={styles.tlSub}>{archivedSearch.trim() ? "Nenhum projeto encontrado para essa busca." : "Nenhum projeto finalizado ou com baixa dada ainda."}</p>
         )}
-        {archivedOrders !== null && archivedOrders.length > 0 && (
-          <p className={styles.tlSub} style={{ marginBottom: "0.5rem" }}>
-            Mostrando {archivedOrders.length} de {archivedTotal}
-          </p>
-        )}
         {filteredArchivedOrders.length > 0 && (
           <div className={styles.ordersList}>
             {filteredArchivedOrders.map((order) => (
@@ -243,10 +238,14 @@ export default function MechanicProjectsPanel() {
             ))}
           </div>
         )}
-        {archivedOrders !== null && archivedOrders.length < archivedTotal && (
-          <Button variant="outline" size="sm" className="mt-3" disabled={loadingArchived} onClick={() => loadArchived(archivedPage + 1)}>
-            {loadingArchived ? "Carregando..." : "Carregar mais"}
-          </Button>
+        {archivedOrders !== null && (
+          <ShowMoreButton
+            shown={archivedOrders.length}
+            total={archivedTotal}
+            loading={loadingArchived && archivedOrders.length > 0}
+            onClick={() => loadArchived(true)}
+            noun="projetos"
+          />
         )}
       </div>
     );
@@ -317,7 +316,7 @@ export default function MechanicProjectsPanel() {
           </div>
           {filteredListOrders.length === 0 && <p className={styles.tlSub}>Nenhum projeto encontrado para essa busca.</p>}
           <div className={styles.ordersList}>
-          {filteredListOrders.map((order) => {
+          {listOrders.visible.map((order) => {
             const priority = order.priority ?? "NORMAL";
             return (
               <button
@@ -351,6 +350,7 @@ export default function MechanicProjectsPanel() {
             );
           })}
           </div>
+          <ShowMoreButton shown={listOrders.shown} total={listOrders.total} onClick={listOrders.showMore} noun="projetos" />
         </>
       )}
 

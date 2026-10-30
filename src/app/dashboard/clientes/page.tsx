@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ClientFormDialog } from "@/components/dashboard/clients/ClientFormDialog";
 import { useAuth } from "@/lib/auth-context";
+import { ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { api } from "@/lib/api";
 import type { Client } from "@/lib/types";
 
@@ -17,15 +18,17 @@ export default function ClientesPage() {
   const { token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
+  // 10 clientes; "Ver mais" busca o resto (volta a 10 quando a busca muda).
+  const { pageSize, showMore } = useShowMore(q);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["clients", q, page],
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["clients", q, pageSize],
     queryFn: async () => {
-      const res = await api.clients(token!, { q, page, pageSize: 20 });
+      const res = await api.clients(token!, { q, pageSize });
       return { items: res.items as Client[], pagination: res.pagination };
     },
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
 
   const clients = useMemo(() => data?.items ?? [], [data]);
@@ -63,7 +66,6 @@ export default function ClientesPage() {
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
-            setPage(1);
           }}
         />
       </div>
@@ -114,21 +116,13 @@ export default function ClientesPage() {
         </Table>
       </div>
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-          <span>
-            Página {pagination.page} de {pagination.totalPages} — {pagination.total} clientes
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Anterior
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Próxima
-            </Button>
-          </div>
-        </div>
-      )}
+      <ShowMoreButton
+        shown={clients.length}
+        total={pagination?.total ?? 0}
+        loading={isFetching && !isLoading}
+        onClick={showMore}
+        noun="clientes"
+      />
     </main>
   );
 }

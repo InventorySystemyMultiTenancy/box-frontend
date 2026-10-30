@@ -8,12 +8,14 @@ import { User, Role } from "@/lib/types";
 import { UserFormDialog } from "@/components/dashboard/users/UserFormDialog";
 import { WhatsappConnectionPanel } from "@/components/dashboard/users/WhatsappConnectionPanel";
 import { ScrollX } from "@/components/ui/scroll-x";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import styles from "./dashboard.module.css";
 import { displayEmail } from "@/lib/utils";
 
 export default function MechanicUsersPanel() {
   const { token, user: me } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
+  const visibleUsers = useVisibleItems(users);
   const [roles, setRoles] = useState<Role[]>([]);
   const [userForm, setUserForm] = useState({
     name: "",
@@ -206,7 +208,7 @@ export default function MechanicUsersPanel() {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {visibleUsers.visible.map((user) => (
               <tr key={user.id} style={user.active === false ? { opacity: 0.55 } : undefined}>
                 <td>
                   <strong>{user.name}</strong>
@@ -267,6 +269,7 @@ export default function MechanicUsersPanel() {
           </tbody>
         </table>
       </ScrollX>
+      <ShowMoreButton shown={visibleUsers.shown} total={visibleUsers.total} onClick={visibleUsers.showMore} noun="usuários" />
     </div>
   );
 }

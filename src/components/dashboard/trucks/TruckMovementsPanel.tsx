@@ -1,14 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { api, API_URL } from "@/lib/api";
-import { matchesSearch } from "@/lib/utils";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import type { TruckTrip } from "@/lib/types";
 
 function mediaUrl(url: string) {
@@ -82,30 +83,23 @@ export function TruckMovementsPanel() {
   const { token } = useAuth();
   const [search, setSearch] = useState("");
 
-  const { data: trips, isLoading } = useQuery({
-    queryKey: ["truck-movements"],
-    queryFn: async () => (await api.truckMovements(token!)).trips as TruckTrip[],
+  // Busca e paginação no servidor (placa, caminhão, motorista ou dia "12/05"): 10 por vez.
+  const q = useDebouncedValue(search.trim());
+  const list = useShowMore(q);
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["truck-movements", q, list.pageSize],
+    queryFn: async () => {
+      const res = await api.truckMovements(token!, { q: q || undefined, pageSize: list.pageSize });
+      return { trips: res.trips as TruckTrip[], total: res.pagination.total };
+    },
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
-
-  const filteredTrips = useMemo(
-    () =>
-      (trips ?? []).filter((trip) =>
-        matchesSearch(search, [
-          trip.truck?.plate,
-          trip.truck?.brand,
-          trip.truck?.model,
-          trip.driver?.name,
-          formatDate(trip.startedAt),
-          formatDate(trip.endedAt),
-        ])
-      ),
-    [trips, search]
-  );
+  const filteredTrips = data?.trips ?? [];
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
 
-  if (!trips || trips.length === 0) {
+  if (!q && !search.trim() && filteredTrips.length === 0) {
     return <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Nenhuma movimentação registrada ainda.</p>;
   }
 
@@ -125,6 +119,7 @@ export function TruckMovementsPanel() {
           ))}
         </div>
       )}
+      <ShowMoreButton shown={filteredTrips.length} total={data?.total ?? 0} loading={isFetching && list.showAll} onClick={list.showMore} noun="movimentações" />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertTriangle, Clock, FolderTree, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { ALL_PAGE_SIZE, ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDialog";
 import { ExpenseClassificationsDialog } from "@/components/dashboard/finance/ExpenseClassificationsDialog";
 import { SettleManyDialog } from "@/components/dashboard/finance/SettleManyDialog";
@@ -116,23 +117,25 @@ function PayablesList() {
     enabled: !!token,
   });
 
-  const { data: page, isLoading, dataUpdatedAt } = useQuery({
-    queryKey: ["payables", view, filterKey],
-    queryFn: async () =>
-      api.payables(token!, {
-        ...(view === "open"
-          ? { situation: "open" as const }
-          : view === "paid"
-            ? { situation: "paid" as const }
-            : view === "overdue"
-              ? { status: "OVERDUE" }
-              : view === "cancelled"
-                ? { status: "CANCELLED" }
-                : {}),
-        ...filterParams,
-        pageSize: 100,
-      }),
+  const listParams = {
+    ...(view === "open"
+      ? { situation: "open" as const }
+      : view === "paid"
+        ? { situation: "paid" as const }
+        : view === "overdue"
+          ? { status: "OVERDUE" }
+          : view === "cancelled"
+            ? { status: "CANCELLED" }
+            : {}),
+    ...filterParams,
+  };
+  // Começa com 10 contas; "Ver mais" busca todas do filtro (volta a 10 ao trocar aba/filtro).
+  const { pageSize, showMore } = useShowMore(`${view}|${filterKey}`);
+  const { data: page, isLoading, isFetching, dataUpdatedAt } = useQuery({
+    queryKey: ["payables", view, filterKey, pageSize],
+    queryFn: async () => api.payables(token!, { ...listParams, pageSize }),
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
   const data = page?.items as AccountPayable[] | undefined;
   const total = page?.pagination.total ?? 0;
@@ -314,6 +317,7 @@ function PayablesList() {
               .filter(Boolean)
               .join(" ")}
             rows={data ?? []}
+            loadRows={async () => (await api.payables(token!, { ...listParams, pageSize: ALL_PAGE_SIZE })).items as AccountPayable[]}
             columns={[
               { header: "Descrição", value: (p) => (p.installmentTotal && p.installmentTotal > 1 ? `${p.description} (${p.installmentNumber}/${p.installmentTotal})` : p.description) },
               { header: "Fornecedor/Beneficiário", value: (p) => p.payeeName },
@@ -340,12 +344,12 @@ function PayablesList() {
         </div>
       </div>
 
-      {/* Seleção em lote: "Selecionar tudo" pega todas as contas em aberto da lista filtrada. */}
+      {/* Seleção em lote: "Selecionar tudo" pega as contas em aberto que estão na tela. */}
       {canManage && openRows.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-3 py-2 text-sm">
           <label className="flex items-center gap-2">
             <Checkbox checked={allSelected} onCheckedChange={(v) => toggleAll(v === true)} aria-label="Selecionar todas as contas em aberto" />
-            Selecionar tudo ({openRows.length} em aberto{hasFilters ? " no filtro" : ""})
+            Selecionar tudo ({openRows.length} em aberto na tela)
           </label>
           {/* Pergunta se mantém a data de hoje; se não, uma data por conta. */}
           <SettleManyDialog
@@ -357,9 +361,7 @@ function PayablesList() {
             }}
           />
           {total > (data?.length ?? 0) && (
-            <span className="text-xs text-muted-foreground">
-              Mostrando {data?.length ?? 0} de {total} contas — refine o filtro para alcançar as demais.
-            </span>
+            <span className="text-xs text-muted-foreground">Use &ldquo;Ver mais&rdquo; para incluir as outras {total - (data?.length ?? 0)} contas.</span>
           )}
         </div>
       )}
@@ -466,6 +468,7 @@ function PayablesList() {
             ))}
           </TableBody>
         </Table>
+        <ShowMoreButton shown={data?.length ?? 0} total={total} onClick={showMore} loading={isFetching && !isLoading && (data?.length ?? 0) < total} noun="contas" />
       </div>
     </div>
   );

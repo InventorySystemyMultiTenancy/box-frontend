@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import { toast } from "sonner";
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ export default function RelatoriosPage() {
     queryFn: async () => (await api.revisionAlerts(token!)).alerts as RevisionAlert[],
     enabled: !!token && allowed && showRevision,
   });
+  const shownAlerts = useVisibleItems(alerts);
 
   if (!allowed) return null;
 
@@ -244,7 +246,7 @@ export default function RelatoriosPage() {
                   {(alerts ?? []).length === 0 && (
                     <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Nenhum veículo em atraso.</TableCell></TableRow>
                   )}
-                  {(alerts ?? []).map((a) => (
+                  {shownAlerts.visible.map((a) => (
                     <TableRow key={a.vehicle.id}>
                       <TableCell className="font-medium">{a.vehicle.brand} {a.vehicle.model} {a.vehicle.plate ? `(${a.vehicle.plate})` : ""}</TableCell>
                       <TableCell className="text-muted-foreground">{a.owner.name}</TableCell>
@@ -253,6 +255,7 @@ export default function RelatoriosPage() {
                   ))}
                 </TableBody>
               </Table>
+              <ShowMoreButton shown={shownAlerts.shown} total={shownAlerts.total} onClick={shownAlerts.showMore} noun="veículos" />
             </CardContent>
           </Card>
         )}

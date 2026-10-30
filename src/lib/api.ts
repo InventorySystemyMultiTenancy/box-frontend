@@ -374,8 +374,9 @@ export const api = {
     request<void>(`/api/finance/expenses/${id}`, { method: "DELETE" }, token),
 
   // Admin: gastos de todo mundo (scope "mine" = só os dele). Funcionário: sempre os seus.
-  myExpenses: (token: string, params: { from?: string; to?: string; scope?: "mine" } = {}) =>
-    request<{ entries: unknown[]; total: number }>(`/api/finance/my-expenses${toQuery(params)}`, {}, token),
+  // Com pageSize: só a página (lista da aba); `total` (soma) e `count` são do período inteiro.
+  myExpenses: (token: string, params: { from?: string; to?: string; scope?: "mine"; pageSize?: number } = {}) =>
+    request<{ entries: unknown[]; total: number; count?: number }>(`/api/finance/my-expenses${toQuery(params)}`, {}, token),
 
   updateFinancialEntry: (id: string, payload: Record<string, unknown>, token: string) =>
     request<{ entry: unknown }>(`/api/finance/entries/${id}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
@@ -951,7 +952,8 @@ export const api = {
 
   truckTrips: (truckId: string, token: string) => request<{ trips: unknown[] }>(`/api/trucks/${truckId}/trips`, {}, token),
 
-  truckMovements: (token: string) => request<{ trips: unknown[] }>("/api/trucks/movements", {}, token),
+  truckMovements: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ trips: unknown[]; pagination: Pagination }>(`/api/trucks/movements${toQuery(params)}`, {}, token),
 
   startTruckTrip: (
     truckId: string,
@@ -996,7 +998,8 @@ export const api = {
 
   truckRefuelings: (truckId: string, token: string) => request<{ refuelings: unknown[] }>(`/api/trucks/${truckId}/refuelings`, {}, token),
 
-  allTruckRefuelings: (token: string) => request<{ refuelings: unknown[] }>("/api/trucks/refuelings", {}, token),
+  allTruckRefuelings: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) =>
+    request<{ refuelings: unknown[]; pagination: Pagination }>(`/api/trucks/refuelings${toQuery(params)}`, {}, token),
 
   createTruckRefueling: (
     truckId: string,

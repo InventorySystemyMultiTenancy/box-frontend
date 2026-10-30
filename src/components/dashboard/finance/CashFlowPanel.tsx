@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
@@ -70,6 +71,8 @@ export default function CashFlowPanel() {
         ...cashFlow.entries.map((record): LedgerRow => ({ kind: "entry", date: record.occurredAt, record })),
       ].sort((a, b) => b.date.localeCompare(a.date))
     : [];
+  // Totais, planilha e PDF usam todos os lançamentos do período; a tabela desenha 10 por vez.
+  const ledger = useVisibleItems(rows, `${from}|${to}`);
 
   // Colunas da planilha de lançamentos — mesmo sinal (+/-) e valor efetivo do PDF abaixo.
   const ledgerColumns: ExportColumn<LedgerRow>[] = [
@@ -258,7 +261,7 @@ export default function CashFlowPanel() {
               {rows.length === 0 && (
                 <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum lançamento no período.</TableCell></TableRow>
               )}
-              {rows.map((row) => {
+              {ledger.visible.map((row) => {
                 const isOut = row.kind === "payable" || (row.kind === "entry" && row.record.type === "EXPENSE");
                 const amount =
                   row.kind === "receivable"
@@ -286,6 +289,7 @@ export default function CashFlowPanel() {
               })}
             </TableBody>
           </Table>
+          <ShowMoreButton shown={ledger.shown} total={ledger.total} onClick={ledger.showMore} noun="lançamentos" />
         </CardContent>
       </Card>
 

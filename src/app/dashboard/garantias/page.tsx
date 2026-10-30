@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import { useAuth } from "@/lib/auth-context";
 import { api } from "@/lib/api";
 import type { ExpiringWarrantyPart } from "@/lib/types";
@@ -49,6 +50,7 @@ export default function GarantiasPage() {
       return haystack.includes(term);
     });
   }, [parts, search]);
+  const shownParts = useVisibleItems(filteredParts, `${withinDays}|${search}`);
 
   if (!allowed) return null;
 
@@ -106,7 +108,7 @@ export default function GarantiasPage() {
             {!isLoading && (parts ?? []).length > 0 && filteredParts.length === 0 && (
               <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Nenhum resultado para essa busca.</TableCell></TableRow>
             )}
-            {filteredParts.map((part) => (
+            {shownParts.visible.map((part) => (
               <TableRow key={part.id}>
                 <TableCell className="font-medium">{part.name}</TableCell>
                 <TableCell className="font-mono text-sm">{part.serviceOrder.code}</TableCell>
@@ -125,6 +127,7 @@ export default function GarantiasPage() {
             ))}
           </TableBody>
         </Table>
+        <ShowMoreButton shown={shownParts.shown} total={shownParts.total} onClick={shownParts.showMore} noun="garantias" />
       </div>
     </main>
   );

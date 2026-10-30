@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SupplierFormDialog } from "@/components/dashboard/suppliers/SupplierFormDialog";
 import { useAuth } from "@/lib/auth-context";
+import { ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { api, ApiError } from "@/lib/api";
 import type { Supplier } from "@/lib/types";
 
@@ -17,15 +18,17 @@ export default function FornecedoresPage() {
   const { token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
+  // 10 fornecedores; "Ver mais" busca o resto (volta a 10 quando a busca muda).
+  const { pageSize, showMore } = useShowMore(q);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["suppliers", q, page],
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["suppliers", q, pageSize],
     queryFn: async () => {
-      const res = await api.suppliers(token!, { q, page, pageSize: 20 });
+      const res = await api.suppliers(token!, { q, pageSize });
       return { items: res.items as Supplier[], pagination: res.pagination };
     },
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
 
   const suppliers = useMemo(() => data?.items ?? [], [data]);
@@ -74,7 +77,6 @@ export default function FornecedoresPage() {
           value={q}
           onChange={(e) => {
             setQ(e.target.value);
-            setPage(1);
           }}
         />
       </div>
@@ -142,21 +144,13 @@ export default function FornecedoresPage() {
         </Table>
       </div>
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-          <span>
-            Página {pagination.page} de {pagination.totalPages} — {pagination.total} fornecedores
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Anterior
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Próxima
-            </Button>
-          </div>
-        </div>
-      )}
+      <ShowMoreButton
+        shown={suppliers.length}
+        total={pagination?.total ?? 0}
+        loading={isFetching && !isLoading}
+        onClick={showMore}
+        noun="fornecedores"
+      />
     </main>
   );
 }

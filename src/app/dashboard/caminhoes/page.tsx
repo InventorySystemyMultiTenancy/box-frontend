@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { matchesSearch } from "@/lib/utils";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import type { Appointment, Truck } from "@/lib/types";
 
 const APPOINTMENT_TYPE_LABELS: Record<string, string> = { PICKUP: "retirar", DROPOFF: "entregar" };
@@ -81,6 +82,7 @@ export default function CaminhoesPage() {
       }),
     [visibleTrucks, search]
   );
+  const shownTrucks = useVisibleItems(filteredTrucks, search);
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -189,7 +191,7 @@ export default function CaminhoesPage() {
           )}
 
           <div className="grid gap-3">
-            {filteredTrucks.map((truck) => {
+            {shownTrucks.visible.map((truck) => {
               const openTrip = truck.trips?.[0];
               const canOperate = isAdmin || truck.assignedEmployeeId === user?.id;
               return (
@@ -239,6 +241,7 @@ export default function CaminhoesPage() {
               );
             })}
           </div>
+          <ShowMoreButton shown={shownTrucks.shown} total={shownTrucks.total} onClick={shownTrucks.showMore} noun="caminhões" />
         </>
       )}
     </main>

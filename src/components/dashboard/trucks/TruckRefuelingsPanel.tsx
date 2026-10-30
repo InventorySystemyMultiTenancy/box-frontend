@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Search, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth-context";
 import { api, API_URL } from "@/lib/api";
-import { matchesSearch } from "@/lib/utils";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
+import { ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import type { ConsumptionAlert, TruckRefueling } from "@/lib/types";
 
 function mediaUrl(url: string) {
@@ -94,23 +95,23 @@ export function TruckRefuelingsPanel() {
   const { token } = useAuth();
   const [search, setSearch] = useState("");
 
-  const { data: refuelings, isLoading } = useQuery({
-    queryKey: ["truck-refuelings"],
-    queryFn: async () => (await api.allTruckRefuelings(token!)).refuelings as TruckRefueling[],
+  // Busca e paginação no servidor (placa, caminhão, motorista ou dia "12/05"): 10 por vez.
+  const q = useDebouncedValue(search.trim());
+  const list = useShowMore(q);
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["truck-refuelings", q, list.pageSize],
+    queryFn: async () => {
+      const res = await api.allTruckRefuelings(token!, { q: q || undefined, pageSize: list.pageSize });
+      return { refuelings: res.refuelings as TruckRefueling[], total: res.pagination.total };
+    },
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
-
-  const filteredRefuelings = useMemo(
-    () =>
-      (refuelings ?? []).filter((r) =>
-        matchesSearch(search, [r.truck?.plate, r.truck?.brand, r.truck?.model, r.driver?.name, formatDate(r.createdAt)])
-      ),
-    [refuelings, search]
-  );
+  const filteredRefuelings = data?.refuelings ?? [];
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
 
-  if (!refuelings || refuelings.length === 0) {
+  if (!q && !search.trim() && filteredRefuelings.length === 0) {
     return <p className="rounded-lg border bg-card p-6 text-center text-sm text-muted-foreground">Nenhum abastecimento registrado ainda.</p>;
   }
 
@@ -130,6 +131,7 @@ export function TruckRefuelingsPanel() {
           ))}
         </div>
       )}
+      <ShowMoreButton shown={filteredRefuelings.length} total={data?.total ?? 0} loading={isFetching && list.showAll} onClick={list.showMore} noun="abastecimentos" />
     </div>
   );
 }

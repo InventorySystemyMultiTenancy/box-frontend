@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth-context";
+import { ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { api, ApiError } from "@/lib/api";
 import type { Client, CounterSale, InventoryPart, Store } from "@/lib/types";
 
@@ -60,11 +61,18 @@ export default function PdvPage() {
     enabled: !!token,
   });
 
-  const { data: sales, isLoading } = useQuery({
-    queryKey: ["counter-sales"],
-    queryFn: async () => (await api.counterSales(token!, { pageSize: 20 })).items as CounterSale[],
+  // Últimas 10 vendas; "Ver mais" busca o resto.
+  const { pageSize, showMore } = useShowMore();
+  const { data: salesPage, isLoading, isFetching } = useQuery({
+    queryKey: ["counter-sales", pageSize],
+    queryFn: async () => {
+      const res = await api.counterSales(token!, { pageSize });
+      return { items: res.items as CounterSale[], total: res.pagination.total };
+    },
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
+  const sales = salesPage?.items;
 
   if (!allowed) return null;
 
@@ -283,6 +291,13 @@ export default function PdvPage() {
           </TableBody>
         </Table>
       </div>
+      <ShowMoreButton
+        shown={sales?.length ?? 0}
+        total={salesPage?.total ?? 0}
+        loading={isFetching && !isLoading}
+        onClick={showMore}
+        noun="vendas"
+      />
     </main>
   );
 }

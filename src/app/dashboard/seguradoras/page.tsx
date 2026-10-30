@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Search, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { InsuranceCompanyFormDialog } from "@/components/dashboard/insurance/InsuranceCompanyFormDialog";
 import { useAuth } from "@/lib/auth-context";
+import { ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { api, ApiError } from "@/lib/api";
 import type { InsuranceCompany } from "@/lib/types";
 
@@ -20,15 +21,17 @@ export default function SeguradorasPage() {
   const queryClient = useQueryClient();
   const [q, setQ] = useState("");
   const [accreditedOnly, setAccreditedOnly] = useState(false);
-  const [page, setPage] = useState(1);
+  // 10 seguradoras; "Ver mais" busca o resto (volta a 10 quando busca/filtro mudam).
+  const { pageSize, showMore } = useShowMore(`${q}|${accreditedOnly}`);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["insurance-companies", q, accreditedOnly, page],
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["insurance-companies", q, accreditedOnly, pageSize],
     queryFn: async () => {
-      const res = await api.insuranceCompanies(token!, { q, accredited: accreditedOnly ? "true" : undefined, page, pageSize: 20 });
+      const res = await api.insuranceCompanies(token!, { q, accredited: accreditedOnly ? "true" : undefined, pageSize });
       return { items: res.items as InsuranceCompany[], pagination: res.pagination };
     },
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
 
   const companies = useMemo(() => data?.items ?? [], [data]);
@@ -78,7 +81,6 @@ export default function SeguradorasPage() {
             value={q}
             onChange={(e) => {
               setQ(e.target.value);
-              setPage(1);
             }}
           />
         </div>
@@ -88,7 +90,6 @@ export default function SeguradorasPage() {
             checked={accreditedOnly}
             onCheckedChange={(v) => {
               setAccreditedOnly(v === true);
-              setPage(1);
             }}
           />
           <Label htmlFor="accredited-filter" className="font-normal">Mostrar somente credenciadas</Label>
@@ -157,21 +158,13 @@ export default function SeguradorasPage() {
         </Table>
       </div>
 
-      {pagination && pagination.totalPages > 1 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-          <span>
-            Página {pagination.page} de {pagination.totalPages} — {pagination.total} seguradoras
-          </span>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Anterior
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= pagination.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Próxima
-            </Button>
-          </div>
-        </div>
-      )}
+      <ShowMoreButton
+        shown={companies.length}
+        total={pagination?.total ?? 0}
+        loading={isFetching && !isLoading}
+        onClick={showMore}
+        noun="seguradoras"
+      />
     </main>
   );
 }

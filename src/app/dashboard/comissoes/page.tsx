@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { ALL_PAGE_SIZE, ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -45,11 +46,16 @@ export default function ComissoesPage() {
   const [status, setStatus] = useState("");
   const [generating, setGenerating] = useState(false);
 
-  const { data: commissions, isLoading } = useQuery({
-    queryKey: ["commissions", status],
-    queryFn: async () => (await api.commissions(token!, { status: status || undefined, pageSize: 50 })).items as Commission[],
+  // Começa com 10 comissões; "Ver mais" busca todas do status escolhido.
+  const { pageSize, showMore } = useShowMore(status);
+  const { data: page, isLoading, isFetching } = useQuery({
+    queryKey: ["commissions", status, pageSize],
+    queryFn: async () => api.commissions(token!, { status: status || undefined, pageSize }),
     enabled: !!token && allowed,
+    placeholderData: keepPreviousData,
   });
+  const commissions = page?.items as Commission[] | undefined;
+  const total = page?.pagination.total ?? 0;
 
   const { data: accounts } = useQuery({
     queryKey: ["bank-accounts"],
@@ -141,6 +147,7 @@ export default function ComissoesPage() {
           filename="comissoes"
           subtitle={status ? `Status: ${STATUS_LABELS[status as CommissionStatus]}.` : undefined}
           rows={commissions ?? []}
+          loadRows={async () => (await api.commissions(token!, { status: status || undefined, pageSize: ALL_PAGE_SIZE })).items as Commission[]}
           columns={[
             { header: "Mecânico", value: (c) => c.mechanic.name },
             { header: "OS", value: (c) => c.serviceOrder.code },
@@ -218,6 +225,7 @@ export default function ComissoesPage() {
             ))}
           </TableBody>
         </Table>
+        <ShowMoreButton shown={commissions?.length ?? 0} total={total} onClick={showMore} loading={isFetching && !isLoading && (commissions?.length ?? 0) < total} noun="comissões" />
       </div>
     </main>
   );

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Check, Car, Wallet, Calendar, MessageCircle, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError, ALERTS_CHANGED_EVENT } from "@/lib/api";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
@@ -173,6 +174,10 @@ export default function AlertasPage() {
   });
 
   const visibleNotifications = selectedCategory && selectedCategory !== "CLIENTES" ? grouped.get(selectedCategory) ?? [] : [];
+  // Só os não lidos já vêm do servidor (as contagens dos cards precisam de todos); na tela,
+  // 10 por categoria e "Ver mais".
+  const shownNotifications = useVisibleItems(visibleNotifications, selectedCategory ?? "");
+  const shownReminders = useVisibleItems(reminders, "CLIENTES");
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -231,7 +236,7 @@ export default function AlertasPage() {
               Nenhum cliente com revisão atrasada ou garantia vencendo nos próximos 30 dias.
             </p>
           )}
-          {(reminders ?? []).map((r) => (
+          {shownReminders.visible.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{r.kind}</Badge>
@@ -249,6 +254,7 @@ export default function AlertasPage() {
               )}
             </div>
           ))}
+          <ShowMoreButton shown={shownReminders.shown} total={shownReminders.total} onClick={shownReminders.showMore} noun="lembretes" />
         </div>
       )}
 
@@ -259,7 +265,7 @@ export default function AlertasPage() {
               Nenhum alerta de {CATEGORY_THEME[selectedCategory].label.toLowerCase()} no momento.
             </p>
           )}
-          {visibleNotifications.map((n) => (
+          {shownNotifications.visible.map((n) => (
             <div key={n.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{TYPE_LABELS[n.type] ?? n.type}</Badge>
@@ -271,6 +277,7 @@ export default function AlertasPage() {
               </Button>
             </div>
           ))}
+          <ShowMoreButton shown={shownNotifications.shown} total={shownNotifications.total} onClick={shownNotifications.showMore} noun="alertas" />
         </div>
       )}
     </main>

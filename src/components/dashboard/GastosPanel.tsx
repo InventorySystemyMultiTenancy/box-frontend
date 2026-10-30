@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { toast } from "sonner";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -239,13 +240,15 @@ function MyExpensesList({
   const [edit, setEdit] = useState({ category: "", description: "", amount: "", occurredAt: "" });
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["my-expenses", from, to, scope ?? "all"],
+  const list = useShowMore(`${from}|${to}|${scope ?? "all"}`);
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["my-expenses", from, to, scope ?? "all", list.pageSize],
     queryFn: async () => {
-      const res = await api.myExpenses(token!, { from, to, scope });
-      return { entries: res.entries as FinancialEntry[], total: res.total };
+      const res = await api.myExpenses(token!, { from, to, scope, pageSize: list.pageSize });
+      return { entries: res.entries as FinancialEntry[], total: res.total, count: res.count ?? res.entries.length };
     },
     enabled: !!token && !!from && !!to,
+    placeholderData: keepPreviousData,
   });
 
   function refetch() {
@@ -389,6 +392,9 @@ function MyExpensesList({
             </tr>
           </tfoot>
         </table>
+      )}
+      {entries.length > 0 && (
+        <ShowMoreButton shown={entries.length} total={data?.count ?? entries.length} loading={isFetching && list.showAll} onClick={list.showMore} noun="gastos" />
       )}
     </ScrollX>
   );

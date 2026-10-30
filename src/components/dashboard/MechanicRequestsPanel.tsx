@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { getSocket, joinStaffRoom } from "@/lib/socket";
 import { QuoteRequest } from "@/lib/types";
 import QuoteRequestQueueCard from "@/components/dashboard/QuoteRequestQueueCard";
+import { ShowMoreButton, useVisibleItems } from "@/components/ui/show-more";
 import styles from "./dashboard.module.css";
 
 /** Fila de solicitações de orçamento — o mecânico aceita (agenda) ou recusa. */
@@ -50,6 +51,8 @@ export default function MechanicRequestsPanel() {
     setPendingRequests((prev) => prev.filter((r) => r.id !== request.id));
   }
 
+  const visibleRequests = useVisibleItems(pendingRequests);
+
   return (
     <div className={styles.content}>
       <div className={styles.sectionTitle}>Solicitações de orçamento pendentes</div>
@@ -57,7 +60,7 @@ export default function MechanicRequestsPanel() {
         <p className={styles.tlSub}>Nenhuma solicitação aguardando resposta.</p>
       ) : (
         <div className={styles.queueGrid}>
-          {pendingRequests.map((request) => (
+          {visibleRequests.visible.map((request) => (
             <QuoteRequestQueueCard
               key={request.id}
               request={request}
@@ -67,6 +70,7 @@ export default function MechanicRequestsPanel() {
           ))}
         </div>
       )}
+      <ShowMoreButton shown={visibleRequests.shown} total={visibleRequests.total} onClick={visibleRequests.showMore} noun="solicitações" />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
+import { ALL_PAGE_SIZE, ShowMoreButton, useShowMore } from "@/components/ui/show-more";
 import { SuggestInput } from "@/components/ui/suggest-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker";
@@ -43,11 +44,16 @@ export default function InvoicesPanel() {
   const canManage = hasPermission("invoices", "manage");
   const [search, setSearch] = useState(EMPTY_SEARCH);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["invoices", search],
-    queryFn: async () => (await api.invoices(token!, { pageSize: 50, ...search })).items as Invoice[],
+  // Começa com 10 notas; "Ver mais" busca todas da busca (volta a 10 ao mudar a busca).
+  const { pageSize, showMore } = useShowMore(JSON.stringify(search));
+  const { data: page, isLoading, isFetching } = useQuery({
+    queryKey: ["invoices", search, pageSize],
+    queryFn: async () => api.invoices(token!, { pageSize, ...search }),
     enabled: !!token,
+    placeholderData: keepPreviousData,
   });
+  const data = page?.items as Invoice[] | undefined;
+  const total = page?.pagination.total ?? 0;
 
   function refetch() {
     queryClient.invalidateQueries({ queryKey: ["invoices"] });
@@ -88,6 +94,7 @@ export default function InvoicesPanel() {
           title="Notas fiscais"
           filename="notas-fiscais"
           rows={data ?? []}
+          loadRows={async () => (await api.invoices(token!, { ...search, pageSize: ALL_PAGE_SIZE })).items as Invoice[]}
           columns={[
             { header: "Tipo", value: (i) => TYPE_LABELS[i.type] },
             { header: "Número", value: (i) => i.number },
@@ -205,6 +212,7 @@ export default function InvoicesPanel() {
             ))}
           </TableBody>
         </Table>
+        <ShowMoreButton shown={data?.length ?? 0} total={total} onClick={showMore} loading={isFetching && !isLoading && (data?.length ?? 0) < total} noun="notas" />
       </div>
     </div>
   );
