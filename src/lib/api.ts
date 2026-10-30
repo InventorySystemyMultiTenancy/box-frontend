@@ -515,6 +515,24 @@ export const api = {
   expenseClassifications: (token: string) =>
     request<ExpenseClassifications>("/api/finance/payables/classifications", {}, token),
 
+  // "Grupos e categorias": cada alteração devolve as classificações atualizadas.
+  createExpenseGroup: (name: string, token: string) =>
+    request<ExpenseClassifications>("/api/finance/payables/classifications/groups", { method: "POST", body: JSON.stringify({ name }) }, token),
+  renameExpenseGroup: (oldName: string, name: string, token: string) =>
+    request<ExpenseClassifications>("/api/finance/payables/classifications/groups", { method: "PATCH", body: JSON.stringify({ oldName, name }) }, token),
+  deleteExpenseGroup: (name: string, token: string) =>
+    request<ExpenseClassifications>(`/api/finance/payables/classifications/groups?${new URLSearchParams({ name })}`, { method: "DELETE" }, token),
+  createExpenseCategory: (group: string, name: string, token: string) =>
+    request<ExpenseClassifications>("/api/finance/payables/classifications/categories", { method: "POST", body: JSON.stringify({ group, name }) }, token),
+  renameExpenseCategory: (group: string, oldName: string, name: string, token: string) =>
+    request<ExpenseClassifications>(
+      "/api/finance/payables/classifications/categories",
+      { method: "PATCH", body: JSON.stringify({ group, oldName, name }) },
+      token
+    ),
+  deleteExpenseCategory: (group: string, name: string, token: string) =>
+    request<ExpenseClassifications>(`/api/finance/payables/classifications/categories?${new URLSearchParams({ group, name })}`, { method: "DELETE" }, token),
+
   // Totais do topo (em aberto / vencido / já pago) — mesmos filtros da lista, sem situação.
   payablesSummary: (token: string, params: Record<string, string | undefined> = {}) =>
     request<{ summary: SettlementSummary }>(`/api/finance/payables/summary${toQuery(params)}`, {}, token),

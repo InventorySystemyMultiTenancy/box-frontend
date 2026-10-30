@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Clock, Plus } from "lucide-react";
+import { AlertTriangle, Clock, FolderTree, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExportButtons } from "@/components/ui/export-buttons";
 import { PayableFormDialog } from "@/components/dashboard/finance/PayableFormDialog";
+import { ExpenseClassificationsDialog } from "@/components/dashboard/finance/ExpenseClassificationsDialog";
 import { SettleManyDialog } from "@/components/dashboard/finance/SettleManyDialog";
 import { SettlementSummaryCards } from "@/components/dashboard/finance/SettlementSummaryCards";
 import InvoicesPanel from "@/components/dashboard/finance/InvoicesPanel";
@@ -332,6 +333,9 @@ function PayablesList() {
               { header: "Observação", value: (p) => p.notes },
             ]}
           />
+          {canManage && (
+            <ExpenseClassificationsDialog trigger={<Button size="sm" variant="outline"><FolderTree className="size-4" />Grupos e categorias</Button>} />
+          )}
           {canManage && <PayableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a pagar</Button>} />}
         </div>
       </div>
