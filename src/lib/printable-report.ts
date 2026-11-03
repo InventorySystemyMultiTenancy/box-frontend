@@ -5,6 +5,23 @@
 // Tudo acontece NA MESMA ABA, num quadro invisível: antes abria uma aba nova, e no app
 // instalado no celular (atalho na tela inicial) essa aba abria no navegador comum, sem o
 // login — voltar não levava de volta ao site logado. Também não sofre bloqueio de pop-up.
+// Numeração das páginas no rodapé (caixas de margem do @page — Chrome/Edge, inclusive no
+// celular). A margem da página é que abre espaço para o rodapé; o body perde a sua para o
+// conteúdo não ficar com borda dobrada.
+const PAGE_NUMBER_CSS = `
+  @page {
+    size: A4;
+    margin: 12mm 12mm 16mm;
+    @bottom-center {
+      content: "Página " counter(page) " de " counter(pages);
+      font-family: Arial, sans-serif;
+      font-size: 9px;
+      color: #777;
+    }
+  }
+  @media print { body { margin: 0 !important; } }
+`;
+
 export function printHtml(fullHtmlDocument: string) {
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
@@ -20,6 +37,10 @@ export function printHtml(fullHtmlDocument: string) {
   doc.open();
   doc.write(fullHtmlDocument);
   doc.close();
+  // Todo PDF/relatório do sistema sai com "Página X de N" no rodapé de cada página.
+  const pageNumbers = doc.createElement("style");
+  pageNumbers.textContent = PAGE_NUMBER_CSS;
+  doc.head.appendChild(pageNumbers);
 
   // Espera a logo carregar antes de imprimir — chamar print() logo em seguida tira a imagem
   // do PDF na maioria das vezes. Timeout como rede de segurança caso o load nunca dispare.

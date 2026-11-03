@@ -1001,6 +1001,10 @@ export const api = {
   allTruckRefuelings: (token: string, params: { q?: string; page?: number; pageSize?: number } = {}) =>
     request<{ refuelings: unknown[]; pagination: Pagination }>(`/api/trucks/refuelings${toQuery(params)}`, {}, token),
 
+  // Relatório de abastecimentos do período (datas AAAA-MM-DD) — só admin.
+  truckRefuelingReport: (token: string, params: { from: string; to: string; truckId?: string }) =>
+    request<{ report: unknown }>(`/api/trucks/refuelings/report${toQuery(params)}`, {}, token),
+
   createTruckRefueling: (
     truckId: string,
     payload: { currentKm: number; liters: number; amountPaid: number; pricePerLiter?: number; notes?: string; photo: File; panelPhoto?: File | null },

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, CalendarDays, Plus, Receipt, Search, Trash2, Truck as TruckIcon } from "lucide-react";
+import { Bell, CalendarDays, FileBarChart, Plus, Receipt, Search, Trash2, Truck as TruckIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +14,7 @@ import { FinishTripDialog } from "@/components/dashboard/trucks/FinishTripDialog
 import { RefuelingDialog } from "@/components/dashboard/trucks/RefuelingDialog";
 import { TruckMovementsPanel } from "@/components/dashboard/trucks/TruckMovementsPanel";
 import { TruckRefuelingsPanel } from "@/components/dashboard/trucks/TruckRefuelingsPanel";
+import { RefuelingReportDialog } from "@/components/dashboard/trucks/RefuelingReportDialog";
 import { DriverSchedulePanel } from "@/components/dashboard/agenda/DriverSchedulePanel";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
@@ -99,6 +100,16 @@ export default function CaminhoesPage() {
               Lançar gastos
             </Link>
           </Button>
+          {isAdmin && view === "refuelings" && (
+            <RefuelingReportDialog
+              trigger={
+                <Button variant="outline" className="w-full sm:w-auto">
+                  <FileBarChart className="size-4" />
+                  Relatório
+                </Button>
+              }
+            />
+          )}
           {isAdmin && view === "trucks" && (
             <TruckFormDialog
               onSaved={refetch}
