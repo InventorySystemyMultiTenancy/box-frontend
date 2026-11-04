@@ -125,6 +125,8 @@ export interface TimelineEvent {
   id: string;
   title: string;
   description?: string | null;
+  // Observação digitada ao avançar etapa / finalizar a entrega (listada com data no PDF).
+  note?: string | null;
   occurredAt: string;
   done: boolean;
   media: Media[];

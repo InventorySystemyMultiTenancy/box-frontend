@@ -124,6 +124,7 @@ export default function OrderDetail({
   // Acabou de avançar etapa/entregar — destaca o "Avisar cliente" pra não esquecer.
   const [notifyPrompt, setNotifyPrompt] = useState(false);
   const [advancePhoto, setAdvancePhoto] = useState<File | null>(null);
+  const [advanceNote, setAdvanceNote] = useState("");
   const [advanceBusy, setAdvanceBusy] = useState(false);
   const [advanceMessage, setAdvanceMessage] = useState<string | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
@@ -343,7 +344,7 @@ export default function OrderDetail({
     setAdvanceBusy(true);
     setAdvanceMessage(null);
     try {
-      const result = await api.updateOrderStatus(order.id, nextStatus, token, advancePhoto);
+      const result = await api.updateOrderStatus(order.id, nextStatus, token, advancePhoto, advanceNote.trim() || undefined);
       const updatedOrder = result.order as Partial<ServiceOrder>;
       const event = result.event as TimelineEvent | null;
       setOrder((prev) => {
@@ -359,6 +360,7 @@ export default function OrderDetail({
       if (event) setJustArrivedId(event.id);
       if (nextStatus === "FINISHED" && isAdmin) toast.success("Projeto finalizado — o valor já está pendente em Financeiro > Contas a receber.");
       setAdvancePhoto(null);
+      setAdvanceNote("");
       setNotifyPrompt(true);
     } catch {
       setAdvanceMessage("Não foi possível avançar a etapa.");
@@ -645,6 +647,25 @@ export default function OrderDetail({
         return `<li>${escapeHtml(part.name)} - ${escapeHtml(part.note ?? "Serviço concluído")}${by}</li>`;
       })
       .join("");
+    // Observações digitadas ao avançar etapa / finalizar a entrega, com a data do registro.
+    // Projeto entregue antes da observação ir pra timeline: usa a descrição da entrega.
+    const notes = order.timelineEvents
+      .filter((event) => event.note)
+      .map((event) => ({ date: event.occurredAt, title: event.title, author: event.author?.name ?? null, text: event.note! }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (notes.length === 0 && order.deliveryDescription) {
+      notes.push({ date: order.completedAt ?? order.updatedAt ?? order.createdAt ?? new Date().toISOString(), title: "Entrega do veículo", author: null, text: order.deliveryDescription });
+    }
+    const notesHtml = notes
+      .map(
+        (note) => `
+          <div class="note">
+            <div class="muted">${escapeHtml([new Date(note.date).toLocaleString("pt-BR"), note.title, note.author].filter(Boolean).join(" · "))}</div>
+            <div>${escapeHtml(note.text)}</div>
+          </div>
+        `
+      )
+      .join("");
     const printedAt = new Date().toLocaleString("pt-BR");
     const vehicle = `${order.vehicle.brand} ${order.vehicle.model} ${order.vehicle.year}`;
     // Na mesma aba (diálogo de impressão / salvar como PDF) — ver printHtml.
@@ -668,6 +689,7 @@ export default function OrderDetail({
             th { background: #f4f4f4; }
             .total { margin-top: 18px; text-align: right; font-size: 18px; font-weight: 700; }
             li { margin-bottom: 6px; }
+            .note { border-left: 3px solid #ddd; padding: 4px 10px; margin-top: 10px; font-size: 13px; white-space: pre-wrap; break-inside: avoid; }
           </style>
         </head>
         <body>
@@ -724,6 +746,7 @@ export default function OrderDetail({
               : ""
           }
           <div class="total">Valor final: ${formatCurrency(values.total)}</div>
+          ${notesHtml ? `<h2>Observações</h2>${notesHtml}` : ""}
         </body>
       </html>
     `);
@@ -1044,7 +1067,7 @@ export default function OrderDetail({
                 </div>
                 <form className={styles.formGrid} onSubmit={finalizeOrder}>
                   <label className={styles.fullField}>
-                    Descrição da entrega
+                    Observação da entrega (vai para a timeline e para o PDF do projeto)
                     <textarea
                       value={finalizeForm.description}
                       onChange={(e) => setFinalizeForm((prev) => ({ ...prev, description: e.target.value }))}
@@ -1151,6 +1174,10 @@ export default function OrderDetail({
                     Foto desta etapa (opcional)
                     <input type="file" accept="image/*" onChange={(e) => setAdvancePhoto(e.target.files?.[0] ?? null)} />
                     {advancePhoto && <span>{advancePhoto.name}</span>}
+                  </label>
+                  <label className={styles.fullField} style={{ display: "block", marginBottom: "0.8rem" }}>
+                    Observação (opcional — vai para a timeline e para o PDF do projeto)
+                    <textarea value={advanceNote} onChange={(e) => setAdvanceNote(e.target.value)} rows={2} />
                   </label>
                 </>
               )}
