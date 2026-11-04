@@ -886,6 +886,16 @@
   margin-top: 0.15rem;
 }
 
+.tlNote {
+  font-size: 0.82rem;
+  margin-top: 0.3rem;
+  padding: 0.35rem 0.6rem;
+  border-left: 3px solid #f59e0b;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.1);
+  white-space: pre-wrap;
+}
+
 .approval {
   border-left: 3px solid var(--warning);
 }

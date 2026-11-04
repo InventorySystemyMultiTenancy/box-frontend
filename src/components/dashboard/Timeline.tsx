@@ -2,7 +2,7 @@ import { TimelineEvent } from "@/lib/types";
 import styles from "./dashboard.module.css";
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function Timeline({
@@ -32,7 +32,15 @@ export default function Timeline({
             {event.author?.name && ` · por ${event.author.name}`}
           </div>
           <div className={styles.tlText}>{event.title}</div>
-          {event.description && (canViewPrices || !/R\$|valor/i.test(event.description)) && <div className={styles.tlSub}>{event.description}</div>}
+          {event.description &&
+            event.description !== `Observação: ${event.note}` &&
+            (canViewPrices || !/R\$|valor/i.test(event.description)) && <div className={styles.tlSub}>{event.description}</div>}
+          {/* Observação digitada ao avançar etapa / finalizar — sempre visível e destacada. */}
+          {event.note && (
+            <div className={styles.tlNote}>
+              <strong>Observação:</strong> {event.note}
+            </div>
+          )}
         </div>
       ))}
     </div>
