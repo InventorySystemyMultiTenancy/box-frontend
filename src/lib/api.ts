@@ -966,7 +966,8 @@ export const api = {
     if (payload.startCondition) form.append("startCondition", payload.startCondition);
     if (payload.photo) form.append("photo", payload.photo);
     if (payload.appointmentId) form.append("appointmentId", payload.appointmentId);
-    return request<{ trip: unknown }>(`/api/trucks/${truckId}/trips/start`, { method: "POST", body: form }, token);
+    // warning: km menor que a da última pilotagem — inicia mesmo assim, só avisa.
+    return request<{ trip: unknown; warning?: string | null }>(`/api/trucks/${truckId}/trips/start`, { method: "POST", body: form }, token);
   },
 
   finishTruckTrip: (

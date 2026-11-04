@@ -85,12 +85,13 @@ export function StartTripDialog({ truck, onSaved }: { truck: Truck; onSaved: () 
     }
     setSaving(true);
     try {
-      await api.startTruckTrip(
+      const { warning } = await api.startTruckTrip(
         truck.id,
         { startKm: Number(startKm), startFuelLevel, startCondition: startCondition || undefined, photo, appointmentId: appointmentId || undefined },
         token
       );
       toast.success(`Pilotagem do caminhão ${truck.plate} iniciada.`);
+      if (warning) toast.warning(warning, { duration: 10000 });
       setOpen(false);
       reset();
       onSaved();

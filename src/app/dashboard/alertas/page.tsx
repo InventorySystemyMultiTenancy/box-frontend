@@ -20,6 +20,7 @@ const TYPE_LABELS: Record<string, string> = {
   INSPECTION_TODAY: "Vistoria hoje",
   DELIVERY_TOMORROW: "Entrega amanhã",
   PAYABLE_OVERDUE: "Conta vencida",
+  TRUCK_KM_REGRESSION: "Km do caminhão",
 };
 
 type AlertCategory = "VEICULOS" | "FINANCEIRO" | "AGENDA" | "CLIENTES";
@@ -33,6 +34,7 @@ const TYPE_CATEGORY: Record<string, AlertCategory> = {
   SUPPLEMENT_PENDING: "FINANCEIRO",
   PAYABLE_OVERDUE: "FINANCEIRO",
   INSPECTION_TODAY: "AGENDA",
+  TRUCK_KM_REGRESSION: "VEICULOS",
 };
 
 interface CategoryTheme {

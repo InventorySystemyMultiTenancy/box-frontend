@@ -15,6 +15,7 @@ export const ALERT_TYPE_OPTIONS = [
   { key: "DELIVERY_TOMORROW", label: "Entrega prevista para amanhã", group: "Veículos" },
   { key: "SUPPLEMENT_PENDING", label: "Complemento pendente de aprovação", group: "Financeiro" },
   { key: "PAYABLE_OVERDUE", label: "Conta a pagar vencida", group: "Financeiro" },
+  { key: "TRUCK_KM_REGRESSION", label: "Caminhão iniciou pilotagem com km menor que a anterior", group: "Veículos" },
   { key: "INSPECTION_TODAY", label: "Vistoria marcada para hoje", group: "Agenda" },
   { key: "REVISION_REMINDER", label: "Lembrete de revisão preventiva", group: "Lembretes p/ clientes" },
   { key: "WARRANTY_REMINDER", label: "Lembrete de garantia vencendo", group: "Lembretes p/ clientes" },
