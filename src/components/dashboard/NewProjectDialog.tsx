@@ -42,17 +42,21 @@ function plateLookupSummary(r: PlateLookupResult) {
 const LOCALIZA_TRACKING_URL = "https://fornecedor.localiza.com/portal/#/operacional/acompanhamento-carros";
 
 /** Baixa as fotos para o dispositivo (pasta de downloads / galeria, conforme o aparelho). */
+// Um download por vez, com intervalo: vários (ou um vídeo grande) ao mesmo tempo pesavam na
+// memória do celular junto com a câmera aberta.
 function saveFilesToDevice(files: File[], prefix: string, startIndex: number) {
   files.forEach((file, i) => {
-    const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ".jpg";
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${prefix}-${startIndex + i + 1}${ext}`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    setTimeout(() => {
+      const ext = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : ".jpg";
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${prefix}-${startIndex + i + 1}${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }, i * 700);
   });
 }
 
@@ -68,6 +72,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
 
   const [vehicleMode, setVehicleMode] = useState<"existing" | "new">("new");
   const [selectedVehicleId, setSelectedVehicleId] = useState("");
+  const [vehicleSearch, setVehicleSearch] = useState("");
   const [newVehicle, setNewVehicle] = useState(EMPTY_NEW_VEHICLE);
 
   const [aiBusy, setAiBusy] = useState(false);
@@ -102,6 +107,18 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     queryFn: async () => (await api.vehicles(token!, { ownerId: selectedClient!.userId! })).vehicles as Vehicle[],
     enabled: !!token && !!selectedClient?.userId && vehicleMode === "existing",
   });
+  // Cliente com vários carros: filtra por placa (ignorando traço/espaço) ou marca/modelo/ano.
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const vehicleTerm = normalize(vehicleSearch.trim());
+  const vehicleTermPlate = vehicleTerm.replace(/[^a-z0-9]/g, "");
+  const filteredVehicles = (clientVehicles ?? []).filter((v) => {
+    if (!vehicleTerm) return true;
+    const plate = normalize(v.plate ?? "").replace(/[^a-z0-9]/g, "");
+    return (
+      (vehicleTermPlate.length > 0 && plate.includes(vehicleTermPlate)) ||
+      normalize([v.brand, v.model, v.version, v.year, v.color].filter(Boolean).join(" ")).includes(vehicleTerm)
+    );
+  });
 
   function resetAll() {
     setClientMode("existing");
@@ -110,6 +127,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     setNewClient(EMPTY_NEW_CLIENT);
     setVehicleMode("new");
     setSelectedVehicleId("");
+    setVehicleSearch("");
     setNewVehicle(EMPTY_NEW_VEHICLE);
     setAiResult(null);
     setIncludeAiProblems(true);
@@ -444,17 +462,48 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
             </div>
 
             {vehicleMode === "existing" ? (
-              <Select value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
-                <SelectTrigger><SelectValue placeholder="Selecione o veículo..." /></SelectTrigger>
-                <SelectContent>
-                  {(clientVehicles ?? []).map((v) => (
-                    <SelectItem key={v.id} value={v.id}>{v.brand} {v.model} {v.year} {v.plate ? `· ${v.plate}` : ""}</SelectItem>
-                  ))}
-                  {(clientVehicles ?? []).length === 0 && (
-                    <div className="px-2 py-1.5 text-xs text-muted-foreground">Este cliente ainda não tem veículo cadastrado.</div>
-                  )}
-                </SelectContent>
-              </Select>
+              <div className="grid gap-2">
+                {(clientVehicles ?? []).length > 1 && (
+                  <Input
+                    placeholder={`Buscar entre os ${(clientVehicles ?? []).length} veículos por placa ou modelo...`}
+                    value={vehicleSearch}
+                    onChange={(e) => setVehicleSearch(e.target.value)}
+                  />
+                )}
+                <Select value={selectedVehicleId} onValueChange={setSelectedVehicleId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o veículo..." /></SelectTrigger>
+                  <SelectContent>
+                    {(clientVehicles ?? [])
+                      .filter((v) => v.id === selectedVehicleId || filteredVehicles.includes(v))
+                      .map((v) => (
+                        <SelectItem key={v.id} value={v.id}>{v.brand} {v.model} {v.year} {v.plate ? `· ${v.plate}` : ""}</SelectItem>
+                      ))}
+                    {(clientVehicles ?? []).length === 0 && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">Este cliente ainda não tem veículo cadastrado.</div>
+                    )}
+                    {(clientVehicles ?? []).length > 0 && filteredVehicles.length === 0 && (
+                      <div className="px-2 py-1.5 text-xs text-muted-foreground">Nenhum veículo deste cliente com &quot;{vehicleSearch}&quot;.</div>
+                    )}
+                  </SelectContent>
+                </Select>
+                {vehicleTerm && filteredVehicles.length > 0 && (
+                  <div className="grid gap-1">
+                    {filteredVehicles.slice(0, 5).map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        className={`rounded-md border px-2.5 py-1.5 text-left text-sm ${v.id === selectedVehicleId ? "border-primary bg-primary/10" : "hover:bg-muted"}`}
+                        onClick={() => setSelectedVehicleId(v.id)}
+                      >
+                        <span className="font-medium">{v.plate ?? "Sem placa"}</span> · {v.brand} {v.model} {v.year}
+                      </button>
+                    ))}
+                    {filteredVehicles.length > 5 && (
+                      <span className="text-xs text-muted-foreground">+{filteredVehicles.length - 5} — refine a busca ou use a lista acima.</span>
+                    )}
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <div className="grid gap-1.5 rounded-md border border-dashed px-3 py-2">

@@ -17,7 +17,10 @@ const isVideo = (file: File) => file.type.startsWith("video/");
  * envio que falha não derruba os outros.
  */
 export async function uploadDamageMediaInBatches(orderId: string, files: File[], token: string) {
-  const photos = await Promise.all(files.filter((f) => !isVideo(f)).map((file) => compressImage(file)));
+  // Uma foto por vez: cada foto de câmera aberta ocupa ~50 MB de memória (12 MP); as 20
+  // juntas (Promise.all) estouravam a memória do celular e o Android fechava o navegador.
+  const photos: File[] = [];
+  for (const file of files.filter((f) => !isVideo(f))) photos.push(await compressImage(file));
   const videos = files.filter(isVideo);
   const batches = [
     ...Array.from({ length: Math.ceil(photos.length / PHOTO_BATCH_SIZE) }, (_, i) => photos.slice(i * PHOTO_BATCH_SIZE, (i + 1) * PHOTO_BATCH_SIZE)),
