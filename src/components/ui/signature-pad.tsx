@@ -14,8 +14,17 @@ export interface SignaturePadHandle {
  * Campo de assinatura com o dedo/caneta/mouse (pointer events — funciona no celular e no
  * tablet entregue ao cliente no balcão). Fundo branco no PNG para ficar legível impresso.
  */
-export const SignaturePad = forwardRef<SignaturePadHandle, { label?: string; onChange?: (empty: boolean) => void }>(
-  function SignaturePad({ label = "Assinatura do cliente", onChange }, ref) {
+export const SignaturePad = forwardRef<
+  SignaturePadHandle,
+  {
+    label?: string;
+    onChange?: (empty: boolean) => void;
+    /** Assinatura já feita (data URL PNG) para redesenhar — ex.: rascunho restaurado. */
+    initialImage?: string | null;
+    /** Imagem atual (data URL) a cada traço concluído, ou null ao limpar. */
+    onImage?: (dataUrl: string | null) => void;
+  }
+>(function SignaturePad({ label = "Assinatura do cliente", onChange, initialImage, onImage }, ref) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const drawing = useRef(false);
     const [empty, setEmpty] = useState(true);
@@ -40,7 +49,26 @@ export const SignaturePad = forwardRef<SignaturePadHandle, { label?: string; onC
       ctx.strokeStyle = "#111827";
     }
 
-    useEffect(setup, []);
+    useEffect(() => {
+      setup();
+      if (!initialImage) return;
+      // Espera a animação do Dialog terminar para medir o tamanho final do quadro.
+      const timer = setTimeout(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || drawing.current) return;
+        const img = new Image();
+        img.onload = () => {
+          setup();
+          const { width, height } = canvas.getBoundingClientRect();
+          canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+          setEmpty(false);
+        };
+        img.src = initialImage;
+      }, 300);
+      return () => clearTimeout(timer);
+      // Só na montagem: a imagem inicial não deve sobrescrever traços novos.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     function point(e: React.PointerEvent<HTMLCanvasElement>) {
       const rect = e.currentTarget.getBoundingClientRect();
@@ -72,6 +100,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, { label?: string; onC
     }
 
     function end() {
+      if (drawing.current && onImage && canvasRef.current) onImage(canvasRef.current.toDataURL("image/png"));
       drawing.current = false;
     }
 
@@ -79,6 +108,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, { label?: string; onC
       setup();
       setEmpty(true);
       onChange?.(true);
+      onImage?.(null);
     }
 
     useImperativeHandle(ref, () => ({
@@ -124,5 +154,4 @@ export const SignaturePad = forwardRef<SignaturePadHandle, { label?: string; onC
         <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>Assine com o dedo, caneta ou mouse dentro do quadro.</span>
       </div>
     );
-  }
-);
+});

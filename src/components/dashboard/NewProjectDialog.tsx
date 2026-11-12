@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ExternalLink, Sparkles } from "lucide-react";
@@ -16,6 +16,7 @@ import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker"
 import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
 import { MAX_DAMAGE_PHOTOS, MAX_DAMAGE_VIDEOS, shareFilesToGallery, splitOversizedVideos, uploadDamageMediaInBatches } from "@/lib/damage-photos";
 import { useAuth } from "@/lib/auth-context";
+import { clearDraft, clearDraftText, loadDraftFiles, loadDraftText, saveDraftFiles, saveDraftText } from "@/lib/project-draft";
 import { api, ApiError, type ExistingVehicle } from "@/lib/api";
 import type { Client, PlateLookupResult, RecognizedVehicleData, ServiceOrderPriority, Vehicle } from "@/lib/types";
 import { PRIORITY_LABELS, SERVICE_ORDER_PRIORITIES } from "@/lib/types";
@@ -62,7 +63,8 @@ function saveFilesToDevice(files: File[], prefix: string, startIndex: number) {
 }
 
 export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactNode; onCreated: (orderId: string) => void }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const userId = user?.id;
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -95,6 +97,87 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   // Vídeos do checklist de entrada (até 5) — enviados e salvos no aparelho como as fotos.
   const [damageVideos, setDamageVideos] = useState<File[]>([]);
   const checkinSignatureRef = useRef<SignaturePadHandle>(null);
+  const [signatureImage, setSignatureImage] = useState<string | null>(null);
+  // Remonta o quadro de assinatura ao descartar o rascunho (ele guarda o desenho por dentro).
+  const [signatureKey, setSignatureKey] = useState(0);
+
+  // Rascunho: o que foi preenchido continua salvo (neste aparelho) até criar o projeto ou
+  // descartar — mesmo fechando o form, trocando de aba ou o celular desligando.
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
+  const draftText = {
+    clientMode,
+    clientSearch,
+    selectedClientId,
+    newClient,
+    vehicleMode,
+    selectedVehicleId,
+    vehicleSearch,
+    newVehicle,
+    aiResult,
+    includeAiProblems,
+    plateResult,
+    existing,
+    priority,
+    ssNumber,
+    insurance,
+    signatureImage,
+  };
+  type DraftText = typeof draftText;
+  const draftJson = JSON.stringify(draftText);
+  // Form vazio (valores iniciais) não conta como rascunho.
+  const [emptyDraftJson] = useState(draftJson);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+    loadDraftFiles(userId).then((files) => {
+      if (cancelled) return;
+      const saved = loadDraftText<DraftText>(userId);
+      const text = saved && JSON.stringify({ ...saved, savedAt: undefined }) !== emptyDraftJson ? saved : null;
+      if (text) {
+        setClientMode(text.clientMode ?? "existing");
+        setClientSearch(text.clientSearch ?? "");
+        setSelectedClientId(text.selectedClientId ?? "");
+        setNewClient({ ...EMPTY_NEW_CLIENT, ...text.newClient });
+        setVehicleMode(text.vehicleMode ?? "new");
+        setSelectedVehicleId(text.selectedVehicleId ?? "");
+        setVehicleSearch(text.vehicleSearch ?? "");
+        setNewVehicle({ ...EMPTY_NEW_VEHICLE, ...text.newVehicle });
+        setAiResult(text.aiResult ?? null);
+        setIncludeAiProblems(text.includeAiProblems ?? true);
+        setPlateResult(text.plateResult ?? null);
+        setExisting(text.existing ?? null);
+        setPriority(text.priority ?? "NORMAL");
+        setSsNumber(text.ssNumber ?? "");
+        setInsurance({ ...EMPTY_INSURANCE, ...text.insurance });
+        setSignatureImage(text.signatureImage ?? null);
+        setSignatureKey((k) => k + 1);
+      }
+      if (files) {
+        setDamagePhotos(files.photos ?? []);
+        setDamageVideos(files.videos ?? []);
+      }
+      if (text || files) setDraftRestoredAt(text?.savedAt ?? Date.now());
+      setDraftLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // emptyDraftJson é fixo (estado inicial).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !draftLoaded) return;
+    if (draftJson === emptyDraftJson) clearDraftText(userId);
+    else saveDraftText(userId, JSON.parse(draftJson));
+  }, [userId, draftLoaded, draftJson, emptyDraftJson]);
+
+  useEffect(() => {
+    if (!userId || !draftLoaded) return;
+    saveDraftFiles(userId, { photos: damagePhotos, videos: damageVideos });
+  }, [userId, draftLoaded, damagePhotos, damageVideos]);
 
   const { data: clients } = useQuery({
     queryKey: ["clients-with-login", clientSearch],
@@ -140,11 +223,21 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     setInsurance(EMPTY_INSURANCE);
     setDamagePhotos([]);
     setDamageVideos([]);
+    setSignatureImage(null);
+    setSignatureKey((k) => k + 1);
+    setDraftRestoredAt(null);
+    if (userId) void clearDraft(userId);
   }
 
+  // Fechar o form NÃO apaga o que foi preenchido — fica como rascunho.
   function handleOpenChange(next: boolean) {
-    if (!next) resetAll();
     setOpen(next);
+  }
+
+  function discardDraft() {
+    if (!window.confirm("Descartar tudo o que foi preenchido neste novo projeto?")) return;
+    resetAll();
+    toast.success("Rascunho descartado.");
   }
 
   async function handleAiPhoto(file: File | null) {
@@ -387,6 +480,17 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
         <DialogHeader>
           <DialogTitle>Novo projeto</DialogTitle>
         </DialogHeader>
+
+        {draftRestoredAt && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200">
+            <span>
+              Rascunho recuperado ({new Date(draftRestoredAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}) — continue de onde parou.
+            </span>
+            <button type="button" className="font-medium underline" onClick={discardDraft}>
+              Começar do zero
+            </button>
+          </div>
+        )}
 
         <div className="grid gap-5">
           {existing ? (
@@ -705,11 +809,21 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
           {/* Assinatura do cliente no laudo de entrada — confirma o estado em que o carro
               chegou (avarias acima). Opcional: o cliente pode não estar presente. */}
           <section className="grid gap-2">
-            <SignaturePad ref={checkinSignatureRef} label="Assinatura do cliente na entrada (opcional)" />
+            <SignaturePad
+              key={signatureKey}
+              ref={checkinSignatureRef}
+              label="Assinatura do cliente na entrada (opcional)"
+              initialImage={signatureImage}
+              onImage={setSignatureImage}
+            />
           </section>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2">
+          <span className="mr-auto self-center text-xs text-muted-foreground">O preenchimento fica salvo automaticamente.</span>
+          <Button type="button" variant="outline" onClick={discardDraft} disabled={creating}>
+            Limpar
+          </Button>
           <Button onClick={handleCreate} disabled={creating}>
             {creating ? "Criando..." : "Criar projeto"}
           </Button>
