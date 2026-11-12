@@ -849,6 +849,13 @@ export default function OrderDetail({
           <div className={styles.meta}>
             {order.code}
             {order.ssNumber ? ` · SS ${order.ssNumber}` : ""} · KM {order.vehicle.mileage.toLocaleString("pt-BR")}
+            {order.hasInsurance
+              ? ` · Seguro: ${order.insuranceCompany ? (order.insuranceCompany.tradeName ?? order.insuranceCompany.legalName) : "seguradora não informada"}${
+                  order.deductibleAmount != null
+                    ? ` · Franquia ${Number(order.deductibleAmount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`
+                    : ""
+                }`
+              : ""}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -857,6 +864,8 @@ export default function OrderDetail({
               vehicle={order.vehicle}
               // Mantém o dono já carregado (a rota de veículo não devolve o owner).
               onSaved={(vehicle) => setOrder((prev) => (prev ? { ...prev, vehicle: { ...prev.vehicle, ...vehicle, owner: prev.vehicle.owner } } : prev))}
+              order={order}
+              onInsuranceSaved={(data) => setOrder((prev) => (prev ? { ...prev, ...data } : prev))}
             />
           )}
           {isStaff && (

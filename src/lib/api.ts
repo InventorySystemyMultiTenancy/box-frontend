@@ -1055,6 +1055,10 @@ export const api = {
   createVehicle: (payload: Record<string, unknown>, token: string) =>
     request<{ vehicle: unknown }>("/api/vehicles", { method: "POST", body: JSON.stringify(payload) }, token),
 
+  // Seguradoras ativas para o form do projeto (sem exigir a permissão do módulo de seguradoras).
+  insuranceOptions: (token: string) =>
+    request<{ companies: { id: string; legalName: string; tradeName: string | null }[] }>("/api/service-orders/insurance-options", {}, token),
+
   createServiceOrder: (payload: Record<string, unknown>, token: string) =>
     request<{ order: unknown }>("/api/service-orders", { method: "POST", body: JSON.stringify(payload) }, token),
 

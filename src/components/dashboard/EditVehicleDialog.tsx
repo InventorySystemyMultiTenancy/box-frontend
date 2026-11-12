@@ -5,7 +5,8 @@ import { Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import type { Vehicle } from "@/lib/types";
+import type { ServiceOrder, Vehicle } from "@/lib/types";
+import { InsuranceFields, insuranceFromOrder, insurancePayload, type InsuranceValue } from "@/components/dashboard/InsuranceFields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,18 +51,35 @@ const OPTIONAL_FIELDS: { key: keyof VehicleForm; label: string }[] = [
   { key: "renavam", label: "Renavam" },
 ];
 
+type OrderInsurance = Pick<ServiceOrder, "id" | "hasInsurance" | "insuranceCompanyId" | "insuranceCompany" | "deductibleAmount">;
+
 /**
  * Corrige os dados do veículo de um projeto (placa esquecida/errada, modelo, ano, km...).
  * Vale para o veículo em si — outros projetos do mesmo carro passam a mostrar os dados novos.
+ * Com `order`, também edita o seguro deste projeto (seguradora e franquia), mesmo em andamento.
  */
-export function EditVehicleDialog({ vehicle, onSaved }: { vehicle: Vehicle; onSaved: (vehicle: Vehicle) => void }) {
+export function EditVehicleDialog({
+  vehicle,
+  onSaved,
+  order,
+  onInsuranceSaved,
+}: {
+  vehicle: Vehicle;
+  onSaved: (vehicle: Vehicle) => void;
+  order?: OrderInsurance;
+  onInsuranceSaved?: (data: Omit<OrderInsurance, "id">) => void;
+}) {
   const { token } = useAuth();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState<VehicleForm>(() => toForm(vehicle));
+  const [insurance, setInsurance] = useState<InsuranceValue>(() => insuranceFromOrder(order ?? {}));
 
   function handleOpenChange(next: boolean) {
-    if (next) setForm(toForm(vehicle));
+    if (next) {
+      setForm(toForm(vehicle));
+      setInsurance(insuranceFromOrder(order ?? {}));
+    }
     setOpen(next);
   }
 
@@ -75,6 +93,11 @@ export function EditVehicleDialog({ vehicle, onSaved }: { vehicle: Vehicle; onSa
     const year = Number(form.year);
     if (!form.brand.trim() || !form.model.trim() || !Number.isInteger(year) || year < 1950 || year > 2100) {
       toast.error("Informe marca, modelo e um ano válido.");
+      return;
+    }
+    const insuranceData = order ? insurancePayload(insurance) : null;
+    if (insuranceData && "error" in insuranceData) {
+      toast.error(String(insuranceData.error));
       return;
     }
     setBusy(true);
@@ -92,6 +115,17 @@ export function EditVehicleDialog({ vehicle, onSaved }: { vehicle: Vehicle; onSa
         token
       );
       onSaved(updated as Vehicle);
+      const original = order ? JSON.stringify(insurancePayload(insuranceFromOrder(order))) : null;
+      if (order && insuranceData && JSON.stringify(insuranceData) !== original) {
+        const { order: saved } = await api.updateServiceOrderProcess(order.id, insuranceData, token);
+        const s = saved as OrderInsurance;
+        onInsuranceSaved?.({
+          hasInsurance: s.hasInsurance,
+          insuranceCompanyId: s.insuranceCompanyId,
+          insuranceCompany: s.insuranceCompany,
+          deductibleAmount: s.deductibleAmount != null ? Number(s.deductibleAmount) : null,
+        });
+      }
       toast.success("Dados do veículo atualizados.");
       setOpen(false);
     } catch (err) {
@@ -141,6 +175,12 @@ export function EditVehicleDialog({ vehicle, onSaved }: { vehicle: Vehicle; onSa
                 <Input id={`ev-${key}`} value={form[key]} onChange={(e) => set(key, e.target.value)} />
               </div>
             ))}
+            {order && (
+              <div className="grid gap-2 border-t pt-3 sm:col-span-2">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seguro deste projeto</Label>
+                <InsuranceFields value={insurance} onChange={setInsurance} idPrefix="ev" />
+              </div>
+            )}
           </div>
           <DialogFooter className="border-t pt-3">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy}>

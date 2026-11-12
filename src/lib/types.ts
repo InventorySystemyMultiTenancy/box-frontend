@@ -267,6 +267,7 @@ export interface ServiceOrder {
   deliveryForecastReason?: string | null;
   currentSectorId?: string | null;
   currentSector?: Sector | null;
+  hasInsurance?: boolean;
   insuranceCompanyId?: string | null;
   insuranceCompany?: InsuranceCompany | null;
   claimNumber?: string | null;

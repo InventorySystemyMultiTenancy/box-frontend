@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { EMPTY_INSURANCE, InsuranceFields, insurancePayload, type InsuranceValue } from "@/components/dashboard/InsuranceFields";
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { CameraOrGalleryPicker } from "@/components/ui/camera-or-gallery-picker";
 import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
@@ -89,6 +90,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   const [priority, setPriority] = useState<ServiceOrderPriority>("NORMAL");
   // SS (solicitação de serviço) — opcional, letras e números.
   const [ssNumber, setSsNumber] = useState("");
+  const [insurance, setInsurance] = useState<InsuranceValue>(EMPTY_INSURANCE);
   const [damagePhotos, setDamagePhotos] = useState<File[]>([]);
   // Vídeos do checklist de entrada (até 5) — enviados e salvos no aparelho como as fotos.
   const [damageVideos, setDamageVideos] = useState<File[]>([]);
@@ -135,6 +137,7 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
     setExisting(null);
     setPriority("NORMAL");
     setSsNumber("");
+    setInsurance(EMPTY_INSURANCE);
     setDamagePhotos([]);
     setDamageVideos([]);
   }
@@ -246,6 +249,11 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
 
   async function handleCreate() {
     if (!token) return;
+    const insuranceCheck = insurancePayload(insurance);
+    if ("error" in insuranceCheck) {
+      toast.error(String(insuranceCheck.error));
+      return;
+    }
     if (existing) return createProject(existing.vehicle.id);
     if (clientMode === "existing" && !selectedClientId) {
       toast.error("Selecione um cliente.");
@@ -312,9 +320,15 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
   /** Cria o projeto no veículo (novo ou já cadastrado) e envia checklist, assinatura e problemas da IA. */
   async function createProject(vehicleId: string, alreadyCreating = false) {
     if (!token) return;
+    const insuranceData = insurancePayload(insurance);
+    if ("error" in insuranceData) {
+      toast.error(String(insuranceData.error));
+      if (alreadyCreating) setCreating(false);
+      return;
+    }
     if (!alreadyCreating) setCreating(true);
     try {
-      const { order } = await api.createServiceOrder({ vehicleId, priority, ssNumber: ssNumber.trim() || undefined }, token);
+      const { order } = await api.createServiceOrder({ vehicleId, priority, ssNumber: ssNumber.trim() || undefined, ...insuranceData }, token);
       const orderId = (order as { id: string }).id;
 
       if (damagePhotos.length > 0 || damageVideos.length > 0) {
@@ -584,6 +598,12 @@ export function NewProjectDialog({ trigger, onCreated }: { trigger: React.ReactN
           <section className="grid gap-2">
             <Label htmlFor="new-project-ss" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SS (opcional)</Label>
             <Input id="new-project-ss" maxLength={50} placeholder="Ex.: SS12345A" value={ssNumber} onChange={(e) => setSsNumber(e.target.value)} />
+          </section>
+
+          {/* Seguro */}
+          <section className="grid gap-2">
+            <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seguro do veículo</Label>
+            <InsuranceFields value={insurance} onChange={setInsurance} idPrefix="new-project" />
           </section>
 
           {/* Checklist de fotos de avaria pré-existente */}
