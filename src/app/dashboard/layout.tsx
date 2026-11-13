@@ -60,7 +60,7 @@ const HTML_THEME_CLASSES = ["dash-premium", ...DASH_FONT_CLASSES];
 const ROOT_THEME_CLASS = ["dash-premium-root", ...DASH_FONT_CLASSES].join(" ");
 
 // Abas claras ou escuras (o header e a sidebar ficam escuros nos dois). Preferência
-// guardada só neste navegador; padrão escuro.
+// guardada só neste navegador; padrão claro (o que os usuários já conheciam).
 type ContentTheme = "dark" | "light";
 const THEME_KEY = "box.dashTheme";
 const THEME_EVENT = "box:dash-theme";
@@ -74,9 +74,9 @@ function subscribeTheme(callback: () => void) {
 }
 function readTheme(): ContentTheme {
   try {
-    return window.localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+    return window.localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
   } catch {
-    return "dark";
+    return "light";
   }
 }
 function saveTheme(theme: ContentTheme) {
@@ -137,7 +137,7 @@ function mediaUrl(url: string) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
-  const contentTheme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark" as ContentTheme);
+  const contentTheme = useSyncExternalStore(subscribeTheme, readTheme, () => "light" as ContentTheme);
   const themeClass = contentTheme === "light" ? "dash-light" : "dark";
   const rootClass = `${ROOT_THEME_CLASS} ${contentTheme === "light" ? "dash-light" : ""}`;
 
