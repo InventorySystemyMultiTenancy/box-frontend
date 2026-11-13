@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -13,6 +13,8 @@ import {
   PanelLeftOpen,
   X,
   Bell,
+  Moon,
+  Sun,
   LogOut,
   Sparkles,
   ClipboardList,
@@ -54,8 +56,37 @@ import { DASH_FONT_CLASSES } from "./fonts";
 
 // Tema premium (só aparência): classes no <html> para diálogos/menus/toasts, que abrem
 // fora da árvore do painel, também ficarem no tema. Removidas ao sair do painel.
-const HTML_THEME_CLASSES = ["dash-premium", "dark", ...DASH_FONT_CLASSES];
+const HTML_THEME_CLASSES = ["dash-premium", ...DASH_FONT_CLASSES];
 const ROOT_THEME_CLASS = ["dash-premium-root", ...DASH_FONT_CLASSES].join(" ");
+
+// Abas claras ou escuras (o header e a sidebar ficam escuros nos dois). Preferência
+// guardada só neste navegador; padrão escuro.
+type ContentTheme = "dark" | "light";
+const THEME_KEY = "box.dashTheme";
+const THEME_EVENT = "box:dash-theme";
+function subscribeTheme(callback: () => void) {
+  window.addEventListener(THEME_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(THEME_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+function readTheme(): ContentTheme {
+  try {
+    return window.localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  } catch {
+    return "dark";
+  }
+}
+function saveTheme(theme: ContentTheme) {
+  try {
+    window.localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // Sem armazenamento (modo privado): vale só até recarregar.
+  }
+  window.dispatchEvent(new Event(THEME_EVENT));
+}
 
 // key = identificador estável de cada aba, usado pelo Role.allowedTabs (ver aba Cargos)
 // pra restringir quais abas um cargo específico pode ver — independente do href/label.
@@ -106,11 +137,21 @@ function mediaUrl(url: string) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  const contentTheme = useSyncExternalStore(subscribeTheme, readTheme, () => "dark" as ContentTheme);
+  const themeClass = contentTheme === "light" ? "dash-light" : "dark";
+  const rootClass = `${ROOT_THEME_CLASS} ${contentTheme === "light" ? "dash-light" : ""}`;
+
   useEffect(() => {
     const html = document.documentElement;
     html.classList.add(...HTML_THEME_CLASSES);
     return () => html.classList.remove(...HTML_THEME_CLASSES);
   }, []);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    html.classList.add(themeClass);
+    return () => html.classList.remove(themeClass);
+  }, [themeClass]);
 
   const { user, token, loading, hasPermission, allowedTabs, logout } = useAuth();
   const router = useRouter();
@@ -272,7 +313,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   if (loading || !user || !isOnAllowedTab) {
-    return <div className={`${styles.empty} ${ROOT_THEME_CLASS}`}>Carregando painel...</div>;
+    return <div className={`${styles.empty} ${rootClass}`}>Carregando painel...</div>;
   }
 
   const navList = (
@@ -291,7 +332,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className={`${styles.page} ${ROOT_THEME_CLASS}`}>
+    <div className={`${styles.page} ${rootClass}`}>
       <header className={styles.topbar}>
         <Link href="/dashboard" className={styles.brand} aria-label="Ir para o painel">
           <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
@@ -351,6 +392,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               <VoiceInputButton onTranscribed={goToSearch} title="Perguntar por voz" className={styles.headerMicBtn} />
             </form>
           )}
+
+          <button
+            type="button"
+            className={styles.notifBtn}
+            onClick={() => saveTheme(contentTheme === "light" ? "dark" : "light")}
+            aria-label={contentTheme === "light" ? "Usar abas escuras" : "Usar abas claras"}
+            title={contentTheme === "light" ? "Abas escuras" : "Abas claras"}
+          >
+            {contentTheme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
 
           {isStaff && (
             <Link href="/dashboard/alertas" className={styles.notifBtn} aria-label="Alertas">
@@ -432,7 +483,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <Toaster theme="dark" />
+      <Toaster theme={contentTheme} />
     </div>
   );
 }

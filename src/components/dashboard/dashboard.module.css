@@ -697,6 +697,17 @@
 .panel:hover {
   border-color: var(--border-strong);
 }
+/* Tema claro das abas (header/sidebar continuam escuros). */
+:global(.dash-light) .panel {
+  background: linear-gradient(180deg, #ffffff, #f8fafd);
+}
+:global(.dash-light) .panel h2 {
+  color: #1d6fe6;
+}
+:global(.dash-light) .panel h2::before {
+  background: linear-gradient(90deg, transparent, #1d6fe6);
+  box-shadow: none;
+}
 .panel h2 {
   font-size: 0.7rem;
   text-transform: uppercase;

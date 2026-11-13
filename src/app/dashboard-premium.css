@@ -46,9 +46,11 @@
   --font-display: var(--font-landing-display), "Segoe UI", system-ui, sans-serif;
   --font-body: var(--font-landing-body), "Segoe UI", system-ui, sans-serif;
   --font-mono: var(--font-landing-mono), "Cascadia Code", Consolas, monospace;
+}
 
-  /* Tons fixos do Tailwind usados em textos/alertas pensados para fundo claro:
-     versões que leem bem no escuro (os que têm dark: já usam a variante própria). */
+/* Tons fixos do Tailwind usados em textos/alertas pensados para fundo claro: versões que
+   leem bem no escuro (os que têm dark: já usam a variante própria). Só no tema escuro. */
+:is(html.dash-premium:not(.dash-light), .dash-premium-root:not(.dash-light)) {
   --color-emerald-50: rgba(52, 211, 153, 0.1);
   --color-emerald-600: #34d399;
   --color-emerald-700: #6ee7b7;
@@ -322,4 +324,122 @@ html.dash-premium [data-sonner-toast] {
   html.dash-premium [data-slot="card"] {
     animation: none;
   }
+}
+
+/* ==========================================================================
+   Variação CLARA (botão sol/lua no header): só a área das abas clareia — o header
+   e a sidebar usam as variáveis --shell-* e continuam escuros.
+   ========================================================================== */
+:is(html.dash-premium.dash-light, .dash-premium-root.dash-light) {
+  color-scheme: light;
+  --bg: #eef2f8;
+  --bg-elevated: #ffffff;
+  --bg-panel: #e7ecf4;
+  --text: #0f1b2d;
+  --text-muted: #5a6b86;
+  --border: rgba(15, 40, 80, 0.12);
+  --border-strong: rgba(15, 40, 80, 0.22);
+  --accent-blue: #1d6fe6;
+  --accent-blue-strong: #1559c4;
+  --accent-blue-soft: rgba(29, 111, 230, 0.1);
+  --accent-gray: #64748b;
+  --accent-gray-soft: rgba(100, 116, 139, 0.12);
+  --holo: #0ea5e9;
+  --holo-soft: rgba(14, 165, 233, 0.1);
+  --holo-glow: rgba(14, 165, 233, 0.35);
+  --success: #15803d;
+  --success-soft: rgba(21, 128, 61, 0.12);
+  --warning: #b45309;
+  --warning-soft: rgba(180, 83, 9, 0.12);
+  --critical: #dc2626;
+  --critical-soft: rgba(220, 38, 38, 0.1);
+  --grid-line: rgba(15, 40, 80, 0.07);
+  --shadow: 0 1px 2px rgba(15, 30, 60, 0.05), 0 14px 32px -20px rgba(15, 30, 60, 0.25);
+}
+html.dash-premium.dash-light body,
+.dash-premium-root.dash-light {
+  background:
+    radial-gradient(1100px 600px at 85% -10%, rgba(29, 111, 230, 0.1), transparent 60%),
+    radial-gradient(900px 600px at -10% 30%, rgba(14, 165, 233, 0.06), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+.dash-premium-root.dash-light main h1 {
+  color: var(--text);
+}
+html.dash-premium.dash-light {
+  scrollbar-color: rgba(15, 40, 80, 0.25) transparent;
+}
+html.dash-premium.dash-light ::-webkit-scrollbar-thumb {
+  background-color: rgba(15, 40, 80, 0.2);
+}
+html.dash-premium.dash-light .floating-scrollbar {
+  background: rgba(238, 242, 248, 0.94);
+}
+html.dash-premium.dash-light ::selection {
+  background: rgba(29, 111, 230, 0.22);
+  color: inherit;
+}
+html.dash-premium.dash-light [data-slot="card"] {
+  background: linear-gradient(180deg, #ffffff, #f8fafd);
+}
+html.dash-premium.dash-light [data-slot="card"]:hover {
+  box-shadow:
+    var(--shadow),
+    0 0 0 1px rgba(29, 111, 230, 0.08),
+    0 18px 40px -24px rgba(29, 111, 230, 0.35);
+}
+html.dash-premium.dash-light [data-slot="button"][data-variant="outline"] {
+  background-color: #ffffff;
+}
+html.dash-premium.dash-light [data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
+  background-color: var(--accent-blue-soft);
+  border-color: rgba(29, 111, 230, 0.45);
+  box-shadow: none;
+}
+html.dash-premium.dash-light [data-slot="button"][data-variant="ghost"]:hover:not(:disabled) {
+  background-color: rgba(15, 40, 80, 0.06);
+}
+html.dash-premium.dash-light :is([data-slot="input"], [data-slot="select-trigger"], textarea) {
+  background-color: #ffffff;
+}
+html.dash-premium.dash-light :is([data-slot="input"], [data-slot="select-trigger"], textarea):hover {
+  border-color: rgba(15, 40, 80, 0.32);
+}
+html.dash-premium.dash-light :is([data-slot="input"], [data-slot="select-trigger"], textarea):focus-visible,
+html.dash-premium.dash-light [data-slot="select-trigger"][data-state="open"] {
+  border-color: var(--accent-blue);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(29, 111, 230, 0.15);
+}
+html.dash-premium.dash-light :is(input, textarea)::placeholder {
+  color: rgba(90, 107, 134, 0.75);
+}
+html.dash-premium.dash-light input::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+html.dash-premium.dash-light [data-slot="table-header"] [data-slot="table-row"] {
+  background: rgba(15, 40, 80, 0.035);
+}
+html.dash-premium.dash-light [data-slot="table-body"] [data-slot="table-row"]:hover {
+  background: rgba(29, 111, 230, 0.05);
+}
+html.dash-premium.dash-light [data-slot="dialog-overlay"] {
+  background: rgba(10, 20, 40, 0.45);
+}
+html.dash-premium.dash-light [data-slot="dialog-content"] {
+  background: #ffffff;
+  box-shadow: 0 40px 90px -30px rgba(10, 20, 40, 0.45);
+}
+html.dash-premium.dash-light :is([data-slot="dropdown-menu-content"], [data-slot="select-content"], [data-slot="dropdown-menu-sub-content"]) {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 24px 60px -24px rgba(10, 20, 40, 0.4);
+}
+html.dash-premium.dash-light :is([data-slot="dropdown-menu-item"], [data-slot="select-item"])[data-highlighted] {
+  background: var(--accent-blue-soft);
+  color: var(--text);
+}
+html.dash-premium.dash-light [data-sonner-toast] {
+  --normal-bg: #ffffff;
+  box-shadow: 0 20px 50px -20px rgba(10, 20, 40, 0.35) !important;
 }
