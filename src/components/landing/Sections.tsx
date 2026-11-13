@@ -1,7 +1,35 @@
 import Image from "next/image";
-import Reveal from "./Reveal";
+import {
+  Activity,
+  ArrowRight,
+  Battery,
+  CircleDot,
+  Cog,
+  Disc,
+  Disc3,
+  Hammer,
+  Layers,
+  MapPin,
+  Paintbrush,
+  Phone,
+  Quote,
+  Route,
+  Settings2,
+  Shield,
+  ShieldCheck,
+  Smartphone,
+  Snowflake,
+  Thermometer,
+  Waves,
+  Wind,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { api, API_URL } from "@/lib/api";
-import styles from "./landing.module.css";
+import EngineeringSceneLoader from "./premium/EngineeringSceneLoader";
+import ProcessVideoScene from "./premium/ProcessVideoScene";
+import { Appear, Counter, LiveTimelineDemo, TiltCard } from "./premium/Interactive";
+import styles from "./premium/premium.module.css";
 
 function mediaUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
@@ -12,97 +40,160 @@ function initials(name: string) {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }
 
+function SectionHead({ eyebrow, title, text, center = false }: { eyebrow: string; title: string; text?: string; center?: boolean }) {
+  return (
+    <Appear className={`${styles.sectionHead} ${center ? styles.sectionHeadCenter : ""}`}>
+      <span className={styles.eyebrow}>{eyebrow}</span>
+      <h2>{title}</h2>
+      {text && <p>{text}</p>}
+    </Appear>
+  );
+}
+
+const STATS = [
+  { value: "17", label: "anos de operação" },
+  { value: "6.400+", label: "veículos atendidos" },
+  { value: "4.9/5", label: "nota média dos clientes" },
+];
+
 export function Presentation() {
   return (
-    <section className={styles.section}>
-      <Reveal>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">A oficina</span>
-          <h2>Uma equipe técnica que documenta cada passo.</h2>
-          <p>
-            Somos a Reblind, especializada em blindagem — reparo, recuperação e documentação —,
-            funilaria, pintura e mecânica, homologada pelo Ministério da Defesa (Exército Brasileiro)
-            e associada à ABRABLIN. Tratamos cada ordem de serviço como um relatório de engenharia:
-            tudo o que é encontrado, trocado ou testado fica registrado e visível para você, no
-            momento em que acontece.
-          </p>
+    <section className={`${styles.section} ${styles.presentation}`}>
+      <div className={styles.presentationGrid}>
+        <SectionHead
+          eyebrow="A oficina"
+          title="Uma equipe técnica que documenta cada passo."
+          text="Somos a Reblind, especializada em blindagem — reparo, recuperação e documentação —, funilaria, pintura e mecânica, homologada pelo Ministério da Defesa (Exército Brasileiro) e associada à ABRABLIN. Tratamos cada ordem de serviço como um relatório de engenharia: tudo o que é encontrado, trocado ou testado fica registrado e visível para você, no momento em que acontece."
+        />
+        <div className={styles.statsCol}>
+          {STATS.map((s, i) => (
+            <Appear key={s.label} delay={i * 110}>
+              <div className={styles.stat}>
+                <div className={styles.statValue}>
+                  <Counter value={s.value} />
+                </div>
+                <div className={styles.statLabel}>{s.label}</div>
+                <span className={styles.statLine} aria-hidden />
+              </div>
+            </Appear>
+          ))}
         </div>
-      </Reveal>
-      <Reveal delay={80}>
-        <div className={styles.statsRow}>
-          <div className={styles.stat}>
-            <div className={`mono ${styles.v}`}>17</div>
-            <div className={styles.l}>anos de operação</div>
-          </div>
-          <div className={styles.stat}>
-            <div className={`mono ${styles.v}`}>6.400+</div>
-            <div className={styles.l}>veículos atendidos</div>
-          </div>
-          <div className={styles.stat}>
-            <div className={`mono ${styles.v}`}>4.9/5</div>
-            <div className={styles.l}>nota média dos clientes</div>
-          </div>
-        </div>
-      </Reveal>
+      </div>
     </section>
   );
 }
 
-const DIFFERENTIALS = [
-  { title: "Você aprova pelo celular", text: "Todo problema novo encontrado vira uma notificação com fotos e valor — aprovar ou recusar é um toque." },
-  { title: "Timeline ao vivo", text: "Cada evento da manutenção aparece no seu painel no instante em que o mecânico registra." },
-  { title: "Peça por peça", text: "Motor, freios, suspensão e mais 10 sistemas com histórico individual, não um status genérico." },
-  { title: "Garantia rastreável", text: "Toda peça trocada tem prazo de garantia salvo na sua conta, não em um papel que se perde." },
+const DIFFERENTIALS: { title: string; text: string; icon: LucideIcon }[] = [
+  { title: "Você aprova pelo celular", text: "Todo problema novo encontrado vira uma notificação com fotos e valor — aprovar ou recusar é um toque.", icon: Smartphone },
+  { title: "Timeline ao vivo", text: "Cada evento da manutenção aparece no seu painel no instante em que o mecânico registra.", icon: Activity },
+  { title: "Peça por peça", text: "Motor, freios, suspensão e mais 10 sistemas com histórico individual, não um status genérico.", icon: Layers },
+  { title: "Garantia rastreável", text: "Toda peça trocada tem prazo de garantia salvo na sua conta, não em um papel que se perde.", icon: ShieldCheck },
 ];
 
 export function Differentiators() {
   return (
-    <section className={styles.section} id="diferenciais">
-      <Reveal>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">Diferenciais</span>
-          <h2>O que muda quando o carro entra aqui.</h2>
+    <section className={`${styles.section} ${styles.tech}`} id="diferenciais">
+      <SectionHead eyebrow="Diferenciais" title="O que muda quando o carro entra aqui." />
+      <div className={styles.techGrid}>
+        <Appear className={styles.techVisual}>
+          <div className={styles.techImage}>
+            <Image src="/landing/holo-cockpit.jpg" alt="" fill sizes="(max-width: 900px) 100vw, 50vw" className={styles.cover} />
+            <span className={styles.scanline} aria-hidden />
+          </div>
+          <div className={styles.techFloat}>
+            <LiveTimelineDemo />
+          </div>
+        </Appear>
+        <div className={styles.techList}>
+          {DIFFERENTIALS.map((d, i) => (
+            <Appear key={d.title} delay={i * 90}>
+              <TiltCard className={styles.diffCard} max={5}>
+                <span className={styles.iconBox}>
+                  <d.icon aria-hidden />
+                </span>
+                <div>
+                  <h3>{d.title}</h3>
+                  <p>{d.text}</p>
+                </div>
+              </TiltCard>
+            </Appear>
+          ))}
         </div>
-      </Reveal>
-      <div className={styles.grid}>
-        {DIFFERENTIALS.map((d, i) => (
-          <Reveal key={d.title} delay={i * 60}>
-            <div className={styles.card}>
-              <h3>{d.title}</h3>
-              <p>{d.text}</p>
-            </div>
-          </Reveal>
-        ))}
       </div>
     </section>
   );
 }
 
-const SERVICES = [
-  "Motor", "Freios", "Suspensão", "Transmissão", "Embreagem", "Escapamento",
-  "Direção", "Elétrica", "Ar-condicionado", "Pneus e alinhamento", "Bateria", "Arrefecimento",
+const SPECIALTIES: { title: string; text: string; icon: LucideIcon }[] = [
+  { title: "Blindagem", text: "Reparo, recuperação e documentação de veículos blindados.", icon: Shield },
+  { title: "Funilaria", text: "Recuperação estrutural e de carroceria.", icon: Hammer },
+  { title: "Pintura", text: "Acabamento e pintura automotiva.", icon: Paintbrush },
+];
+
+const SERVICES: { name: string; text: string; icon: LucideIcon }[] = [
+  { name: "Motor", text: "Diagnóstico, reparo e manutenção do conjunto do motor.", icon: Cog },
+  { name: "Freios", text: "Discos, pastilhas, pinças e fluido, com evidência antes da troca.", icon: Disc3 },
+  { name: "Suspensão", text: "Amortecedores, molas, bandejas e buchas.", icon: Waves },
+  { name: "Transmissão", text: "Câmbio e componentes de transmissão.", icon: Settings2 },
+  { name: "Embreagem", text: "Kit de embreagem, acionamento e regulagem.", icon: CircleDot },
+  { name: "Escapamento", text: "Tubulação, silenciosos e fixações.", icon: Wind },
+  { name: "Direção", text: "Caixa de direção, terminais e folgas.", icon: Route },
+  { name: "Elétrica", text: "Faróis, módulos, chicotes e diagnóstico elétrico.", icon: Zap },
+  { name: "Ar-condicionado", text: "Carga de gás, filtros e componentes do sistema.", icon: Snowflake },
+  { name: "Pneus e alinhamento", text: "Pneus, alinhamento e balanceamento.", icon: Disc },
+  { name: "Bateria", text: "Teste, carga e substituição.", icon: Battery },
+  { name: "Arrefecimento", text: "Radiador, bomba d'água, mangueiras e fluido.", icon: Thermometer },
 ];
 
 export function Services() {
   return (
-    <section className={styles.section} id="servicos">
-      <Reveal>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">Serviços</span>
-          <h2>Cobertura completa, um vocabulário só.</h2>
-          <p>A mesma categoria que você escolhe aqui é a que aparece depois no seu painel de acompanhamento.</p>
-        </div>
-      </Reveal>
-      <div className={styles.grid}>
-        {SERVICES.map((s, i) => (
-          <Reveal key={s} delay={i * 40}>
-            <div className={styles.card}>
-              <h3>{s}</h3>
+    <>
+      <EngineeringSceneLoader />
+      <section className={styles.section} id="servicos">
+        <SectionHead
+          eyebrow="Serviços"
+          title="Cobertura completa, um vocabulário só."
+          text="A mesma categoria que você escolhe aqui é a que aparece depois no seu painel de acompanhamento."
+        />
+        <div className={styles.specialties}>
+          {SPECIALTIES.map((s, i) => (
+            <Appear key={s.title} delay={i * 100}>
+              <TiltCard className={styles.specialtyCard}>
+                <span className={styles.specialtyGlow} aria-hidden />
+                <s.icon className={styles.specialtyIcon} aria-hidden />
+                <span className={styles.specialtyTag}>Especialidade</span>
+                <h3>{s.title}</h3>
+                <p>{s.text}</p>
+              </TiltCard>
+            </Appear>
+          ))}
+          <Appear delay={300} className={styles.specialtyImageWrap}>
+            <div className={styles.specialtyImage}>
+              <Image src="/landing/suspension.jpg" alt="Conjunto de suspensão e freio em vista explodida" fill sizes="(max-width: 900px) 100vw, 33vw" className={styles.cover} />
+              <span className={styles.imageLabel}>
+                <span className="mono">SUSPENSÃO · FREIOS</span>
+                Vista explodida
+              </span>
             </div>
-          </Reveal>
-        ))}
-      </div>
-    </section>
+          </Appear>
+        </div>
+        <div className={styles.serviceGrid}>
+          {SERVICES.map((s, i) => (
+            <Appear key={s.name} delay={(i % 4) * 70}>
+              <TiltCard className={styles.serviceCard}>
+                <span className={styles.serviceIcon}>
+                  <s.icon aria-hidden />
+                </span>
+                <span className={`mono ${styles.serviceIndex}`}>{String(i + 1).padStart(2, "0")}</span>
+                <h3>{s.name}</h3>
+                <p>{s.text}</p>
+                <span className={styles.serviceRule} aria-hidden />
+              </TiltCard>
+            </Appear>
+          ))}
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -114,27 +205,7 @@ const PROCESS = [
 ];
 
 export function ProcessSteps() {
-  return (
-    <section className={styles.section}>
-      <Reveal>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">Como funciona</span>
-          <h2>Quatro etapas, sem telefonema no meio.</h2>
-        </div>
-      </Reveal>
-      <Reveal delay={60}>
-        <div className={styles.processFlow}>
-          {PROCESS.map((p) => (
-            <div key={p.n} className={styles.processStep}>
-              <div className={`mono ${styles.n}`}>{p.n}</div>
-              <h4>{p.title}</h4>
-              <p>{p.text}</p>
-            </div>
-          ))}
-        </div>
-      </Reveal>
-    </section>
-  );
+  return <ProcessVideoScene steps={PROCESS} eyebrow="Como funciona" title="Quatro etapas, sem telefonema no meio." />;
 }
 
 const TESTIMONIALS = [
@@ -145,20 +216,22 @@ const TESTIMONIALS = [
 export function Testimonials() {
   return (
     <section className={styles.section}>
-      <Reveal>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">Depoimentos</span>
-          <h2>Quem já acompanhou o próprio carro.</h2>
-        </div>
-      </Reveal>
-      <div className={styles.grid}>
+      <SectionHead eyebrow="Depoimentos" title="Quem já acompanhou o próprio carro." />
+      <div className={styles.testimonialGrid}>
         {TESTIMONIALS.map((t, i) => (
-          <Reveal key={t.name} delay={i * 80}>
-            <div className={styles.testimonial}>
+          <Appear key={t.name} delay={i * 120}>
+            <TiltCard className={styles.testimonial} max={4}>
+              <Quote className={styles.quoteIcon} aria-hidden />
               <p>&ldquo;{t.quote}&rdquo;</p>
-              <footer>{t.name} · {t.car}</footer>
-            </div>
-          </Reveal>
+              <footer>
+                <span className={styles.testimonialAvatar}>{initials(t.name)}</span>
+                <span>
+                  <strong>{t.name}</strong>
+                  <small>{t.car}</small>
+                </span>
+              </footer>
+            </TiltCard>
+          </Appear>
         ))}
       </div>
     </section>
@@ -186,43 +259,50 @@ export async function Team() {
   const team = await getTeam();
   return (
     <section className={styles.section} id="equipe">
-      <Reveal>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">Equipe</span>
-          <h2>Quem assina cada serviço.</h2>
-          <p>O mesmo nome que aparece aqui é o &ldquo;responsável pelo serviço&rdquo; na sua timeline.</p>
-        </div>
-      </Reveal>
+      <SectionHead
+        eyebrow="Equipe"
+        title="Quem assina cada serviço."
+        text="O mesmo nome que aparece aqui é o “responsável pelo serviço” na sua timeline."
+      />
       <div className={styles.teamGrid}>
         {team.map((m, i) => (
-          <Reveal key={m.id} delay={i * 60}>
-            <div className={styles.teamCard}>
-              {m.avatarUrl ? (
-                <img src={mediaUrl(m.avatarUrl)} alt="" className={styles.avatarImg} />
-              ) : (
-                <div className={styles.avatar}>{initials(m.name)}</div>
-              )}
+          <Appear key={m.id} delay={(i % 4) * 80}>
+            <TiltCard className={styles.teamCard} max={6}>
+              <span className={styles.avatarRing}>
+                {m.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={mediaUrl(m.avatarUrl)} alt="" className={styles.avatarImg} />
+                ) : (
+                  <span className={styles.avatar}>{initials(m.name)}</span>
+                )}
+              </span>
               <h4>{m.name}</h4>
               <p>{m.role}</p>
-            </div>
-          </Reveal>
+            </TiltCard>
+          </Appear>
         ))}
       </div>
     </section>
   );
 }
 
+const PARTNERS = ["Exército Brasileiro · homologada", "ABRABLIN", "Jaguar", "Land Rover"];
+
 export function Partners() {
   return (
-    <section className={styles.section}>
-      <Reveal>
-        <div className={styles.partnersRow}>
-          <span>Exército Brasileiro · homologada</span>
-          <span>ABRABLIN</span>
-          <span>Jaguar</span>
-          <span>Land Rover</span>
-        </div>
-      </Reveal>
+    <section className={styles.partners} aria-label="Parceiros e homologações">
+      <div className={styles.marquee}>
+        {[0, 1].map((copy) => (
+          <div key={copy} className={styles.marqueeRow} aria-hidden={copy === 1}>
+            {[...PARTNERS, ...PARTNERS].map((p, i) => (
+              <span key={`${copy}-${i}`}>
+                <ShieldCheck aria-hidden />
+                {p}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -230,17 +310,28 @@ export function Partners() {
 export function FinalCta() {
   return (
     <section className={styles.section} id="orcamento">
-      <Reveal>
+      <Appear>
         <div className={styles.ctaBand}>
-          <div>
-            <span className="eyebrow">Orçamento</span>
+          <Image src="/landing/holo-car.jpg" alt="" fill sizes="100vw" className={`${styles.cover} ${styles.ctaImage}`} />
+          <div className={styles.ctaShade} aria-hidden />
+          <div className={styles.ctaBody}>
+            <span className={styles.eyebrow}>Orçamento</span>
             <h2>Monte seu orçamento antes de falar com alguém.</h2>
+            <a href="/login" className={`${styles.btn} ${styles.btnPrimary} ${styles.btnLarge}`}>
+              Iniciar orçamento
+              <ArrowRight aria-hidden />
+            </a>
+            <div className={styles.ctaContact}>
+              <span>
+                <MapPin aria-hidden /> Rua Antônio das Chagas, 530 — Chácara Santo Antônio, São Paulo/SP
+              </span>
+              <a href="tel:+551123370101">
+                <Phone aria-hidden /> (11) 2337-0101
+              </a>
+            </div>
           </div>
-          <a href="/login" className={`${styles.btn} ${styles.btnPrimary}`}>
-            Iniciar orçamento
-          </a>
         </div>
-      </Reveal>
+      </Appear>
     </section>
   );
 }
@@ -248,11 +339,18 @@ export function FinalCta() {
 export function SiteFooter() {
   return (
     <footer className={styles.footer}>
-      <div className={styles.footerBrand}>
-        <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} />
+      <div className={styles.footerInner}>
+        <div className={styles.footerBrand}>
+          <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.footerLogo} />
+          <p>Reblind — acompanhamento de manutenção em tempo real.</p>
+        </div>
+        <div className={styles.footerInfo}>
+          <p>Rua Antônio das Chagas, 530 — Chácara Santo Antônio, São Paulo/SP · (11) 2337-0101</p>
+          <a href="/login" className={styles.footerLink}>
+            Fazer login <ArrowRight aria-hidden />
+          </a>
+        </div>
       </div>
-      <p>Reblind — acompanhamento de manutenção em tempo real.</p>
-      <p>Rua Antônio das Chagas, 530 — Chácara Santo Antônio, São Paulo/SP · (11) 2337-0101</p>
     </footer>
   );
 }
