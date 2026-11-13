@@ -685,8 +685,17 @@ export interface AccountReceivable {
   client?: { id: string; name: string } | null;
   serviceOrderId?: string | null;
   // SS e data de finalização da OS (colunas "SS" e "Data").
-  serviceOrder?: { id: string; code: string; ssNumber?: string | null; completedAt?: string | null } | null;
+  serviceOrder?: {
+    id: string;
+    code: string;
+    ssNumber?: string | null;
+    completedAt?: string | null;
+    insuranceCompany?: { legalName: string; tradeName?: string | null } | null;
+  } | null;
   amount: number;
+  // Projeto com seguro: valor total do projeto e a franquia descontada (amount = bruto - franquia).
+  orderGrossAmount?: number | null;
+  deductibleAmount?: number | null;
   // Prazo — null = sem prazo (já conta como vencida até alguém definir).
   dueDate: string | null;
   receivedAt?: string | null;

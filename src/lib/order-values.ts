@@ -4,7 +4,13 @@ import type { Approval } from "@/lib/types";
 // do projeto" na tela. Problema recusado pelo cliente aparece, mas não soma no total.
 // Sem nenhum valor lançado, vale o estimado da abertura. Mesma regra do backend
 // (projectValues em service-order-report.service.ts).
-export function projectValues(order: { approvals: Approval[]; estimatedMin?: number | null; deliveryExtraValue?: number | null }) {
+export function projectValues(order: {
+  approvals: Approval[];
+  estimatedMin?: number | null;
+  deliveryExtraValue?: number | null;
+  hasInsurance?: boolean;
+  deductibleAmount?: number | null;
+}) {
   const rows = order.approvals.map((approval) => ({
     approval,
     labor: approval.laborValue ?? 0,
@@ -18,5 +24,8 @@ export function projectValues(order: { approvals: Approval[]; estimatedMin?: num
   const problemsTotal = counted.reduce((sum, row) => sum + row.total, 0);
   const estimate = problemsTotal ? 0 : order.estimatedMin ?? 0;
   const extra = order.deliveryExtraValue ?? 0;
-  return { rows, laborTotal, partsTotal, problemsTotal, estimate, extra, total: (problemsTotal || estimate) + extra };
+  const gross = (problemsTotal || estimate) + extra;
+  // Franquia do seguro: sai do total — o valor final é o que o cliente paga.
+  const deductible = order.hasInsurance ? Math.min(gross, Math.max(0, Number(order.deductibleAmount ?? 0))) : 0;
+  return { rows, laborTotal, partsTotal, problemsTotal, estimate, extra, gross, deductible, total: gross - deductible };
 }

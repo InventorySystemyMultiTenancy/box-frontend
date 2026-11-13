@@ -19,17 +19,21 @@ export default function ProjectValuesPanel({
   parts,
   estimatedMin,
   deliveryExtraValue,
+  hasInsurance,
+  deductibleAmount,
   onUpdateLabor,
 }: {
   approvals: Approval[];
   parts: VehiclePart[];
   estimatedMin?: number | null;
   deliveryExtraValue?: number | null;
+  hasInsurance?: boolean;
+  deductibleAmount?: number | null;
   onUpdateLabor?: (approvalId: string, laborValue: number) => Promise<void>;
 }) {
   const [editing, setEditing] = useState<{ id: string; value: string } | null>(null);
   const [saving, setSaving] = useState(false);
-  const values = projectValues({ approvals, estimatedMin, deliveryExtraValue });
+  const values = projectValues({ approvals, estimatedMin, deliveryExtraValue, hasInsurance, deductibleAmount });
   if (values.rows.length === 0 && !values.total) return null;
 
   async function saveLabor(e: React.FormEvent) {
@@ -119,6 +123,12 @@ export default function ProjectValuesPanel({
           )}
           {values.estimate > 0 && <span className="text-muted-foreground">Valor estimado na abertura: {brl(values.estimate)}</span>}
           {values.extra > 0 && <span className="text-muted-foreground">Valor extra na entrega: {brl(values.extra)}</span>}
+          {values.deductible > 0 && (
+            <>
+              <span className="text-muted-foreground">Valor total do projeto: {brl(values.gross)}</span>
+              <span className="font-medium text-amber-700 dark:text-amber-300">Franquia do seguro (desconto): − {brl(values.deductible)}</span>
+            </>
+          )}
           <span>
             Valor final (igual ao PDF): <strong>{brl(values.total)}</strong>
           </span>

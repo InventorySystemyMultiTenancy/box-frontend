@@ -745,6 +745,11 @@ export default function OrderDetail({
               ? `<div class="muted" style="margin-top: 4px; text-align: right;">Valor extra na entrega: ${formatCurrency(values.extra)}</div>`
               : ""
           }
+          ${
+            values.deductible
+              ? `<div class="muted" style="margin-top: 4px; text-align: right;">Valor total do projeto: ${formatCurrency(values.gross)}</div><div class="muted" style="margin-top: 4px; text-align: right;">Franquia do seguro (desconto): - ${formatCurrency(values.deductible)}</div>`
+              : ""
+          }
           <div class="total">Valor final: ${formatCurrency(values.total)}</div>
           ${notesHtml ? `<h2>Observações</h2>${notesHtml}` : ""}
         </body>
@@ -1049,6 +1054,8 @@ export default function OrderDetail({
                 parts={order.parts}
                 estimatedMin={order.estimatedMin}
                 deliveryExtraValue={order.deliveryExtraValue}
+                hasInsurance={order.hasInsurance}
+                deductibleAmount={order.deductibleAmount}
                 onUpdateLabor={isAdmin ? updateProblemLabor : undefined}
               />
             )}

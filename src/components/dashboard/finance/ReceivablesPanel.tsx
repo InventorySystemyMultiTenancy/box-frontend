@@ -170,6 +170,8 @@ export default function ReceivablesPanel() {
               { header: "Nota fiscal", value: (r) => (r.invoices ?? []).map((i) => i.number).filter(Boolean).join(", ") },
               { header: "Categoria", value: (r) => r.category },
               { header: "Valor", value: (r) => r.amount, type: "money" },
+              { header: "Valor do projeto", value: (r) => r.orderGrossAmount, type: "money" },
+              { header: "Franquia do seguro (desconto)", value: (r) => r.deductibleAmount, type: "money" },
               { header: "Prazo", value: (r) => r.dueDate, type: "date" },
               { header: "Faturado", value: (r) => r.receivedAt, type: "date" },
               { header: "Valor recebido", value: (r) => r.receivedAmount, type: "money" },
@@ -262,7 +264,16 @@ export default function ReceivablesPanel() {
                 {/* OS do projeto que gerou a cobrança (contas de Serviços). */}
                 <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">{receivable.serviceOrder?.code ?? "—"}</TableCell>
                 <TableCell className="text-muted-foreground">{receivable.client?.name || "—"}</TableCell>
-                <TableCell>R$ {receivable.amount.toFixed(2)}</TableCell>
+                <TableCell>
+                  R$ {receivable.amount.toFixed(2)}
+                  {/* Projeto com seguro: deixa claro que a franquia já foi descontada. */}
+                  {receivable.deductibleAmount ? (
+                    <span className="mt-1 block w-max rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[11px] leading-tight text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                      Projeto R$ {(receivable.orderGrossAmount ?? 0).toFixed(2)}
+                      <br />− Franquia R$ {receivable.deductibleAmount.toFixed(2)}
+                    </span>
+                  ) : null}
+                </TableCell>
                 {/* Faturado = data em que foi marcada como recebida; vazio enquanto pendente. */}
                 <TableCell className="text-muted-foreground">
                   {receivable.receivedAt ? (
@@ -362,6 +373,17 @@ export default function ReceivablesPanel() {
                       ["OS", detail.serviceOrder?.code],
                       ["Cliente", detail.client?.name],
                       ["Valor", `R$ ${detail.amount.toFixed(2)}`],
+                      ["Valor total do projeto", detail.deductibleAmount ? `R$ ${(detail.orderGrossAmount ?? 0).toFixed(2)}` : null],
+                      [
+                        "Franquia do seguro (desconto)",
+                        detail.deductibleAmount
+                          ? `− R$ ${detail.deductibleAmount.toFixed(2)}${
+                              detail.serviceOrder?.insuranceCompany
+                                ? ` · ${detail.serviceOrder.insuranceCompany.tradeName || detail.serviceOrder.insuranceCompany.legalName}`
+                                : ""
+                            }`
+                          : null,
+                      ],
                       ["Faturado", detail.receivedAt ? formatDate(detail.receivedAt) : null],
                       ["Valor recebido", detail.status === "RECEIVED" ? `R$ ${(detail.receivedAmount ?? detail.amount).toFixed(2)}` : null],
                       ["Forma de pagamento", detail.paymentMethod],
