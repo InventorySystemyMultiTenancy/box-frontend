@@ -4,6 +4,10 @@
    da Reblind (cinza + azul-marinho) já vale para os componentes shadcn. */
 @import "tailwindcss";
 
+/* As variantes dark: dos componentes seguem a classe .dark (posta no <html> pelo layout do
+   painel, que é sempre escuro no tema premium) — não mais a preferência do sistema. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--text);

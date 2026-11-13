@@ -49,6 +49,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import styles from "@/components/dashboard/dashboard.module.css";
 import "../dashboard.css";
+import "../dashboard-premium.css";
+import { DASH_FONT_CLASSES } from "./fonts";
+
+// Tema premium (só aparência): classes no <html> para diálogos/menus/toasts, que abrem
+// fora da árvore do painel, também ficarem no tema. Removidas ao sair do painel.
+const HTML_THEME_CLASSES = ["dash-premium", "dark", ...DASH_FONT_CLASSES];
+const ROOT_THEME_CLASS = ["dash-premium-root", ...DASH_FONT_CLASSES].join(" ");
 
 // key = identificador estável de cada aba, usado pelo Role.allowedTabs (ver aba Cargos)
 // pra restringir quais abas um cargo específico pode ver — independente do href/label.
@@ -99,6 +106,12 @@ function mediaUrl(url: string) {
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const html = document.documentElement;
+    html.classList.add(...HTML_THEME_CLASSES);
+    return () => html.classList.remove(...HTML_THEME_CLASSES);
+  }, []);
+
   const { user, token, loading, hasPermission, allowedTabs, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -259,7 +272,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   if (loading || !user || !isOnAllowedTab) {
-    return <div className={styles.empty}>Carregando painel...</div>;
+    return <div className={`${styles.empty} ${ROOT_THEME_CLASS}`}>Carregando painel...</div>;
   }
 
   const navList = (
@@ -278,7 +291,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${ROOT_THEME_CLASS}`}>
       <header className={styles.topbar}>
         <Link href="/dashboard" className={styles.brand} aria-label="Ir para o painel">
           <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
@@ -419,7 +432,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <Toaster />
+      <Toaster theme="dark" />
     </div>
   );
 }
