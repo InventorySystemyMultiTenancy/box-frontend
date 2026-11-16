@@ -23,6 +23,7 @@ import ProjectValuesPanel from "@/components/dashboard/ProjectValuesPanel";
 import { projectValues } from "@/lib/order-values";
 import { EditVehicleDialog } from "@/components/dashboard/EditVehicleDialog";
 import { EditClientDialog } from "@/components/dashboard/EditClientDialog";
+import { isPlaceholderEmail } from "@/lib/utils";
 import { EditSsNumberDialog } from "@/components/dashboard/EditSsNumberDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -605,6 +606,15 @@ export default function OrderDetail({
     // as recusadas pelo cliente (mesma conta do quadro "Valores do projeto").
     const completedParts = order.parts.filter((part) => part.status === "DONE");
     const values = projectValues(order);
+    // Dados atuais do cliente (o PDF sempre sai com o cadastro mais recente).
+    const owner = order.vehicle.owner;
+    const ownerEmail = owner?.client?.email ?? owner?.email ?? null;
+    const clientContact = [
+      (owner?.client?.phone ?? owner?.phone) ? `Telefone: ${owner?.client?.phone ?? owner?.phone}` : null,
+      owner?.client?.whatsapp ? `WhatsApp: ${owner.client.whatsapp}` : null,
+      ownerEmail && !isPlaceholderEmail(ownerEmail) ? `E-mail: ${ownerEmail}` : null,
+      owner?.client?.cpfCnpj ? `CPF/CNPJ: ${owner.client.cpfCnpj}` : null,
+    ].filter((line): line is string => !!line);
     const partsRows = order.parts
       .map(
         (part) => `
@@ -699,7 +709,9 @@ export default function OrderDetail({
           <div class="muted">Gerado em ${printedAt} · Etapa atual: ${escapeHtml(STATUS_LABELS[order.status])}</div>
           <div class="summary">
             <div class="box"><strong>Ordem</strong><br />${escapeHtml(order.code)}</div>
-            <div class="box"><strong>Cliente</strong><br />${escapeHtml(order.vehicle.owner?.name ?? "Não informado")}</div>
+            <div class="box"><strong>Cliente</strong><br />${escapeHtml(owner?.client?.name ?? owner?.name ?? "Não informado")}${clientContact
+              .map((line) => `<br /><span class="muted">${escapeHtml(line)}</span>`)
+              .join("")}</div>
             <div class="box"><strong>Veículo</strong><br />${escapeHtml(vehicle)}</div>
             <div class="box"><strong>Placa</strong><br />${escapeHtml(order.vehicle.plate ?? "Não informada")}</div>
             <div class="box"><strong>Quilometragem</strong><br />${order.vehicle.mileage.toLocaleString("pt-BR")} km</div>
