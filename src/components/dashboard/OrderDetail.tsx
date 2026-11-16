@@ -22,6 +22,7 @@ import ServicePartsPanel from "@/components/dashboard/ServicePartsPanel";
 import ProjectValuesPanel from "@/components/dashboard/ProjectValuesPanel";
 import { projectValues } from "@/lib/order-values";
 import { EditVehicleDialog } from "@/components/dashboard/EditVehicleDialog";
+import { EditClientDialog } from "@/components/dashboard/EditClientDialog";
 import { EditSsNumberDialog } from "@/components/dashboard/EditSsNumberDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -851,6 +852,12 @@ export default function OrderDetail({
             {order.vehicle.engine ? ` · ${order.vehicle.engine}` : ""}
             {order.vehicle.plate ? ` · ${order.vehicle.plate}` : ""}
           </h1>
+          {order.vehicle.owner && (
+            <div className={styles.orderClient}>
+              <span>Cliente:</span> <strong>{order.vehicle.owner.client?.name ?? order.vehicle.owner.name}</strong>
+              {(order.vehicle.owner.client?.phone ?? order.vehicle.owner.phone) && <> · {order.vehicle.owner.client?.phone ?? order.vehicle.owner.phone}</>}
+            </div>
+          )}
           <div className={styles.meta}>
             {order.code}
             {order.ssNumber ? ` · SS ${order.ssNumber}` : ""} · KM {order.vehicle.mileage.toLocaleString("pt-BR")}
@@ -871,6 +878,13 @@ export default function OrderDetail({
               onSaved={(vehicle) => setOrder((prev) => (prev ? { ...prev, vehicle: { ...prev.vehicle, ...vehicle, owner: prev.vehicle.owner } } : prev))}
               order={order}
               onInsuranceSaved={(data) => setOrder((prev) => (prev ? { ...prev, ...data } : prev))}
+            />
+          )}
+          {isStaff && order.vehicle.owner && (
+            <EditClientDialog
+              orderId={order.id}
+              owner={order.vehicle.owner}
+              onSaved={(owner) => setOrder((prev) => (prev ? { ...prev, vehicle: { ...prev.vehicle, owner } } : prev))}
             />
           )}
           {isStaff && (

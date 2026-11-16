@@ -1,4 +1,4 @@
-import type { ExpenseClassifications, FinancialReportData, PayableDueWarnings, SettlementSummary } from "@/lib/types";
+import type { ExpenseClassifications, FinancialReportData, PayableDueWarnings, SettlementSummary, VehicleOwner } from "@/lib/types";
 import type { ReportAccess } from "@/lib/access";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -1058,6 +1058,10 @@ export const api = {
   // Seguradoras ativas para o form do projeto (sem exigir a permissão do módulo de seguradoras).
   insuranceOptions: (token: string) =>
     request<{ companies: { id: string; legalName: string; tradeName: string | null }[] }>("/api/service-orders/insurance-options", {}, token),
+
+  // Dados do cliente editados de dentro do projeto (usuário dono + cadastro de cliente).
+  updateOrderClient: (orderId: string, payload: Record<string, unknown>, token: string) =>
+    request<{ owner: VehicleOwner }>(`/api/service-orders/${orderId}/client`, { method: "PATCH", body: JSON.stringify(payload) }, token),
 
   createServiceOrder: (payload: Record<string, unknown>, token: string) =>
     request<{ order: unknown }>("/api/service-orders", { method: "POST", body: JSON.stringify(payload) }, token),

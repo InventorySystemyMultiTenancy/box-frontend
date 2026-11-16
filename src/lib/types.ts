@@ -93,6 +93,15 @@ export interface User {
   active?: boolean;
 }
 
+/** Dono do veículo (usuário) com o cadastro de cliente (CRM), quando houver. */
+export interface VehicleOwner {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string | null;
+  client?: { id: string; name: string; phone?: string | null; whatsapp?: string | null; email?: string | null; cpfCnpj?: string | null } | null;
+}
+
 export interface Vehicle {
   id: string;
   brand: string;
@@ -106,7 +115,7 @@ export interface Vehicle {
   fuelType?: string | null;
   version?: string | null;
   mileage: number;
-  owner?: { id: string; name: string; email?: string; phone?: string | null };
+  owner?: VehicleOwner;
 }
 
 export interface Media {
