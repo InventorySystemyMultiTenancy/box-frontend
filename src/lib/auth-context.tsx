@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { api, AUTH_EXPIRED_EVENT, TOKEN_RENEWED_EVENT } from "@/lib/api";
+import { api, ApiError, AUTH_EXPIRED_EVENT, TOKEN_RENEWED_EVENT } from "@/lib/api";
 import { FULL_ACCESS, ReportAccess } from "@/lib/access";
 
 interface AuthUser {
@@ -56,18 +56,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       renewingRef.current = false;
       return;
     }
-    Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [] as string[], allowedTabs: [] as string[], reportAccess: FULL_ACCESS }))])
-      .then(([{ user }, { permissions, allowedTabs, reportAccess }]) => {
-        setUser(user as AuthUser);
-        setPermissions(new Set(permissions));
-        setAllowedTabs(allowedTabs ?? []);
-        setReportAccess(reportAccess ?? FULL_ACCESS);
-      })
-      .catch(() => {
-        window.localStorage.removeItem(STORAGE_KEY);
-        setToken(null);
-      })
-      .finally(() => setLoading(false));
+    // Só sai do login quando o servidor RECUSA o token (401). Falha de rede (celular
+    // voltando da tela apagada, 4G oscilando, servidor acordando) não desloga: tenta de
+    // novo sozinho até conseguir.
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+    const load = () => {
+      timer = undefined;
+      Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [] as string[], allowedTabs: [] as string[], reportAccess: FULL_ACCESS }))])
+        .then(([{ user }, { permissions, allowedTabs, reportAccess }]) => {
+          if (cancelled) return;
+          setUser(user as AuthUser);
+          setPermissions(new Set(permissions));
+          setAllowedTabs(allowedTabs ?? []);
+          setReportAccess(reportAccess ?? FULL_ACCESS);
+          setLoading(false);
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          if (err instanceof ApiError && err.status === 401) {
+            window.localStorage.removeItem(STORAGE_KEY);
+            setToken(null);
+            setLoading(false);
+            return;
+          }
+          attempt += 1;
+          timer = setTimeout(load, Math.min(15000, 1000 * 2 ** attempt));
+        });
+    };
+    const retryNow = () => {
+      if (timer === undefined) return;
+      clearTimeout(timer);
+      timer = undefined;
+      load();
+    };
+    load();
+    window.addEventListener("online", retryNow);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      window.removeEventListener("online", retryNow);
+    };
   }, [token]);
 
   // Qualquer chamada da API que receba 401 com sessão aberta (token vencido ou conta

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -20,7 +20,7 @@ export default function LoginPageWrapper() {
 }
 
 function LoginPage() {
-  const { login, registerCustomer } = useAuth();
+  const { user, login, registerCustomer } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -33,6 +33,11 @@ function LoginPage() {
   // Chegou aqui porque a sessão caiu no meio do uso (ver AUTH_EXPIRED_EVENT em lib/api.ts).
   const searchParams = useSearchParams();
   const notice = searchParams.get("sessao") === "expirada" ? "Sua sessão expirou ou a conta foi desativada. Entre novamente." : null;
+
+  // Já está logado (sessão salva no aparelho): vai direto pro painel, sem pedir senha de novo.
+  useEffect(() => {
+    if (user && !loading) router.replace("/dashboard");
+  }, [user, loading, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
