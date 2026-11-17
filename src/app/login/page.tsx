@@ -61,10 +61,11 @@ function LoginPage() {
       } else {
         await registerCustomer({ name, email, password, phone: phone || undefined });
       }
+      // Fica em "carregando" até sair da página: assim o redirecionamento automático de
+      // "já logado" (acima) não dispara junto e o endereço não fica indo e voltando.
       router.push("/dashboard");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível completar a solicitação.");
-    } finally {
       setLoading(false);
     }
   }

@@ -36,6 +36,23 @@ const STORAGE_KEY = "box.token";
 /** Motivo do último "sessão expirada" (mostrado na tela de login para facilitar suporte). */
 export const LOGOUT_REASON_KEY = "box.logoutReason";
 
+type Access = { permissions: string[]; allowedTabs: string[]; reportAccess?: ReportAccess };
+const NO_ACCESS: Access = { permissions: [], allowedTabs: [], reportAccess: FULL_ACCESS };
+
+/**
+ * Permissões do cargo. Falha de rede/servidor sem resposta → erro (quem chamou tenta de
+ * novo; NUNCA abre o painel "sem restrição" por engano). Só se o servidor responder com
+ * erro (ex.: rota indisponível) cai no padrão sem permissões extras, como antes.
+ */
+async function fetchPermissions(token: string): Promise<Access> {
+  try {
+    return await api.mePermissions(token);
+  } catch (err) {
+    if (err instanceof ApiError && err.status >= 400 && err.status !== 401) return NO_ACCESS;
+    throw err;
+  }
+}
+
 function readStoredToken() {
   if (typeof window === "undefined") return null;
   try {
@@ -71,6 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(next);
   }, []);
 
+  const applyAccess = useCallback((access: Access) => {
+    setPermissions(new Set(access.permissions));
+    setAllowedTabs(access.allowedTabs ?? []);
+    setReportAccess(access.reportAccess ?? FULL_ACCESS);
+  }, []);
+
   useEffect(() => {
     const sessionToken = tokenRef.current;
     if (!sessionToken) return;
@@ -84,13 +107,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       timer = undefined;
       const current = tokenRef.current;
       if (!current) return;
-      Promise.all([api.me(current), api.mePermissions(current).catch(() => ({ permissions: [] as string[], allowedTabs: [] as string[], reportAccess: FULL_ACCESS }))])
-        .then(([{ user }, { permissions, allowedTabs, reportAccess }]) => {
+      Promise.all([api.me(current), fetchPermissions(current)])
+        .then(([{ user }, access]) => {
           if (cancelled) return;
           setUser(user as AuthUser);
-          setPermissions(new Set(permissions));
-          setAllowedTabs(allowedTabs ?? []);
-          setReportAccess(reportAccess ?? FULL_ACCESS);
+          applyAccess(access);
           setLoading(false);
         })
         .catch((err) => {
@@ -118,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       window.removeEventListener("online", retryNow);
     };
-  }, [sessionKey]);
+  }, [sessionKey, applyAccess]);
 
   // Uma chamada da API recebeu 401 (token vencido ou conta desativada pelo admin): encerra
   // a sessão e leva pro login com o motivo. Ignora respostas atrasadas de um token que já
@@ -173,20 +194,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       applyToken(token);
       setUser(user as AuthUser);
-      // O login já diz quem é o usuário: o painel abre na hora; permissões chegam em seguida.
-      setLoading(false);
-      setSessionKey((k) => k + 1);
+      // O painel só abre com as permissões do cargo já carregadas — senão quem tem cargo
+      // restrito (ex.: só Caminhões) via por um instante abas que não são dele.
+      try {
+        applyAccess(await fetchPermissions(token));
+        setLoading(false);
+        setSessionKey((k) => k + 1);
+      } catch {
+        // Rede falhou agora: "Carregando painel" segura a tela e o carregamento da sessão
+        // tenta de novo sozinho até conseguir.
+        applyAccess(NO_ACCESS);
+        setLoading(true);
+        setSessionKey((k) => k + 1);
+      }
     },
-    [applyToken]
+    [applyToken, applyAccess]
   );
 
   const registerCustomer = useCallback(async (payload: { name: string; email: string; password: string; phone?: string }) => {
     const { token, user } = await api.registerCustomer(payload);
     applyToken(token);
     setUser(user as AuthUser);
-    setLoading(false);
+    applyAccess(NO_ACCESS);
+    setLoading(true);
     setSessionKey((k) => k + 1);
-  }, [applyToken]);
+  }, [applyToken, applyAccess]);
 
   const logout = useCallback(() => {
     applyToken(null);
