@@ -9,16 +9,30 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}, token?: string | null): Promise<T> {
-  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      ...(options.body && !isFormData ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+async function request<T>(path: string, options: RequestInit & { timeoutMs?: number } = {}, token?: string | null): Promise<T> {
+  const { timeoutMs, ...init } = options;
+  const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
+  // Prazo opcional: no celular uma requisição pode ficar "pendurada" sem resposta nem erro
+  // (rede trocando, aba voltando do fundo) — com prazo ela falha e quem chamou tenta de novo.
+  const controller = timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      ...(controller ? { signal: controller.signal } : {}),
+      headers: {
+        ...(init.body && !isFormData ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
+    });
+  } catch (err) {
+    if (controller?.signal.aborted) throw new ApiError("O servidor demorou para responder. Tente novamente.", 0);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 
   // Sessão deslizante: o servidor manda um token novo enquanto a pessoa usa o sistema.
   const renewed = res.headers.get("X-Renewed-Token");
@@ -119,7 +133,7 @@ export const api = {
     request<{ ok: true }>("/api/auth/reset-password", { method: "POST", body: JSON.stringify({ token: resetToken, password }) }),
 
   me: (token: string) =>
-    request<{ user: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } }>("/api/auth/me", {}, token),
+    request<{ user: { id: string; name: string; email: string; role: string; avatarUrl?: string | null } }>("/api/auth/me", { timeoutMs: 15000 }, token),
 
   updateMyAvatar: (file: File, token: string) => {
     const form = new FormData();
@@ -413,7 +427,7 @@ export const api = {
     ),
 
   mePermissions: (token: string) =>
-    request<{ permissions: string[]; allowedTabs: string[]; reportAccess?: ReportAccess }>("/api/auth/me/permissions", {}, token),
+    request<{ permissions: string[]; allowedTabs: string[]; reportAccess?: ReportAccess }>("/api/auth/me/permissions", { timeoutMs: 15000 }, token),
 
   // PDF financeiro do período — já recortado pelos setores de despesa do cargo.
   financialReport: (token: string, params: { from?: string; to?: string }) =>

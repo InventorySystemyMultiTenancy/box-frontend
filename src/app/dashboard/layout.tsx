@@ -321,7 +321,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   if (loading || !user || !isOnAllowedTab) {
-    return <div className={`${styles.empty} ${rootClass}`}>Carregando painel...</div>;
+    return <PanelLoading className={`${styles.empty} ${rootClass}`} />;
   }
 
   const navList = (
@@ -492,6 +492,32 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       )}
 
       <Toaster theme={contentTheme} />
+    </div>
+  );
+}
+
+/** "Carregando painel" — se passar de 12s (rede ruim), oferece recarregar em vez de travar. */
+function PanelLoading({ className }: { className: string }) {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setSlow(true), 12000);
+    return () => clearTimeout(id);
+  }, []);
+  return (
+    <div className={className}>
+      <div>Carregando painel...</div>
+      {slow && (
+        <div style={{ marginTop: "0.75rem", fontSize: "0.9rem" }}>
+          <div>A conexão está lenta — continuamos tentando.</div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{ marginTop: "0.5rem", padding: "0.45rem 1rem", borderRadius: 8, border: "1px solid currentColor", background: "transparent", color: "inherit", cursor: "pointer" }}
+          >
+            Recarregar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

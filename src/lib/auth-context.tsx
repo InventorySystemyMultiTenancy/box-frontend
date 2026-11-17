@@ -173,6 +173,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       applyToken(token);
       setUser(user as AuthUser);
+      // O login já diz quem é o usuário: o painel abre na hora; permissões chegam em seguida.
+      setLoading(false);
       setSessionKey((k) => k + 1);
     },
     [applyToken]
@@ -182,11 +184,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { token, user } = await api.registerCustomer(payload);
     applyToken(token);
     setUser(user as AuthUser);
+    setLoading(false);
     setSessionKey((k) => k + 1);
   }, [applyToken]);
 
   const logout = useCallback(() => {
     applyToken(null);
+    setLoading(false);
     setUser(null);
     setPermissions(new Set());
     setAllowedTabs([]);
