@@ -131,7 +131,7 @@ export function PayableInvoiceDialog({
           Gerar nota fiscal
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-lg">
+      <DialogContent className="flex max-h-[calc(var(--vvh,100dvh)-1rem)] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Nota fiscal da conta a pagar</DialogTitle>
           <DialogDescription>

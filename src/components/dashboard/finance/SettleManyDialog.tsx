@@ -88,7 +88,7 @@ export function SettleManyDialog({ kind, rows, onDone }: { kind: "payable" | "re
           {`${text.button}${rows.length ? ` (${rows.length})` : ""}`}
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-lg">
+      <DialogContent className="flex max-h-[calc(var(--vvh,100dvh)-1rem)] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
             Marcar {rows.length} conta{rows.length === 1 ? "" : "s"} como {rows.length === 1 ? text.verbOne : text.verb}

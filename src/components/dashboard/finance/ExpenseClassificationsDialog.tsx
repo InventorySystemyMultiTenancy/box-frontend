@@ -139,7 +139,7 @@ export function ExpenseClassificationsDialog({ trigger }: { trigger: React.React
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); setEditing(null); }}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-3xl">
+      <DialogContent className="flex max-h-[calc(var(--vvh,100dvh)-1rem)] flex-col overflow-hidden sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Grupos e categorias de despesa</DialogTitle>
         </DialogHeader>

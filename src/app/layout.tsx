@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/lib/auth-context";
 import { QueryProvider } from "@/lib/query-provider";
 import LoginIntroOverlay from "@/components/LoginIntroOverlay";
+import ViewportVars from "@/components/ViewportVars";
 import "./globals.css";
 
 const TITLE = "Reblind — Oficina que você acompanha em tempo real";
@@ -30,6 +31,15 @@ export const metadata: Metadata = {
   },
 };
 
+// No celular, o teclado virtual passa a ENCOLHER a área do site (em vez de cobrir por cima):
+// formulários em janela (dialog) cabem no espaço visível e a rolagem fica dentro deles,
+// sem arrastar a página de trás.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  interactiveWidget: "resizes-content",
+};
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR">
@@ -38,6 +48,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <AuthProvider>
             {children}
             <LoginIntroOverlay />
+            <ViewportVars />
           </AuthProvider>
         </QueryProvider>
       </body>

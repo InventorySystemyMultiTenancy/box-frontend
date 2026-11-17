@@ -41,6 +41,15 @@ body {
   overflow-x: clip;
 }
 
+/* Janela (dialog) aberta: trava a rolagem da PÁGINA de verdade. O Radix marca o body com
+   data-scroll-locked e põe overflow:hidden nele, mas como o html tem overflow-x: clip
+   (acima), quem rola é o html — sem esta regra a página de trás continuava rolando no
+   celular (iPhone/Android com teclado aberto) em vez do formulário. */
+html:has(> body[data-scroll-locked]) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   min-height: 100%;
   margin: 0;

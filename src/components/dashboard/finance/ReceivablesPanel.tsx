@@ -324,7 +324,7 @@ export default function ReceivablesPanel() {
       </div>
 
       <Dialog open={!!detail} onOpenChange={(next) => !next && setDetailId(null)}>
-        <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-lg">
+        <DialogContent className="flex max-h-[calc(var(--vvh,100dvh)-1rem)] flex-col overflow-hidden sm:max-w-lg">
           {detail && (
             <>
               <DialogHeader>
@@ -595,7 +595,7 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
       <DialogTrigger asChild>
         <Button size="sm" variant="outline">Receber</Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-md">
+      <DialogContent className="flex max-h-[calc(var(--vvh,100dvh)-1rem)] flex-col overflow-hidden sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Receber &ldquo;{receivable.description}&rdquo;</DialogTitle>
         </DialogHeader>

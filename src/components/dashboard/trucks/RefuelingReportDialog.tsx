@@ -69,7 +69,7 @@ export function RefuelingReportDialog({ trigger }: { trigger: React.ReactNode })
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-2xl">
+      <DialogContent className="flex max-h-[calc(var(--vvh,100dvh)-1rem)] flex-col overflow-hidden sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Relatório de abastecimentos</DialogTitle>
         </DialogHeader>

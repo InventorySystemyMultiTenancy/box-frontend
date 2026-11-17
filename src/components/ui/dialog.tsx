@@ -51,9 +51,17 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeOnOutsideClick = false,
+  onInteractOutside,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /**
+   * Por padrão, tocar FORA da janela não fecha (só o X, "Cancelar" ou Esc). No celular era
+   * fácil fechar um formulário sem querer — o dedo caía no fundo escuro ao rolar, ou um
+   * toque "fantasma" chegava ao voltar da câmera/galeria — e perder o que foi preenchido.
+   */
+  closeOnOutsideClick?: boolean
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -61,9 +69,13 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-4 left-1/2 z-50 grid w-[calc(100%-1.5rem)] max-w-[calc(100%-1.5rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 translate-y-0 gap-4 overflow-y-auto overscroll-contain rounded-lg border bg-background p-4 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:top-[50%] sm:max-h-[85dvh] sm:max-w-lg sm:-translate-y-1/2 sm:p-6",
+          "fixed top-[calc(var(--vvtop,0px)+0.5rem)] left-1/2 z-50 grid w-[calc(100%-1.5rem)] max-w-[calc(100%-1.5rem)] max-h-[calc(var(--vvh,100dvh)-1rem)] -translate-x-1/2 translate-y-0 gap-4 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] rounded-lg border bg-background p-4 shadow-lg duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:top-[50%] sm:max-h-[85dvh] sm:max-w-lg sm:-translate-y-1/2 sm:p-6",
           className
         )}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event)
+          if (!closeOnOutsideClick) event.preventDefault()
+        }}
         {...props}
       >
         {children}

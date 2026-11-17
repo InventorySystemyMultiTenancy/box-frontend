@@ -143,7 +143,7 @@ export function EditVehicleDialog({
           Editar veículo
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex max-h-[calc(100dvh-1rem)] flex-col overflow-hidden sm:max-w-lg">
+      <DialogContent className="flex max-h-[calc(var(--vvh,100dvh)-1rem)] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Editar veículo</DialogTitle>
         </DialogHeader>
