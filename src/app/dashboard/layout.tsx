@@ -38,7 +38,7 @@ import {
   Receipt,
   type LucideIcon,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+import { LOGOUT_REASON_KEY, useAuth } from "@/lib/auth-context";
 import { api, API_URL, ALERTS_CHANGED_EVENT } from "@/lib/api";
 import { AppNotification } from "@/lib/types";
 import { Toaster } from "@/components/ui/sonner";
@@ -184,7 +184,15 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    if (!loading && !token) router.replace("/login");
+    if (loading || token) return;
+    // Sessão recusada pelo servidor (ver AuthProvider): mantém o aviso com o motivo.
+    let expired = false;
+    try {
+      expired = sessionStorage.getItem(LOGOUT_REASON_KEY) !== null;
+    } catch {
+      // ignora
+    }
+    router.replace(expired ? "/login?sessao=expirada" : "/login");
   }, [loading, token, router]);
 
   // Fecha o menu hambúrguer automaticamente ao trocar de página (padrão React de

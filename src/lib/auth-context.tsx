@@ -33,9 +33,16 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const STORAGE_KEY = "box.token";
+/** Motivo do último "sessão expirada" (mostrado na tela de login para facilitar suporte). */
+export const LOGOUT_REASON_KEY = "box.logoutReason";
 
 function readStoredToken() {
-  return typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -47,15 +54,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(() => readStoredToken() !== null);
   const router = useRouter();
 
-  // Troca de token por renovação (sessão deslizante) não precisa recarregar o usuário.
-  const renewingRef = useRef(false);
+  // O token muda sozinho a cada renovação (sessão deslizante); o usuário/permissões só
+  // precisam ser (re)carregados quando a SESSÃO muda (abrir o site, login, cadastro). Por
+  // isso o carregamento depende de `sessionKey`, não do texto do token — antes, uma
+  // renovação chegando no meio do carregamento o cancelava e o usuário nunca aparecia.
+  const [sessionKey, setSessionKey] = useState(0);
+  const tokenRef = useRef<string | null>(token);
+  const applyToken = useCallback((next: string | null) => {
+    tokenRef.current = next;
+    try {
+      if (next) window.localStorage.setItem(STORAGE_KEY, next);
+      else window.localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Sem armazenamento (modo privado/sem espaço): a sessão vale só nesta aba.
+    }
+    setToken(next);
+  }, []);
 
   useEffect(() => {
-    if (!token) return;
-    if (renewingRef.current) {
-      renewingRef.current = false;
-      return;
-    }
+    const sessionToken = tokenRef.current;
+    if (!sessionToken) return;
     // Só sai do login quando o servidor RECUSA o token (401). Falha de rede (celular
     // voltando da tela apagada, 4G oscilando, servidor acordando) não desloga: tenta de
     // novo sozinho até conseguir.
@@ -64,7 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let attempt = 0;
     const load = () => {
       timer = undefined;
-      Promise.all([api.me(token), api.mePermissions(token).catch(() => ({ permissions: [] as string[], allowedTabs: [] as string[], reportAccess: FULL_ACCESS }))])
+      const current = tokenRef.current;
+      if (!current) return;
+      Promise.all([api.me(current), api.mePermissions(current).catch(() => ({ permissions: [] as string[], allowedTabs: [] as string[], reportAccess: FULL_ACCESS }))])
         .then(([{ user }, { permissions, allowedTabs, reportAccess }]) => {
           if (cancelled) return;
           setUser(user as AuthUser);
@@ -75,9 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         .catch((err) => {
           if (cancelled) return;
+          // 401: o evento AUTH_EXPIRED (lib/api) já encerra a sessão e leva pro login.
           if (err instanceof ApiError && err.status === 401) {
-            window.localStorage.removeItem(STORAGE_KEY);
-            setToken(null);
+            // Recusado um token que já foi trocado (renovação no meio): tenta com o atual.
+            if (tokenRef.current && tokenRef.current !== current) return load();
             setLoading(false);
             return;
           }
@@ -88,7 +109,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const retryNow = () => {
       if (timer === undefined) return;
       clearTimeout(timer);
-      timer = undefined;
       load();
     };
     load();
@@ -98,66 +118,81 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearTimeout(timer);
       window.removeEventListener("online", retryNow);
     };
-  }, [token]);
+  }, [sessionKey]);
 
-  // Qualquer chamada da API que receba 401 com sessão aberta (token vencido ou conta
-  // desativada pelo admin) encerra a sessão e leva pro login, com o motivo na URL.
+  // Uma chamada da API recebeu 401 (token vencido ou conta desativada pelo admin): encerra
+  // a sessão e leva pro login com o motivo. Ignora respostas atrasadas de um token que já
+  // não é o atual (ex.: requisição antiga voltando depois de um login novo) — antes isso
+  // derrubava o login que a pessoa acabou de fazer.
   useEffect(() => {
-    function onExpired() {
-      if (!window.localStorage.getItem(STORAGE_KEY)) return;
-      window.localStorage.removeItem(STORAGE_KEY);
-      setToken(null);
+    function onExpired(event: Event) {
+      const detail = (event as CustomEvent<{ reason?: string; token?: string }>).detail;
+      const current = tokenRef.current;
+      if (!current || (detail?.token && detail.token !== current)) return;
+      try {
+        sessionStorage.setItem(LOGOUT_REASON_KEY, detail?.reason ?? "");
+      } catch {
+        // ignora
+      }
+      applyToken(null);
       setUser(null);
       setPermissions(new Set());
       setAllowedTabs([]);
       setReportAccess(FULL_ACCESS);
+      setLoading(false);
       router.replace("/login?sessao=expirada");
     }
     window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
-  }, [router]);
+  }, [router, applyToken]);
 
-  // Token renovado pelo servidor enquanto a pessoa usa o sistema: guarda e passa a usar.
+  // Token renovado pelo servidor enquanto a pessoa usa o sistema: guarda e passa a usar —
+  // só se veio de uma requisição feita com o token atual.
   useEffect(() => {
     function onRenewed(event: Event) {
-      const next = (event as CustomEvent<string>).detail;
-      if (!next || !window.localStorage.getItem(STORAGE_KEY)) return;
-      window.localStorage.setItem(STORAGE_KEY, next);
-      renewingRef.current = true;
-      setToken(next);
+      const detail = (event as CustomEvent<{ token: string; previous: string }>).detail;
+      if (!detail?.token || !tokenRef.current || detail.previous !== tokenRef.current) return;
+      applyToken(detail.token);
     }
     window.addEventListener(TOKEN_RENEWED_EVENT, onRenewed);
     return () => window.removeEventListener(TOKEN_RENEWED_EVENT, onRenewed);
-  }, []);
+  }, [applyToken]);
 
   const hasPermission = useCallback(
     (resource: string, action: string) => permissions.has(`${resource}.${action}`),
     [permissions]
   );
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { token, user } = await api.login(email, password);
-    window.localStorage.setItem(STORAGE_KEY, token);
-    setToken(token);
-    setUser(user as AuthUser);
-  }, []);
+  const login = useCallback(
+    async (email: string, password: string) => {
+      const { token, user } = await api.login(email, password);
+      try {
+        sessionStorage.removeItem(LOGOUT_REASON_KEY);
+      } catch {
+        // ignora
+      }
+      applyToken(token);
+      setUser(user as AuthUser);
+      setSessionKey((k) => k + 1);
+    },
+    [applyToken]
+  );
 
   const registerCustomer = useCallback(async (payload: { name: string; email: string; password: string; phone?: string }) => {
     const { token, user } = await api.registerCustomer(payload);
-    window.localStorage.setItem(STORAGE_KEY, token);
-    setToken(token);
+    applyToken(token);
     setUser(user as AuthUser);
-  }, []);
+    setSessionKey((k) => k + 1);
+  }, [applyToken]);
 
   const logout = useCallback(() => {
-    window.localStorage.removeItem(STORAGE_KEY);
-    setToken(null);
+    applyToken(null);
     setUser(null);
     setPermissions(new Set());
     setAllowedTabs([]);
     setReportAccess(FULL_ACCESS);
     router.push("/");
-  }, [router]);
+  }, [router, applyToken]);
 
   const updateAvatar = useCallback(
     async (file: File) => {

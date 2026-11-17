@@ -23,7 +23,9 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
   // Sessão deslizante: o servidor manda um token novo enquanto a pessoa usa o sistema.
   const renewed = res.headers.get("X-Renewed-Token");
   if (renewed && token && typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent(TOKEN_RENEWED_EVENT, { detail: renewed }));
+    // Vai junto o token usado na requisição: o AuthProvider só aceita a renovação se ele
+    // ainda for o token atual (resposta atrasada de uma sessão antiga não sobrescreve).
+    window.dispatchEvent(new CustomEvent(TOKEN_RENEWED_EVENT, { detail: { token: renewed, previous: token } }));
   }
 
   const data = await res.json().catch(() => ({}));
@@ -31,7 +33,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
     // Token vencido/conta desativada no meio do uso: avisa o AuthProvider, que limpa a
     // sessão e manda pro login (em vez de cada tela só começar a dar erro).
     if (res.status === 401 && token && typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: data.error }));
+      window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { reason: data.error, token } }));
     }
     throw new ApiError(data.error || "Não foi possível completar a solicitação.", res.status);
   }

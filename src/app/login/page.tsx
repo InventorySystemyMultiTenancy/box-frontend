@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+import { LOGOUT_REASON_KEY, useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
 import { playLoginIntro } from "@/components/LoginIntroOverlay";
 import styles from "./login.module.css";
@@ -32,7 +32,18 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   // Chegou aqui porque a sessão caiu no meio do uso (ver AUTH_EXPIRED_EVENT em lib/api.ts).
   const searchParams = useSearchParams();
-  const notice = searchParams.get("sessao") === "expirada" ? "Sua sessão expirou ou a conta foi desativada. Entre novamente." : null;
+  // Motivo vindo do servidor (ex.: "Token inválido ou expirado.") — ajuda no suporte.
+  const [logoutReason] = useState(() => {
+    try {
+      return typeof window !== "undefined" ? sessionStorage.getItem(LOGOUT_REASON_KEY) : null;
+    } catch {
+      return null;
+    }
+  });
+  const notice =
+    searchParams.get("sessao") === "expirada"
+      ? `Sua sessão expirou ou a conta foi desativada. Entre novamente.${logoutReason ? ` (Motivo: ${logoutReason})` : ""}`
+      : null;
 
   // Já está logado (sessão salva no aparelho): vai direto pro painel, sem pedir senha de novo.
   useEffect(() => {
