@@ -840,7 +840,7 @@ export default function OrderDetail({
       : null;
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const trackingUrl = shareToken ? `${origin}/acompanhar/${shareToken}` : `${origin}/dashboard`;
+  const trackingUrl = shareToken ? `${origin}/acompanhar/${shareToken.replace(/_/g, "%5F")}` : `${origin}/dashboard`;
   const whatsAppLink = isStaff && order.vehicle.owner ? buildWhatsAppLink(order.vehicle.owner.phone, statusUpdateMessage(order, trackingUrl)) : null;
 
   // Prévia da cobrança na entrega — mesma regra do backend (orderBillingTotal): problemas

@@ -41,7 +41,7 @@ export function ShareLinkDialog({ orderId }: { orderId: string }) {
     if (next) loadOrCreate();
   }
 
-  const shareUrl = link && typeof window !== "undefined" ? `${window.location.origin}/acompanhar/${link.token}` : "";
+  const shareUrl = link && typeof window !== "undefined" ? `${window.location.origin}/acompanhar/${link.token.replace(/_/g, "%5F")}` : "";
 
   async function copyLink() {
     try {

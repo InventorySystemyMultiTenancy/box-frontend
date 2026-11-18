@@ -42,8 +42,19 @@ function toDisplayApprovals(approvals: PublicServiceOrder["approvals"]): Approva
 // dados internos que esse link nunca deve mostrar).
 const LIVE_EVENTS = ["status:update", "timeline:new", "part:update", "approval:new", "approval:update", "service-order:archived", "media:new"];
 
+function safeDecode(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export default function ShareLinkPage() {
-  const params = useParams<{ token: string }>();
+  const rawParams = useParams<{ token: string }>();
+  // Links mandados pelo WhatsApp levam "_" como "%5F" (senão o WhatsApp põe o trecho entre
+  // dois "_" em itálico e quebra o link) — decodifica para o código original.
+  const params = { token: safeDecode(rawParams.token) };
   const [order, setOrder] = useState<PublicServiceOrder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
