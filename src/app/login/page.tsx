@@ -8,6 +8,8 @@ import { Eye, EyeOff } from "lucide-react";
 import { LOGOUT_REASON_KEY, useAuth } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
 import { playLoginIntro } from "@/components/LoginIntroOverlay";
+import { dashboardHomePath } from "@/lib/dashboard-home";
+import { useHeavyMedia } from "@/lib/heavy-media";
 import styles from "./login.module.css";
 
 // useSearchParams exige um Suspense acima dele para a página poder ser pré-renderizada.
@@ -20,7 +22,8 @@ export default function LoginPageWrapper() {
 }
 
 function LoginPage() {
-  const { user, login, registerCustomer } = useAuth();
+  const { user, allowedTabs, login, registerCustomer } = useAuth();
+  const heavyMedia = useHeavyMedia();
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -47,23 +50,24 @@ function LoginPage() {
 
   // Já está logado (sessão salva no aparelho): vai direto pro painel, sem pedir senha de novo.
   useEffect(() => {
-    if (user && !loading) router.replace("/dashboard");
-  }, [user, loading, router]);
+    if (user && !loading) router.replace(dashboardHomePath(allowedTabs));
+  }, [user, loading, allowedTabs, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
+      let home = "/dashboard";
       if (mode === "login") {
-        await login(email, password);
-        await playLoginIntro();
+        home = await login(email, password);
+        await playLoginIntro(home);
       } else {
         await registerCustomer({ name, email, password, phone: phone || undefined });
       }
       // Fica em "carregando" até sair da página: assim o redirecionamento automático de
       // "já logado" (acima) não dispara junto e o endereço não fica indo e voltando.
-      router.push("/dashboard");
+      router.push(home);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível completar a solicitação.");
       setLoading(false);
@@ -80,15 +84,20 @@ function LoginPage() {
 
   return (
     <div className={styles.wrap}>
-      <video
-        className={styles.bgVideo}
-        src="/Car_engine_opened_showing_details_202607310943.mp4"
-        autoPlay
-        loop
-        muted
-        playsInline
-        preload="auto"
-      />
+      {/* Imagem leve sempre; o vídeo (2,6 MB) só em computador — ver lib/heavy-media. */}
+      <div className={styles.bgImage} aria-hidden />
+      {heavyMedia && (
+        <video
+          className={styles.bgVideo}
+          src="/Car_engine_opened_showing_details_202607310943.mp4"
+          poster="/login-poster.jpg"
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+        />
+      )}
       <div className={styles.scrim} />
       <form className={styles.card} onSubmit={handleSubmit}>
         <Link href="/" className={styles.backLink}>

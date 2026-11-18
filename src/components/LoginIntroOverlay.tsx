@@ -2,20 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { useIsMobile } from "@/lib/useIsMobile";
+import { useHeavyMedia } from "@/lib/heavy-media";
 import styles from "./LoginIntroOverlay.module.css";
 
 const DESKTOP_SRC = "/Logo_assembling_in_auto_shop_20260925091252.mp4";
-const MOBILE_SRC = "/3D_logo_assembling_animation_20260925091836.mp4";
 const FADE_MS = 650;
 
-let externalPlay: (() => Promise<void>) | null = null;
+let externalPlay: ((target: string) => Promise<void>) | null = null;
 
 /** Chamado pela tela de login (após confirmar email/senha) — toca o vídeo de abertura
  * até o fim e só então navega pro dashboard, com fade. Resolve mesmo se o overlay
  * ainda não tiver montado, pra nunca travar o login. */
-export function playLoginIntro(): Promise<void> {
-  return externalPlay ? externalPlay() : Promise.resolve();
+export function playLoginIntro(target = "/dashboard"): Promise<void> {
+  return externalPlay ? externalPlay(target) : Promise.resolve();
 }
 
 /** Fica no layout raiz (fora da página de login) pra sobreviver à troca de rota — o
@@ -23,14 +22,17 @@ export function playLoginIntro(): Promise<void> {
 export default function LoginIntroOverlay() {
   const pathname = usePathname();
   const router = useRouter();
-  const isMobile = useIsMobile();
+  // Só em computador (ver lib/heavy-media): no celular a animação eram ~3 MB a mais e
+  // vários segundos antes do painel — lá o login vai direto.
+  const heavyMedia = useHeavyMedia();
+  const targetRef = useRef("/dashboard");
   const [visible, setVisible] = useState(false);
   const [fading, setFading] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const resolveRef = useRef<(() => void) | null>(null);
 
   const finish = useCallback(() => {
-    router.push("/dashboard");
+    router.push(targetRef.current);
     setFading(true);
     window.setTimeout(() => {
       setVisible(false);
@@ -41,10 +43,11 @@ export default function LoginIntroOverlay() {
   }, [router]);
 
   useEffect(() => {
-    externalPlay = () =>
+    externalPlay = (target) =>
       new Promise<void>((resolve) => {
+        targetRef.current = target;
         const video = videoRef.current;
-        if (!video) {
+        if (!video || !heavyMedia) {
           resolve();
           return;
         }
@@ -62,11 +65,11 @@ export default function LoginIntroOverlay() {
     return () => {
       externalPlay = null;
     };
-  }, [finish]);
+  }, [finish, heavyMedia]);
 
   // Preload começa assim que a tela de login abre; mantém a src durante o fade mesmo
   // depois da navegação pro dashboard (senão o vídeo perde o frame no meio da transição).
-  const introSrc = pathname === "/login" || visible ? (isMobile ? MOBILE_SRC : DESKTOP_SRC) : undefined;
+  const introSrc = heavyMedia && (pathname === "/login" || visible) ? DESKTOP_SRC : undefined;
 
   return (
     <div className={`${styles.overlay} ${visible ? styles.visible : ""} ${fading ? styles.fading : ""}`}>

@@ -253,10 +253,13 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
     (canUseTrucks && pathname === "/dashboard/gastos") ||
     tabs.some((tab) => pathMatchesTab(pathname, tab.href));
 
+  // `pathname` nas dependências: se algo levar a pessoa de volta a uma aba proibida depois
+  // do primeiro redirecionamento (ex.: o fim da animação de login navegando pra
+  // /dashboard), redireciona de novo — antes a tela ficava presa em "Carregando painel".
   useEffect(() => {
     if (loading || !user || isOnAllowedTab) return;
     router.replace(tabs[0]?.href ?? "/dashboard/perfil");
-  }, [loading, user, isOnAllowedTab, tabs, router]);
+  }, [loading, user, isOnAllowedTab, tabs, router, pathname]);
 
   function updateScrollState() {
     const el = navRef.current;

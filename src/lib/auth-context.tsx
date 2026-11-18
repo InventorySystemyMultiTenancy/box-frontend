@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, ReactNode, useC
 import { useRouter } from "next/navigation";
 import { api, ApiError, AUTH_EXPIRED_EVENT, TOKEN_RENEWED_EVENT } from "@/lib/api";
 import { FULL_ACCESS, ReportAccess } from "@/lib/access";
+import { dashboardHomePath } from "@/lib/dashboard-home";
 
 interface AuthUser {
   id: string;
@@ -25,7 +26,8 @@ interface AuthContextValue {
   allowedTabs: string[];
   // O que o cargo libera na aba Relatórios (blocos/setores) e na aba Alertas (tipos).
   reportAccess: ReportAccess;
-  login: (email: string, password: string) => Promise<void>;
+  /** Resolve com a primeira tela do painel para o cargo (ex.: só Caminhões → /dashboard/caminhoes). */
+  login: (email: string, password: string) => Promise<string>;
   registerCustomer: (payload: { name: string; email: string; password: string; phone?: string }) => Promise<void>;
   logout: () => void;
   updateAvatar: (file: File) => Promise<void>;
@@ -197,15 +199,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // O painel só abre com as permissões do cargo já carregadas — senão quem tem cargo
       // restrito (ex.: só Caminhões) via por um instante abas que não são dele.
       try {
-        applyAccess(await fetchPermissions(token));
+        const access = await fetchPermissions(token);
+        applyAccess(access);
         setLoading(false);
         setSessionKey((k) => k + 1);
+        return dashboardHomePath(access.allowedTabs ?? []);
       } catch {
         // Rede falhou agora: "Carregando painel" segura a tela e o carregamento da sessão
         // tenta de novo sozinho até conseguir.
         applyAccess(NO_ACCESS);
         setLoading(true);
         setSessionKey((k) => k + 1);
+        return "/dashboard";
       }
     },
     [applyToken, applyAccess]

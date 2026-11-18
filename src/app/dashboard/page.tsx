@@ -1,8 +1,12 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useAuth } from "@/lib/auth-context";
-import CustomerDashboard from "@/components/dashboard/CustomerDashboard";
-import MechanicProjectsPanel from "@/components/dashboard/MechanicProjectsPanel";
+
+// Cada perfil baixa só a sua tela: o cliente não carrega o kanban/detalhe de projeto da
+// oficina, e o funcionário não carrega o painel do cliente.
+const CustomerDashboard = dynamic(() => import("@/components/dashboard/CustomerDashboard"), { ssr: false });
+const MechanicProjectsPanel = dynamic(() => import("@/components/dashboard/MechanicProjectsPanel"), { ssr: false });
 
 export default function DashboardPage() {
   const { user } = useAuth();

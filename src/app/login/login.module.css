@@ -9,6 +9,13 @@
   background: var(--bg);
 }
 
+.bgImage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #0b0b0d url("/login-poster.jpg") center / cover no-repeat;
+}
+
 .bgVideo {
   position: fixed;
   inset: 0;
