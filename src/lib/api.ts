@@ -19,6 +19,9 @@ async function request<T>(path: string, options: RequestInit & { timeoutMs?: num
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
+      // Nunca usa resposta guardada pelo navegador: ela vinha com um X-Renewed-Token
+      // antigo e o site trocava o token bom por um velho/vencido (ver AuthProvider).
+      cache: "no-store",
       ...init,
       ...(controller ? { signal: controller.signal } : {}),
       headers: {
@@ -52,6 +55,18 @@ async function request<T>(path: string, options: RequestInit & { timeoutMs?: num
     throw new ApiError(data.error || "Não foi possível completar a solicitação.", res.status);
   }
   return data as T;
+}
+
+/** Momento de emissão (iat, em segundos) gravado no token; 0 se não der para ler. */
+export function tokenIssuedAt(token: string | null | undefined): number {
+  try {
+    const part = token?.split(".")[1];
+    if (!part) return 0;
+    const payload = JSON.parse(atob(part.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof payload.iat === "number" ? payload.iat : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export const AUTH_EXPIRED_EVENT = "box:auth-expired";

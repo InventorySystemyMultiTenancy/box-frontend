@@ -89,7 +89,7 @@ export default function OrderDetail({
   scrollToTimelineOnLoad?: boolean;
   onDeleted?: () => void;
 }) {
-  const { user, token } = useAuth();
+  const { user, token, hasPermission } = useAuth();
   const [order, setOrder] = useState<ServiceOrder | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [justArrivedId, setJustArrivedId] = useState<string | null>(null);
@@ -155,10 +155,12 @@ export default function OrderDetail({
     api.inventoryParts(token).then(({ parts }) => setInventoryParts(parts as InventoryPart[]));
   }, [token, isStaff]);
 
+  // Só quem enxerga o Financeiro (senão o servidor responde 403 a cada abertura).
+  const canSeeBankAccounts = isAdmin && hasPermission("finance", "view");
   useEffect(() => {
-    if (!token || !isAdmin) return;
+    if (!token || !canSeeBankAccounts) return;
     api.bankAccounts(token).then(({ accounts }) => setBankAccounts(accounts as BankAccount[])).catch(() => {});
-  }, [token, isAdmin]);
+  }, [token, canSeeBankAccounts]);
 
   useEffect(() => {
     if (!token || !isStaff) return;

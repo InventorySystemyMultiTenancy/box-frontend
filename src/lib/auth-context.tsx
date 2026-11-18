@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, ReactNode, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError, AUTH_EXPIRED_EVENT, TOKEN_RENEWED_EVENT } from "@/lib/api";
+import { api, ApiError, AUTH_EXPIRED_EVENT, TOKEN_RENEWED_EVENT, tokenIssuedAt } from "@/lib/api";
 import { FULL_ACCESS, ReportAccess } from "@/lib/access";
 import { dashboardHomePath } from "@/lib/dashboard-home";
 
@@ -170,11 +170,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router, applyToken]);
 
   // Token renovado pelo servidor enquanto a pessoa usa o sistema: guarda e passa a usar —
-  // só se veio de uma requisição feita com o token atual.
+  // só se veio de uma requisição feita com o token atual E se for mais novo que ele. Um
+  // token "renovado" mais velho que o atual só pode ser resposta antiga reaproveitada (cache
+  // do navegador): aceitar trocava a sessão boa por uma vencida e mandava pro login.
   useEffect(() => {
     function onRenewed(event: Event) {
       const detail = (event as CustomEvent<{ token: string; previous: string }>).detail;
       if (!detail?.token || !tokenRef.current || detail.previous !== tokenRef.current) return;
+      if (tokenIssuedAt(detail.token) <= tokenIssuedAt(tokenRef.current)) return;
       applyToken(detail.token);
     }
     window.addEventListener(TOKEN_RENEWED_EVENT, onRenewed);
