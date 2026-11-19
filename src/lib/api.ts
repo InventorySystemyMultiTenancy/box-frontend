@@ -220,7 +220,8 @@ export const api = {
   createProblem: (
     orderId: string,
     payload: {
-      key: string;
+      // Sem key = diagnóstico único do projeto (name = serviço, texto livre).
+      key?: string;
       name: string;
       description: string;
       wearLevel?: string;
@@ -235,7 +236,7 @@ export const api = {
     token: string
   ) => {
     const form = new FormData();
-    form.append("key", payload.key);
+    if (payload.key) form.append("key", payload.key);
     if (payload.axle) form.append("axle", payload.axle);
     if (payload.side) form.append("side", payload.side);
     form.append("name", payload.name);
@@ -252,6 +253,14 @@ export const api = {
       token
     );
   },
+
+  // Diagnóstico único: muda serviço/descrição — a IA refaz os pontos no modelo do veículo.
+  editDiagnosis: (orderId: string, approvalId: string, payload: { service: string; description: string }, token: string) =>
+    request<{ part: unknown; approval: unknown; event: unknown }>(
+      `/api/service-orders/${orderId}/parts/problems/${approvalId}/diagnosis`,
+      { method: "PATCH", body: JSON.stringify(payload), timeoutMs: 60000 },
+      token
+    ),
 
   updateProblemDetails: (
     orderId: string,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   inferPosition,
   parsePartPosition,
@@ -12,7 +12,7 @@ import {
   withPosition as nameWithPosition,
 } from "@/lib/part-position";
 import { API_URL } from "@/lib/api";
-import { Approval, InventoryPart, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/lib/types";
+import { Approval, DIAGNOSIS_PART_KEY, DiagnosisSpot, InventoryPart, PART_STATUS_LABELS, PART_STATUS_TONE, VehiclePart } from "@/lib/types";
 import styles from "./dashboard.module.css";
 
 const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
@@ -32,6 +32,27 @@ const HOTSPOT_POSITIONS: Record<string, { x: number; y: number }> = {
 };
 
 const UNRESOLVED_STATUSES = new Set(["CRITICAL", "WARNING", "IN_PROGRESS"]);
+
+function isDiagnosisPart(part: VehiclePart) {
+  return part.key === DIAGNOSIS_PART_KEY;
+}
+
+/** Pontos do diagnóstico; sem marcação da IA, um ponto geral com a descrição inteira. */
+function diagnosisSpots(part: VehiclePart): DiagnosisSpot[] {
+  if (part.aiSpots && part.aiSpots.length > 0) return part.aiSpots;
+  return [
+    {
+      zone: "carroceria_geral",
+      label: "Diagnóstico",
+      x: 150,
+      y: 340,
+      excerpt: part.note ?? "",
+      reason: "A IA ainda não marcou os locais deste diagnóstico. Edite a descrição para ela analisar de novo.",
+    },
+  ];
+}
+
+const BALLOON_WIDTH = 270;
 
 function mediaUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
@@ -192,6 +213,7 @@ export default function VehicleSchematic({
   inventoryParts = [],
   onPriceProblem,
   onUpdateProblem,
+  onEditDiagnosis,
   onCreatePart,
   onGeneratePdf,
 }: {
@@ -217,8 +239,10 @@ export default function VehicleSchematic({
     approvalId: string,
     data: { note?: string; partUsages: { inventoryPartId: string; quantity: number }[]; files: File[] }
   ) => Promise<void>;
+  // Diagnóstico único: edita serviço/descrição (a IA refaz os pontos).
+  onEditDiagnosis?: (approvalId: string, data: { service: string; description: string }) => Promise<void>;
 }) {
-  const withPosition = useMemo(() => parts.filter((p) => HOTSPOT_POSITIONS[p.key]), [parts]);
+  const withPosition = useMemo(() => parts.filter((p) => HOTSPOT_POSITIONS[p.key] || isDiagnosisPart(p)), [parts]);
 
   const priorityOrder: Record<string, number> = { CRITICAL: 0, WARNING: 1, IN_PROGRESS: 2, DONE: 3, NOT_INSPECTED: 4 };
   const defaultPart = [...withPosition].sort((a, b) => priorityOrder[a.status] - priorityOrder[b.status])[0];
@@ -251,6 +275,47 @@ export default function VehicleSchematic({
   const [detailUsages, setDetailUsages] = useState<UsageRow[]>([]);
   const [detailFiles, setDetailFiles] = useState<File[]>([]);
 
+  // Balão sobre a bolinha do diagnóstico: trecho da descrição + o que a IA identificou.
+  const stageRef = useRef<HTMLDivElement>(null);
+  const [balloon, setBalloon] = useState<{ partId: string; index: number; left: number; width: number; arrow: number; top: number; below: boolean } | null>(null);
+  const balloonSpot = (() => {
+    if (!balloon) return null;
+    const part = withPosition.find((p) => p.id === balloon.partId);
+    return part ? diagnosisSpots(part)[balloon.index] ?? null : null;
+  })();
+
+  function openBalloon(partId: string, index: number, target: Element) {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const box = stage.getBoundingClientRect();
+    const dot = target.getBoundingClientRect();
+    const dotX = dot.left + dot.width / 2 - box.left;
+    const dotTop = dot.top - box.top;
+    const width = Math.min(BALLOON_WIDTH, box.width - 8);
+    const left = Math.max(4, Math.min(dotX - width / 2, box.width - width - 4));
+    // Abre em cima da bolinha; só embaixo quando não há espaço visível na tela acima dela.
+    const below = dot.top < 210;
+    setBalloon({ partId, index, left, width, arrow: dotX - left, top: below ? dot.bottom - box.top + 10 : dotTop - 10, below });
+  }
+
+  useEffect(() => {
+    if (!balloon) return;
+    const close = () => setBalloon(null);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("resize", close);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("resize", close);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [balloon]);
+
+  const [editingDiagnosis, setEditingDiagnosis] = useState(false);
+  const [diagnosisBusy, setDiagnosisBusy] = useState(false);
+  const [diagnosisError, setDiagnosisError] = useState<string | null>(null);
+  const [diagnosisService, setDiagnosisService] = useState("");
+  const [diagnosisDescription, setDiagnosisDescription] = useState("");
+
   useEffect(() => {
     setEditingPrice(false);
     setPriceLaborValue(activeApproval?.laborValue != null ? String(activeApproval.laborValue) : "");
@@ -263,6 +328,8 @@ export default function VehicleSchematic({
       setPriceSide(position.side);
     }
     setDetailsOpen(false);
+    setEditingDiagnosis(false);
+    setDiagnosisError(null);
     setDetailNote(activeApproval?.note ?? "");
     setDetailUsages([]);
     setDetailFiles([]);
@@ -296,7 +363,7 @@ export default function VehicleSchematic({
     try {
       // Só mexe na posição (e no texto) se o eixo ou o lado mudou — editar só o preço não muda nada.
       const before = active ? currentPosition(active) : null;
-      const positionChanged = Boolean(active && before && (before.axle !== priceAxle || before.side !== priceSide));
+      const positionChanged = Boolean(active && !isDiagnosisPart(active) && before && (before.axle !== priceAxle || before.side !== priceSide));
       let textUpdate: { name?: string; description?: string } = {};
       if (positionChanged && active) {
         if (POSITION_REQUIRED_PARTS.has(active.key) && priceAxle && priceSide) {
@@ -338,6 +405,30 @@ export default function VehicleSchematic({
     }
   }
 
+  function startEditingDiagnosis() {
+    if (!active) return;
+    setDiagnosisService(active.name);
+    setDiagnosisDescription(active.note ?? "");
+    setDiagnosisError(null);
+    setEditingDiagnosis(true);
+  }
+
+  async function saveDiagnosis(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeApproval || !onEditDiagnosis) return;
+    setDiagnosisBusy(true);
+    setDiagnosisError(null);
+    try {
+      await onEditDiagnosis(activeApproval.id, { service: diagnosisService.trim(), description: diagnosisDescription.trim() });
+      setBalloon(null);
+      setEditingDiagnosis(false);
+    } catch (err) {
+      setDiagnosisError(err instanceof Error ? err.message : "Não foi possível salvar o diagnóstico.");
+    } finally {
+      setDiagnosisBusy(false);
+    }
+  }
+
   async function respond(status: "APPROVED" | "REJECTED") {
     if (!activeApproval || !onRespondApproval) return;
     if (status === "REJECTED" && !rejectNote.trim()) return;
@@ -376,16 +467,55 @@ export default function VehicleSchematic({
 
   return (
     <div>
+      <div ref={stageRef} className={styles.schematicStage}>
       <div className={styles.carWrap}>
         <svg viewBox="0 0 300 520" role="group" aria-label="Modelo raio-x do veiculo visto de cima com pontos de manutencao">
           <rect x="0" y="0" width="300" height="520" fill="transparent" />
           <image href="/vehicle-xray-top.jpg" x="0" y="0" width="300" height="520" preserveAspectRatio="xMidYMid slice" />
 
           {withPosition.map((part) => {
-            const pos = positionForPart(part);
             const isActive = part.id === active?.id;
             const tone = PART_STATUS_TONE[part.status];
             const fill = isActive ? "var(--accent-blue)" : tone === "crit" ? "var(--critical)" : tone === "warn" ? "var(--warning)" : "var(--accent-gray)";
+            if (isDiagnosisPart(part)) {
+              // Diagnóstico único: várias bolinhas (marcadas pela IA), todas do mesmo diagnóstico.
+              return (
+                <g key={part.id}>
+                  {diagnosisSpots(part).map((spot, index) => {
+                    const open = balloon?.partId === part.id && balloon.index === index;
+                    const select = (target: Element) => {
+                      setActiveId(part.id);
+                      if (open) setBalloon(null);
+                      else openBalloon(part.id, index, target);
+                    };
+                    return (
+                      <g key={`${spot.zone}-${index}`}>
+                        {open && <circle cx={spot.x} cy={spot.y} r={14} fill="none" stroke="var(--accent-blue)" strokeWidth={1.6} opacity={0.7} />}
+                        <circle
+                          className={styles.hotspot}
+                          cx={spot.x}
+                          cy={spot.y}
+                          r={open ? 8.5 : 7}
+                          fill={fill}
+                          tabIndex={0}
+                          role="button"
+                          aria-label={`${spot.label}: ver o problema`}
+                          aria-expanded={open}
+                          onClick={(e) => select(e.currentTarget)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              select(e.currentTarget);
+                            }
+                          }}
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              );
+            }
+            const pos = positionForPart(part);
             return (
               <g key={part.id}>
                 {isActive && <circle cx={pos.x} cy={pos.y} r={14} fill="none" stroke="var(--accent-blue)" strokeWidth={1.6} opacity={0.55} />}
@@ -398,10 +528,14 @@ export default function VehicleSchematic({
                   tabIndex={0}
                   role="button"
                   aria-label={part.name}
-                  onClick={() => setActiveId(part.id)}
+                  onClick={() => {
+                    setBalloon(null);
+                    setActiveId(part.id);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
+                      setBalloon(null);
                       setActiveId(part.id);
                     }
                   }}
@@ -410,6 +544,31 @@ export default function VehicleSchematic({
             );
           })}
         </svg>
+      </div>
+      {balloon && balloonSpot && (
+        <div
+          role="dialog"
+          aria-label={`Problema: ${balloonSpot.label}`}
+          className={`${styles.spotBalloon} ${balloon.below ? styles.spotBalloonBelow : ""}`}
+          style={{
+            left: balloon.left,
+            width: balloon.width,
+            ...(balloon.below ? { top: balloon.top } : { top: balloon.top, transform: "translateY(-100%)" }),
+            ["--arrow-left" as string]: `${balloon.arrow}px`,
+          }}
+        >
+          <button type="button" className={styles.spotBalloonClose} aria-label="Fechar" onClick={() => setBalloon(null)}>
+            ×
+          </button>
+          <strong className={styles.spotBalloonTitle}>{balloonSpot.label}</strong>
+          {balloonSpot.excerpt && <p className={styles.spotBalloonExcerpt}>“{balloonSpot.excerpt}”</p>}
+          {balloonSpot.reason && (
+            <p className={styles.spotBalloonReason}>
+              <span>Análise da IA:</span> {balloonSpot.reason}
+            </p>
+          )}
+        </div>
+      )}
       </div>
 
       {active && (
@@ -422,7 +581,7 @@ export default function VehicleSchematic({
             return (
               <>
                 <div className={styles.partPanelHead}>
-                  <h3>{active.name}</h3>
+                  <h3>{isDiagnosisPart(active) ? `Diagnóstico: ${active.name}` : active.name}</h3>
                   <span className={`${styles.badge} ${styles[tone]}`}>
                     <i className={styles.dot} />
                     {label}
@@ -496,14 +655,56 @@ export default function VehicleSchematic({
                 </>
               )}
 
+              {isDiagnosisPart(active) && canManageMaintenance && onEditDiagnosis && (
+                <div className={styles.approvalActions}>
+                  {!editingDiagnosis ? (
+                    <button className={styles.actionButton} type="button" onClick={startEditingDiagnosis}>
+                      Editar serviço e descrição
+                    </button>
+                  ) : (
+                    <form className={styles.formGrid} onSubmit={saveDiagnosis}>
+                      <label className={styles.fullField}>
+                        Serviço
+                        <input value={diagnosisService} onChange={(e) => setDiagnosisService(e.target.value)} maxLength={200} required />
+                      </label>
+                      <label className={styles.fullField}>
+                        Descrição do diagnóstico
+                        <textarea
+                          value={diagnosisDescription}
+                          onChange={(e) => setDiagnosisDescription(e.target.value)}
+                          rows={5}
+                          minLength={4}
+                          required
+                        />
+                      </label>
+                      {diagnosisError && <div className={styles.formMessage}>{diagnosisError}</div>}
+                      <button className={styles.actionButton} type="submit" disabled={diagnosisBusy}>
+                        {diagnosisBusy ? "Salvando e refazendo as marcações com IA..." : "Salvar diagnóstico"}
+                      </button>
+                      <button className={styles.linkButton} type="button" onClick={() => setEditingDiagnosis(false)} disabled={diagnosisBusy}>
+                        Cancelar
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
               {canEditPrice && onPriceProblem && (
                 <div className={styles.approvalActions}>
                   {!editingPrice ? (
                     <button className={styles.actionButton} type="button" onClick={() => setEditingPrice(true)}>
-                      {activeApproval.estimatedValue != null ? "Editar preço e lado" : "Precificar problema"}
+                      {isDiagnosisPart(active)
+                        ? activeApproval.estimatedValue != null
+                          ? "Editar preço e peças"
+                          : "Precificar diagnóstico"
+                        : activeApproval.estimatedValue != null
+                          ? "Editar preço e lado"
+                          : "Precificar problema"}
                     </button>
                   ) : (
                     <form className={styles.formGrid} onSubmit={savePrice}>
+                      {!isDiagnosisPart(active) && (
+                      <>
                       <label>
                         Posição (frente/trás)
                         <select value={priceAxle} onChange={(e) => setPriceAxle(e.target.value as PartAxle | "")}>
@@ -521,6 +722,8 @@ export default function VehicleSchematic({
                           <option value="ambos">Ambos os lados</option>
                         </select>
                       </label>
+                      </>
+                      )}
                       <label>
                         Mão de obra
                         <input

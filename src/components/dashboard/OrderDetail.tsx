@@ -4,12 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError, API_URL } from "@/lib/api";
 import { getSocket, joinOrderRoom } from "@/lib/socket";
-import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, BankAccount, InventoryPart, PART_STATUS_LABELS, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
+import { ACTIVE_SERVICE_ORDER_STATUSES, Approval, DIAGNOSIS_PART_KEY, BankAccount, InventoryPart, PART_STATUS_LABELS, ServiceOrder, ServiceOrderStatus, STATUS_LABELS, TimelineEvent, VehiclePart } from "@/lib/types";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { FINISHED_ORDER_WHATSAPP, finishedOrderMessage, statusUpdateMessage } from "@/lib/whatsapp-messages";
 import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { printHtml } from "@/lib/printable-report";
-import { POSITION_REQUIRED_PARTS, positionText as formatPosition } from "@/lib/part-position";
 import { SignaturePad, SignaturePadHandle } from "@/components/ui/signature-pad";
 import { toast } from "sonner";
 import StatusStrip from "@/components/dashboard/StatusStrip";
@@ -31,21 +30,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { X } from "lucide-react";
 import styles from "./dashboard.module.css";
 
-const PART_OPTIONS = [
-  { key: "motor", label: "Motor" },
-  { key: "freios", label: "Freios" },
-  { key: "suspensao", label: "Suspensão" },
-  { key: "transmissao", label: "Transmissão" },
-  { key: "escapamento", label: "Escapamento" },
-  { key: "eletrica", label: "Elétrica / Bateria" },
-  { key: "arcondicionado", label: "Ar-condicionado" },
-  { key: "direcao", label: "Direção" },
-  { key: "pneus", label: "Pneus" },
-  { key: "bateria", label: "Bateria" },
-  { key: "arrefecimento", label: "Arrefecimento" },
-  { key: "combustivel", label: "Combustível" },
-  { key: "carroceria", label: "Carroceria" },
-];
 
 
 /** Painel completo de uma ordem de serviço — status, timeline, aprovação e esquema do
@@ -94,14 +78,13 @@ export default function OrderDetail({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [justArrivedId, setJustArrivedId] = useState<string | null>(null);
   const scrolledForOrderRef = useRef<string | null>(null);
+  // Diagnóstico único do projeto: serviço (texto livre) + descrição — a IA marca os
+  // pontos no modelo do veículo a partir da descrição.
   const [problemForm, setProblemForm] = useState({
-    key: "motor",
-    name: "Motor",
+    service: "",
     description: "",
     wearLevel: "",
     laborValue: "",
-    axle: "dianteiro",
-    side: "esquerdo",
     files: [] as File[],
   });
   const [priceForm, setPriceForm] = useState({ laborValue: "", inventoryPartId: "", quantity: "1" });
@@ -252,20 +235,17 @@ export default function OrderDetail({
   async function createProblem(e: React.FormEvent) {
     e.preventDefault();
     if (!token || !order) return;
-    const requiresPosition = POSITION_REQUIRED_PARTS.has(problemForm.key);
-    const positionText = requiresPosition ? formatPosition(problemForm.axle, problemForm.side) : "";
-    const displayName = positionText ? `${problemForm.name} ${positionText}` : problemForm.name;
-    const description = positionText ? `Local: ${positionText}. ${problemForm.description}` : problemForm.description;
     setProblemBusy(true);
     setProblemMessage(null);
     try {
       const result = await api.createProblem(
         order.id,
         {
-          ...problemForm,
-          name: displayName,
-          description,
-          ...(requiresPosition ? { axle: problemForm.axle, side: problemForm.side } : {}),
+          name: problemForm.service.trim(),
+          description: problemForm.description.trim(),
+          wearLevel: problemForm.wearLevel,
+          laborValue: problemForm.laborValue,
+          files: problemForm.files,
           partUsages: problemUsages
             .filter((u) => u.inventoryPartId)
             .map((u) => ({ inventoryPartId: u.inventoryPartId, quantity: Math.max(1, Math.floor(Number(u.quantity) || 1)) })),
@@ -289,11 +269,15 @@ export default function OrderDetail({
         };
       });
       setJustArrivedId(event.id);
-      setProblemForm((prev) => ({ ...prev, description: "", wearLevel: "", laborValue: "", files: [] }));
+      setProblemForm({ service: "", description: "", wearLevel: "", laborValue: "", files: [] });
       setProblemUsages([{ inventoryPartId: "", quantity: "1" }]);
-      setProblemMessage("Problema identificado cadastrado.");
-    } catch {
-      setProblemMessage("Não foi possível cadastrar o problema.");
+      setProblemMessage(
+        (part.aiSpots?.length ?? 0) > 0
+          ? "Diagnóstico cadastrado. A IA marcou os pontos no modelo do veículo."
+          : "Diagnóstico cadastrado. A IA não conseguiu marcar os pontos agora — edite a descrição para tentar de novo."
+      );
+    } catch (err) {
+      setProblemMessage(err instanceof ApiError ? err.message : "Não foi possível cadastrar o diagnóstico.");
     } finally {
       setProblemBusy(false);
     }
@@ -594,6 +578,27 @@ export default function OrderDetail({
     [token, order]
   );
 
+  const editDiagnosis = useCallback(
+    async (approvalId: string, data: { service: string; description: string }) => {
+      if (!token || !order) return;
+      const result = await api.editDiagnosis(order.id, approvalId, data, token);
+      const approval = result.approval as Approval;
+      const part = result.part as VehiclePart;
+      const event = result.event as TimelineEvent;
+      setOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              approvals: prev.approvals.map((a) => (a.id === approval.id ? approval : a)),
+              parts: prev.parts.map((p) => (p.id === part.id ? part : p)),
+              timelineEvents: prev.timelineEvents.some((t) => t.id === event.id) ? prev.timelineEvents : [...prev.timelineEvents, event],
+            }
+          : prev
+      );
+    },
+    [token, order]
+  );
+
   // Admin pode gerar o PDF a qualquer momento, independente do status ou de qualquer
   // confirmação do cliente — inclusive depois de o projeto já ter tido a baixa dada.
   // O cliente só pode gerar quando o veículo está pronto para retirada.
@@ -823,6 +828,7 @@ export default function OrderDetail({
   // Finalizado (ou com baixa): pode ser excluído mesmo com nota/comissão/contas (backend).
   const isFinishedOrder = Boolean(order.archivedAt) || order.status === "FINISHED" || isReady;
   const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
+  const hasDiagnosis = order.parts.some((part) => part.key === DIAGNOSIS_PART_KEY);
   // Diferente de canRegisterProblems: o painel de finalização precisa continuar visível
   // em FINISHED, já que é exatamente esse status que precede "pronto para retirada" —
   // só SCHEDULED (veículo nem chegou) e READY_FOR_PICKUP (já finalizado) ficam de fora.
@@ -1073,6 +1079,7 @@ export default function OrderDetail({
               inventoryParts={inventoryParts}
               onPriceProblem={priceProblem}
               onUpdateProblem={updateProblemDetails}
+              onEditDiagnosis={isStaff ? editDiagnosis : undefined}
               onCreatePart={isAdmin ? createInventoryPartRequest : undefined}
               onGeneratePdf={isAdmin ? generateServicePdf : undefined}
             />
@@ -1262,52 +1269,32 @@ export default function OrderDetail({
         <div className={styles.masonryCol}>
           {isStaff && canRegisterProblems && (
             <div className={styles.panel}>
-              <h2>{isAdmin ? "Diagnóstico com preço" : "Novo problema diagnosticado"}</h2>
+              <h2>Diagnóstico</h2>
+              {hasDiagnosis ? (
+                <p className={styles.tlSub}>
+                  Este projeto já tem o diagnóstico cadastrado. Para mudar serviço, descrição, preço ou peças, clique numa bolinha do
+                  modelo do veículo.
+                </p>
+              ) : (
               <form className={styles.formGrid} onSubmit={createProblem}>
-                <label>
-                  Componente
-                  <select
-                    value={problemForm.key}
-                    onChange={(e) => {
-                      const option = PART_OPTIONS.find((item) => item.key === e.target.value);
-                      setProblemForm((prev) => ({ ...prev, key: e.target.value, name: option?.label ?? prev.name }));
-                    }}
-                  >
-                    {PART_OPTIONS.map((part) => (
-                      <option key={part.key} value={part.key}>
-                        {part.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Nome exibido
-                  <input value={problemForm.name} onChange={(e) => setProblemForm((prev) => ({ ...prev, name: e.target.value }))} required />
-                </label>
-                {POSITION_REQUIRED_PARTS.has(problemForm.key) && (
-                  <>
-                    <label>
-                      Eixo
-                      <select value={problemForm.axle} onChange={(e) => setProblemForm((prev) => ({ ...prev, axle: e.target.value }))}>
-                        <option value="dianteiro">Dianteiro</option>
-                        <option value="traseiro">Traseiro</option>
-                      </select>
-                    </label>
-                    <label>
-                      Lado
-                      <select value={problemForm.side} onChange={(e) => setProblemForm((prev) => ({ ...prev, side: e.target.value }))}>
-                        <option value="esquerdo">Esquerdo</option>
-                        <option value="direito">Direito</option>
-                        <option value="ambos">Ambos os lados</option>
-                      </select>
-                    </label>
-                  </>
-                )}
                 <label className={styles.fullField}>
-                  Descrição do problema
+                  Serviço
+                  <input
+                    value={problemForm.service}
+                    onChange={(e) => setProblemForm((prev) => ({ ...prev, service: e.target.value }))}
+                    placeholder="Ex.: Revisão de freios e troca do óleo"
+                    maxLength={200}
+                    required
+                  />
+                </label>
+                <label className={styles.fullField}>
+                  Descrição do diagnóstico
                   <textarea
                     value={problemForm.description}
                     onChange={(e) => setProblemForm((prev) => ({ ...prev, description: e.target.value }))}
+                    placeholder="Descreva tudo o que foi encontrado e onde (ex.: pastilhas dianteiras gastas, disco esquerdo riscado, vazamento de óleo no motor). A IA marca os pontos no modelo do veículo."
+                    rows={5}
+                    minLength={4}
                     required
                   />
                 </label>
@@ -1427,7 +1414,7 @@ export default function OrderDetail({
                   </>
                 )}
                 <label className={styles.fullField}>
-                  Imagens do problema
+                  Imagens do diagnóstico
                   <input
                     type="file"
                     accept="image/*"
@@ -1436,11 +1423,12 @@ export default function OrderDetail({
                   />
                   {problemForm.files.length > 0 && <span>{problemForm.files.length} imagem(ns) selecionada(s)</span>}
                 </label>
-                {problemMessage && <div className={styles.formMessage}>{problemMessage}</div>}
                 <button className={styles.actionButton} type="submit" disabled={problemBusy}>
-                  {problemBusy ? "Salvando..." : "Cadastrar problema"}
+                  {problemBusy ? "Salvando e analisando com IA..." : "Cadastrar diagnóstico"}
                 </button>
               </form>
+              )}
+              {problemMessage && <div className={styles.formMessage}>{problemMessage}</div>}
             </div>
           )}
 

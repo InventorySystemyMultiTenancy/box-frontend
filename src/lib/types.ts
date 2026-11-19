@@ -158,8 +158,25 @@ export interface VehiclePart {
   // Posição da bolinha no modelo do veículo; quando definidos, valem mais que o texto.
   axle?: "dianteiro" | "traseiro" | null;
   side?: "esquerdo" | "direito" | "ambos" | null;
+  // Diagnóstico único (key "diagnostico"): pontos que a IA marcou a partir da descrição.
+  aiSpots?: DiagnosisSpot[] | null;
   media: Media[];
 }
+
+/** Ponto do diagnóstico no modelo do veículo (coordenadas no SVG 300×520). */
+export interface DiagnosisSpot {
+  zone: string;
+  label: string;
+  x: number;
+  y: number;
+  /** Trecho da descrição que fala deste local. */
+  excerpt: string;
+  /** O que a IA identificou e por que marcou aqui. */
+  reason: string;
+}
+
+/** VehiclePart.key do diagnóstico único do projeto (serviço livre + descrição + IA). */
+export const DIAGNOSIS_PART_KEY = "diagnostico";
 
 export interface ExpiringWarrantyPart extends VehiclePart {
   serviceOrder: {
@@ -220,6 +237,9 @@ export interface PublicServiceOrder {
     name: string;
     status: PartStatus;
     note?: string | null;
+    axle?: "dianteiro" | "traseiro" | null;
+    side?: "esquerdo" | "direito" | "ambos" | null;
+    aiSpots?: DiagnosisSpot[] | null;
     warranty?: string | null;
     updatedAt: string;
     media: Media[];
