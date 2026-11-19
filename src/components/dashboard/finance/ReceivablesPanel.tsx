@@ -39,6 +39,11 @@ const STATUS_VARIANTS: Record<ReceivableStatus, "default" | "secondary" | "outli
   CANCELLED: "secondary",
 };
 
+// Período (de/até) por qual data da conta — igual ao de Contas a pagar; soma com o
+// status e a busca (ex.: "Recebida" + recebimento em outubro).
+type PeriodField = "dueDate" | "receivedAt" | "createdAt";
+const PERIOD_LABELS: Record<PeriodField, string> = { dueDate: "Vencimento", receivedAt: "Recebimento", createdAt: "Lançamento" };
+
 export default function ReceivablesPanel() {
   const { token, hasPermission } = useAuth();
   const queryClient = useQueryClient();
@@ -47,23 +52,29 @@ export default function ReceivablesPanel() {
   // Busca por placa (descrição das contas de projeto), código/SS da OS, cliente ou descrição.
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
+  const [periodField, setPeriodField] = useState<PeriodField>("dueDate");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const periodParams = { from: from || undefined, to: to || undefined, dateField: from || to ? periodField : undefined };
+  const periodKey = JSON.stringify(periodParams);
   useEffect(() => {
     const timer = setTimeout(() => setQ(search.trim()), 300);
     return () => clearTimeout(timer);
   }, [search]);
 
-  // Totais do topo (em aberto / vencido / já recebido) — não dependem do filtro de status.
+  // Totais do topo (em aberto / vencido / já recebido) — não dependem do filtro de status,
+  // mas respeitam o período escolhido.
   const { data: summary } = useQuery({
-    queryKey: ["receivables", "summary"],
-    queryFn: async () => (await api.receivablesSummary(token!)).summary,
+    queryKey: ["receivables", "summary", periodKey],
+    queryFn: async () => (await api.receivablesSummary(token!, periodParams)).summary,
     enabled: !!token,
   });
 
-  const listParams = { status: status || undefined, q: q || undefined };
+  const listParams = { status: status || undefined, q: q || undefined, ...periodParams };
   // Começa com 10 contas; "Ver mais" busca todas do filtro (volta a 10 ao trocar filtro/busca).
-  const { pageSize, showMore } = useShowMore(`${status}|${q}`);
+  const { pageSize, showMore } = useShowMore(`${status}|${q}|${periodKey}`);
   const { data: page, isLoading, isFetching } = useQuery({
-    queryKey: ["receivables", status, q, pageSize],
+    queryKey: ["receivables", status, q, periodKey, pageSize],
     queryFn: async () => api.receivables(token!, { ...listParams, pageSize }),
     enabled: !!token,
     placeholderData: keepPreviousData,
@@ -75,7 +86,7 @@ export default function ReceivablesPanel() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   useEffect(() => {
     setSelected(new Set());
-  }, [status, q]);
+  }, [status, q, periodKey]);
   const isOpen = (r: AccountReceivable) => r.status === "PENDING" || r.status === "OVERDUE";
   const openRows = (data ?? []).filter(isOpen);
   const allSelected = openRows.length > 0 && openRows.every((r) => selected.has(r.id));
@@ -135,7 +146,34 @@ export default function ReceivablesPanel() {
 
   return (
     <div className="grid gap-4">
-      <SettlementSummaryCards summary={summary} kind="receivable" filtered={false} />
+      <SettlementSummaryCards summary={summary} kind="receivable" filtered={Boolean(from || to)} />
+      {/* Período: de/até pela data escolhida, somado ao status e à busca. */}
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="grid gap-1">
+          <Label className="text-xs text-muted-foreground">Período por</Label>
+          <Select value={periodField} onValueChange={(v) => setPeriodField(v as PeriodField)}>
+            <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {(Object.keys(PERIOD_LABELS) as PeriodField[]).map((key) => (
+                <SelectItem key={key} value={key}>{PERIOD_LABELS[key]}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1">
+          <Label htmlFor="r-period-from" className="text-xs text-muted-foreground">De</Label>
+          <Input id="r-period-from" type="date" className="w-40" value={from} onChange={(e) => setFrom(e.target.value)} />
+        </div>
+        <div className="grid gap-1">
+          <Label htmlFor="r-period-to" className="text-xs text-muted-foreground">Até</Label>
+          <Input id="r-period-to" type="date" className="w-40" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        {(from || to) && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); }}>
+            Limpar período
+          </Button>
+        )}
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
         <div className="relative w-64 max-w-full">

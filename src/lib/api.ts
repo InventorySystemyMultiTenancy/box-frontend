@@ -601,7 +601,7 @@ export const api = {
 
   // Financeiro — contas a receber
   // q: busca por descrição (placa), código da OS, placa ou cliente.
-  receivables: (token: string, params: { status?: string; q?: string; category?: string; clientId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) =>
+  receivables: (token: string, params: { status?: string; q?: string; category?: string; clientId?: string; from?: string; to?: string; dateField?: string; page?: number; pageSize?: number } = {}) =>
     request<{ items: unknown[]; pagination: Pagination }>(`/api/finance/receivables${toQuery(params)}`, {}, token),
 
   // Totais do topo (em aberto / vencido / já recebido) — mesmos filtros da lista, sem status.
