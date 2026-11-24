@@ -216,6 +216,7 @@ export default function VehicleSchematic({
   onEditDiagnosis,
   onCreatePart,
   onGeneratePdf,
+  extraActions,
 }: {
   parts: VehiclePart[];
   approvals?: Approval[];
@@ -241,6 +242,9 @@ export default function VehicleSchematic({
   ) => Promise<void>;
   // Diagnóstico único: edita serviço/descrição (a IA refaz os pontos).
   onEditDiagnosis?: (approvalId: string, data: { service: string; description: string }) => Promise<void>;
+  // Ações do projeto mostradas logo abaixo de "Adicionar fotos, peças ou observação"
+  // (ex.: "Confirmar retirada").
+  extraActions?: React.ReactNode;
 }) {
   const withPosition = useMemo(() => parts.filter((p) => HOTSPOT_POSITIONS[p.key] || isDiagnosisPart(p)), [parts]);
 
@@ -462,7 +466,12 @@ export default function VehicleSchematic({
   }
 
   if (withPosition.length === 0) {
-    return <p className={styles.tlSub}>Nenhum componente inspecionado ainda.</p>;
+    return (
+      <>
+        <p className={styles.tlSub}>Nenhum componente inspecionado ainda.</p>
+        {extraActions}
+      </>
+    );
   }
 
   return (
@@ -851,8 +860,10 @@ export default function VehicleSchematic({
                   )}
                 </div>
               )}
+              {extraActions}
             </div>
           )}
+          {!activeApproval && extraActions}
           {canManageMaintenance && UNRESOLVED_STATUSES.has(active.status) && (
             <div className={styles.approvalActions}>
               {active.status === "IN_PROGRESS" ? (

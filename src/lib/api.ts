@@ -322,6 +322,14 @@ export const api = {
 
   assignableStaff: (token: string) => request<{ staff: unknown[] }>("/api/team/assignable", {}, token),
 
+  // "Confirmar retirada" de um projeto pronto para retirada — devolve o PDF atualizado.
+  confirmPickup: (orderId: string, description: string, token: string) =>
+    request<{ order: unknown; reportUrl: string | null }>(
+      `/api/service-orders/${orderId}/pickup`,
+      { method: "PATCH", body: JSON.stringify({ description: description.trim() || undefined }) },
+      token
+    ),
+
   archiveServiceOrder: (orderId: string, token: string) =>
     request<{ order: unknown }>(`/api/service-orders/${orderId}/archive`, { method: "PATCH" }, token),
 

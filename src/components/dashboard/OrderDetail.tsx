@@ -112,6 +112,12 @@ export default function OrderDetail({
   const [advanceNote, setAdvanceNote] = useState("");
   const [advanceBusy, setAdvanceBusy] = useState(false);
   const [advanceMessage, setAdvanceMessage] = useState<string | null>(null);
+  // "Confirmar retirada" (projeto pronto para retirada): janela com a descrição da retirada.
+  const [pickupOpen, setPickupOpen] = useState(false);
+  const [pickupDescription, setPickupDescription] = useState("");
+  const [pickupBusy, setPickupBusy] = useState(false);
+  const [pickupError, setPickupError] = useState<string | null>(null);
+  const [pickupReportUrl, setPickupReportUrl] = useState<string | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveMessage, setArchiveMessage] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -462,6 +468,25 @@ export default function OrderDetail({
   // "Dar baixa": encerra o projeto mesmo sem nenhuma confirmação/aceite do cliente —
   // some da lista/kanban de projetos em andamento, mas o registro (e a garantia das
   // peças/serviço, que independe disso) continua salvo e acessível normalmente.
+  async function confirmPickup(e: React.FormEvent) {
+    e.preventDefault();
+    if (!token || !order) return;
+    setPickupBusy(true);
+    setPickupError(null);
+    try {
+      const result = await api.confirmPickup(order.id, pickupDescription, token);
+      setOrder(result.order as ServiceOrder);
+      setPickupReportUrl(result.reportUrl);
+      setPickupOpen(false);
+      setPickupDescription("");
+      toast.success("Retirada confirmada. Já está na timeline e no PDF do projeto.");
+    } catch (err) {
+      setPickupError(err instanceof ApiError ? err.message : "Não foi possível confirmar a retirada.");
+    } finally {
+      setPickupBusy(false);
+    }
+  }
+
   async function archiveOrder() {
     if (!token || !order) return;
     if (!confirm("Dar baixa neste projeto? Ele sairá da lista de projetos em andamento, mas continua salvo como concluído.")) return;
@@ -771,6 +796,16 @@ export default function OrderDetail({
               : ""
           }
           <div class="total">Valor final: ${formatCurrency(values.total)}</div>
+          ${
+            order.pickedUpAt
+              ? `<h2>Retirada do veículo</h2>
+                 <div class="note"><div><strong>${escapeHtml(
+                   [`Retirado em ${new Date(order.pickedUpAt).toLocaleString("pt-BR")}`, order.pickupConfirmedByName ? `confirmado por ${order.pickupConfirmedByName}` : null]
+                     .filter(Boolean)
+                     .join(" · ")
+                 )}</strong></div>${order.pickupDescription ? `<div>${escapeHtml(order.pickupDescription)}</div>` : ""}</div>`
+              : ""
+          }
           ${notesHtml ? `<h2>Observações</h2>${notesHtml}` : ""}
         </body>
       </html>
@@ -829,6 +864,73 @@ export default function OrderDetail({
   const isFinishedOrder = Boolean(order.archivedAt) || order.status === "FINISHED" || isReady;
   const canRegisterProblems = !["SCHEDULED", "READY_FOR_PICKUP", "FINISHED"].includes(order.status);
   const hasDiagnosis = order.parts.some((part) => part.key === DIAGNOSIS_PART_KEY);
+
+  // "Confirmar retirada": só em projeto pronto para retirada, para a equipe. Depois de
+  // confirmada, mostra quando/quem e a descrição (que também vão na timeline e no PDF).
+  const pickupActions =
+    isStaff && order.status === "READY_FOR_PICKUP" ? (
+      order.pickedUpAt ? (
+        <div className={styles.pickupDone}>
+          <strong>
+            Veículo retirado em {new Date(order.pickedUpAt).toLocaleString("pt-BR")}
+            {order.pickupConfirmedByName ? ` · confirmado por ${order.pickupConfirmedByName}` : ""}
+          </strong>
+          {order.pickupDescription && <p>{order.pickupDescription}</p>}
+          {pickupReportUrl && (
+            <a href={mediaUrl(pickupReportUrl)} target="_blank" rel="noreferrer">
+              Abrir PDF atualizado
+            </a>
+          )}
+        </div>
+      ) : (
+        <div className={`${styles.approvalActions} ${styles.pickupActions}`}>
+          <Dialog
+            open={pickupOpen}
+            onOpenChange={(open) => {
+              setPickupOpen(open);
+              if (!open) setPickupError(null);
+            }}
+          >
+            <DialogTrigger asChild>
+              <button className={styles.btnApprove} type="button">
+                Confirmar retirada
+              </button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirmar retirada do veículo</DialogTitle>
+                <DialogDescription>
+                  Confirma que o {order.vehicle.brand} {order.vehicle.model}
+                  {order.vehicle.plate ? ` (${order.vehicle.plate})` : ""} já saiu da empresa. A descrição aparece na timeline, com a data, e no
+                  PDF do projeto.
+                </DialogDescription>
+              </DialogHeader>
+              <form className="grid gap-3" onSubmit={confirmPickup}>
+                <label className="grid gap-1 text-sm">
+                  Descrição da retirada
+                  <textarea
+                    className="min-h-28 rounded-md border bg-background p-2 text-sm"
+                    value={pickupDescription}
+                    onChange={(e) => setPickupDescription(e.target.value)}
+                    placeholder="Ex.: Retirado pelo próprio cliente às 17h, conferiu o serviço e saiu sem pendências."
+                    maxLength={2000}
+                  />
+                </label>
+                {pickupError && <p className="text-sm text-destructive">{pickupError}</p>}
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setPickupOpen(false)} disabled={pickupBusy}>
+                    Cancelar
+                  </Button>
+                  <Button type="submit" disabled={pickupBusy}>
+                    {pickupBusy ? "Confirmando..." : "Confirmar retirada"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )
+    ) : null;
   // Diferente de canRegisterProblems: o painel de finalização precisa continuar visível
   // em FINISHED, já que é exatamente esse status que precede "pronto para retirada" —
   // só SCHEDULED (veículo nem chegou) e READY_FOR_PICKUP (já finalizado) ficam de fora.
@@ -1080,6 +1182,7 @@ export default function OrderDetail({
               onPriceProblem={priceProblem}
               onUpdateProblem={updateProblemDetails}
               onEditDiagnosis={isStaff ? editDiagnosis : undefined}
+              extraActions={pickupActions}
               onCreatePart={isAdmin ? createInventoryPartRequest : undefined}
               onGeneratePdf={isAdmin ? generateServicePdf : undefined}
             />

@@ -1657,3 +1657,16 @@
     gap: 0.2rem;
   }
 }
+/* "Confirmar retirada" já feita: quando, quem e a descrição. */
+.pickupDone {
+  margin: 0.75rem 0 1rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--success);
+  border-radius: 8px;
+  background: var(--success-soft);
+  font-size: 0.85rem;
+}
+.pickupDone p { margin: 0.35rem 0 0; white-space: pre-wrap; }
+.pickupDone a { display: inline-block; margin-top: 0.45rem; color: var(--accent-blue); font-weight: 600; }
+
+.pickupActions { margin-bottom: 1rem; }

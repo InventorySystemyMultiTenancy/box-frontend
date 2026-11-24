@@ -276,6 +276,10 @@ export interface ServiceOrder {
   completedAt?: string | null;
   deliveryDescription?: string | null;
   deliveryExtraValue?: number | null;
+  // "Confirmar retirada": quando o veículo pronto saiu da empresa, a descrição e quem confirmou.
+  pickedUpAt?: string | null;
+  pickupDescription?: string | null;
+  pickupConfirmedByName?: string | null;
   // "Dar baixa" — projeto concluído e removido da lista/kanban de projetos em andamento.
   archivedAt?: string | null;
   vehicle: Vehicle;
