@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { settlementDateParam, todayInputValue, toLocalDateInput } from "@/lib/dates";
 import type { AccountPayable, BankAccount, PayableStatus } from "@/lib/types";
+import { bankAccountLabel } from "@/lib/bank-accounts";
 
 const STATUS_LABELS: Record<PayableStatus, string> = { PENDING: "Pendente", PAID: "Pago", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
 const STATUS_VARIANTS: Record<PayableStatus, "default" | "secondary" | "outline" | "destructive"> = {
@@ -618,7 +619,7 @@ function PayDialog({ payable, onSaved }: { payable: AccountPayable; onSaved: () 
               <SelectContent>
                 <SelectItem value="NONE">—</SelectItem>
                 {(accounts ?? []).map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  <SelectItem key={a.id} value={a.id}>{bankAccountLabel(a, accounts)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

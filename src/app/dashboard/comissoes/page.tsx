@@ -17,6 +17,7 @@ import { Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import type { BankAccount, Commission, CommissionStatus, ServiceOrder, User } from "@/lib/types";
+import { bankAccountLabel } from "@/lib/bank-accounts";
 
 const STATUS_LABELS: Record<CommissionStatus, string> = { PENDING: "Pendente", PAID: "Paga", CANCELLED: "Cancelada" };
 const STATUS_VARIANTS: Record<CommissionStatus, "default" | "secondary" | "outline"> = {
@@ -211,7 +212,7 @@ export default function ComissoesPage() {
                         <SelectContent>
                           <SelectItem value="NONE">Sem conta</SelectItem>
                           {(accounts ?? []).map((a) => (
-                            <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                            <SelectItem key={a.id} value={a.id}>{bankAccountLabel(a, accounts)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

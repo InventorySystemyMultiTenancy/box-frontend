@@ -18,6 +18,7 @@ import { SupplierFormDialog } from "@/components/dashboard/suppliers/SupplierFor
 import { PayableInvoiceDialog, type PayableInvoiceDetails, type PayableInvoiceResult } from "@/components/dashboard/finance/PayableInvoiceDialog";
 import type { BankAccount, ExpenseClassifications, Store, Supplier } from "@/lib/types";
 import { categoriesForGroup } from "@/lib/utils";
+import { bankAccountLabel } from "@/lib/bank-accounts";
 
 // Mesmo layout do "Cadastrar contas a Pagar" que a oficina já usava: cabeçalho com nota,
 // fornecedor e classificação da despesa, e "Condições de pagamento" com as duplicatas
@@ -363,7 +364,7 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
                     <SelectContent>
                       <SelectItem value="NONE">—</SelectItem>
                       {(accounts ?? []).map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.name}{a.bank ? ` — ${a.bank}` : ""}</SelectItem>
+                        <SelectItem key={a.id} value={a.id}>{bankAccountLabel(a, accounts)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -425,7 +426,7 @@ export function PayableFormDialog({ trigger, onSaved }: { trigger: React.ReactNo
                       <SelectContent>
                         <SelectItem value="NONE">—</SelectItem>
                         {(accounts ?? []).map((a) => (
-                          <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                          <SelectItem key={a.id} value={a.id}>{bankAccountLabel(a, accounts)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

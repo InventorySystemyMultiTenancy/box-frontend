@@ -22,6 +22,7 @@ import { PAYMENT_METHODS } from "@/lib/payment-methods";
 import { prepareImageForAi, UnsupportedImageError } from "@/lib/image-compress";
 import type { BankAccount, Client, ExpenseClassifications, Invoice, InvoiceStatus, InvoiceType } from "@/lib/types";
 import { categoriesForGroup } from "@/lib/utils";
+import { bankAccountLabel } from "@/lib/bank-accounts";
 
 // "Em andamento" = mesma definição usada em MechanicProjectsPanel — qualquer OS que
 // ainda não chegou em FINISHED/READY_FOR_PICKUP.
@@ -534,7 +535,7 @@ function InvoiceFormDialog({ trigger, onSaved }: { trigger: React.ReactNode; onS
                 <SelectContent>
                   <SelectItem value="NONE">—</SelectItem>
                   {(bankAccounts ?? []).map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}{a.bank ? ` — ${a.bank}` : ""}</SelectItem>
+                    <SelectItem key={a.id} value={a.id}>{bankAccountLabel(a, bankAccounts)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

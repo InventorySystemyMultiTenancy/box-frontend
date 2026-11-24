@@ -21,6 +21,7 @@ import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { settlementDateParam, todayInputValue, toLocalDateInput } from "@/lib/dates";
 import { RECEIVABLE_PAYER_LABELS, type AccountReceivable, type BankAccount, type Client, type ReceivableStatus } from "@/lib/types";
+import { bankAccountLabel } from "@/lib/bank-accounts";
 
 const STATUS_LABELS: Record<ReceivableStatus, string> = { PENDING: "Pendente", RECEIVED: "Recebido", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
 // Coluna "Data": quando a OS foi finalizada e a conta entrou em Contas a receber.
@@ -684,7 +685,7 @@ function ReceiveDialog({ receivable, onSaved }: { receivable: AccountReceivable;
               <SelectContent>
                 <SelectItem value="NONE">—</SelectItem>
                 {(accounts ?? []).map((a) => (
-                  <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  <SelectItem key={a.id} value={a.id}>{bankAccountLabel(a, accounts)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

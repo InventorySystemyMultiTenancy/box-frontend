@@ -29,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import styles from "./dashboard.module.css";
+import { bankAccountLabel } from "@/lib/bank-accounts";
 
 
 
@@ -1292,7 +1293,7 @@ export default function OrderDetail({
                         <option value="">Não informar</option>
                         {bankAccounts.map((account) => (
                           <option key={account.id} value={account.id}>
-                            {account.name}
+                            {bankAccountLabel(account, bankAccounts)}
                           </option>
                         ))}
                       </select>
