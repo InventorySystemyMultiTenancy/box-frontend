@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Percent, Eye, EyeOff } from "lucide-react";
+import { Percent, Eye, EyeOff, Search } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { User, Role } from "@/lib/types";
@@ -15,7 +15,12 @@ import { displayEmail } from "@/lib/utils";
 export default function MechanicUsersPanel() {
   const { token, user: me } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
-  const visibleUsers = useVisibleItems(users);
+  // Busca por nome (ignora acentos e maiúsculas).
+  const [search, setSearch] = useState("");
+  const normalize = (text: string) => text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+  const searchTerm = normalize(search.trim());
+  const filteredUsers = searchTerm ? users.filter((user) => normalize(user.name || "").includes(searchTerm)) : users;
+  const visibleUsers = useVisibleItems(filteredUsers, searchTerm);
   const [roles, setRoles] = useState<Role[]>([]);
   const [userForm, setUserForm] = useState({
     name: "",
@@ -196,6 +201,17 @@ export default function MechanicUsersPanel() {
       </div>
 
       <div className={styles.sectionTitle}>Usuários existentes ({users.length})</div>
+      <div className="relative mb-3 max-w-sm">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          type="search"
+          aria-label="Buscar usuário pelo nome"
+          className="h-9 w-full rounded-md border bg-background pl-8 pr-3 text-sm"
+          placeholder="Buscar pelo nome..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
       <ScrollX className={styles.usersTableWrap}>
         <table className={styles.usersTable}>
           <thead>
@@ -208,6 +224,11 @@ export default function MechanicUsersPanel() {
             </tr>
           </thead>
           <tbody>
+            {searchTerm && filteredUsers.length === 0 && (
+              <tr>
+                <td colSpan={5}>Nenhum usuário encontrado com esse nome.</td>
+              </tr>
+            )}
             {visibleUsers.visible.map((user) => (
               <tr key={user.id} style={user.active === false ? { opacity: 0.55 } : undefined}>
                 <td>
