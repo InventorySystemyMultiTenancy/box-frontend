@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { useAuth } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
 import { settlementDateParam, todayInputValue, toLocalDateInput } from "@/lib/dates";
-import { RECEIVABLE_PAYER_LABELS, type AccountReceivable, type BankAccount, type Client, type ReceivableStatus } from "@/lib/types";
+import { RECEIVABLE_PAYER_LABELS, receivablePayerLabel, type AccountReceivable, type BankAccount, type Client, type ReceivableStatus } from "@/lib/types";
 import { bankAccountLabel } from "@/lib/bank-accounts";
 
 const STATUS_LABELS: Record<ReceivableStatus, string> = { PENDING: "Pendente", RECEIVED: "Recebido", OVERDUE: "Vencido", CANCELLED: "Cancelado" };
@@ -216,7 +216,7 @@ export default function ReceivablesPanel() {
               { header: "Valor recebido", value: (r) => r.receivedAmount, type: "money" },
               { header: "Status", value: (r) => STATUS_LABELS[r.status as keyof typeof STATUS_LABELS] ?? r.status },
               { header: "Forma", value: (r) => r.paymentMethod },
-              { header: "Pagador", value: (r) => (r.payer ? RECEIVABLE_PAYER_LABELS[r.payer] ?? r.payer : "") },
+              { header: "Pagador", value: (r) => (r.payer ? receivablePayerLabel(r.payer) : "") },
             ]}
           />
           {canManage && <ReceivableFormDialog onSaved={refetch} trigger={<Button size="sm"><Plus className="size-4" />Nova conta a receber</Button>} />}
@@ -426,7 +426,7 @@ export default function ReceivablesPanel() {
                       ["Faturado", detail.receivedAt ? formatDate(detail.receivedAt) : null],
                       ["Valor recebido", detail.status === "RECEIVED" ? `R$ ${(detail.receivedAmount ?? detail.amount).toFixed(2)}` : null],
                       ["Forma de pagamento", detail.paymentMethod],
-                      ["Pagador", detail.payer ? RECEIVABLE_PAYER_LABELS[detail.payer] ?? detail.payer : null],
+                      ["Pagador", detail.payer ? receivablePayerLabel(detail.payer) : null],
                       ["Conta bancária", detail.bankAccount?.name],
                       ["Nota fiscal", (detail.invoices ?? []).map((i) => (i.number ? `NF ${i.number}` : "Nota s/ nº")).join(", ")],
                       ["Criada em", detail.createdAt ? formatDate(detail.createdAt) : null],

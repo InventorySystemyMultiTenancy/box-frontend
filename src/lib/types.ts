@@ -1172,7 +1172,12 @@ export interface PlateLookupResult {
 export const RECEIVABLE_PAYER_LABELS: Record<string, string> = {
   LOCALIZA: "Localiza",
   PESSOA_JURIDICA: "Pessoa jurídica",
-  EDENRED: "Edenred",
+  ALD_AUTOMOTIVE: "ALD Automotive",
   PLATAFORMA: "Plataforma",
   SEGURADORA: "Seguradora",
 };
+
+// Nome de um pagador já gravado — inclui opções antigas que saíram da lista (ex.: Edenred).
+export function receivablePayerLabel(payer: string) {
+  return RECEIVABLE_PAYER_LABELS[payer] ?? ({ EDENRED: "Edenred" } as Record<string, string>)[payer] ?? payer;
+}
