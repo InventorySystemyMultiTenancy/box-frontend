@@ -14,6 +14,11 @@ import styles from "@/components/dashboard/dashboard.module.css";
 // pelo layout do /dashboard normalmente — esta página fica fora dessa árvore de rotas
 // (link público, sem login), então precisa importar isso ela mesma.
 import "../../dashboard.css";
+// Mesmo tema escuro do painel: sem ele os quadros ficam escuros com o texto escuro (ilegível).
+import "../../dashboard-premium.css";
+import { DASH_FONT_CLASSES } from "../../dashboard/fonts";
+
+const THEME_ROOT = ["dash-premium-root", ...DASH_FONT_CLASSES].join(" ");
 
 function mediaUrl(url: string) {
   return url.startsWith("http://") || url.startsWith("https://") ? url : `${API_URL}${url}`;
@@ -102,7 +107,7 @@ export default function ShareLinkPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: "var(--shell-bg)" }}>
+      <div className={`${THEME_ROOT} flex min-h-screen items-center justify-center`} style={{ background: "var(--shell-bg)" }}>
         <p className="text-sm" style={{ color: "var(--shell-text-muted)" }}>
           Carregando...
         </p>
@@ -112,7 +117,7 @@ export default function ShareLinkPage() {
 
   if (error || !order) {
     return (
-      <div className="flex min-h-screen items-center justify-center px-4" style={{ background: "var(--shell-bg)" }}>
+      <div className={`${THEME_ROOT} flex min-h-screen items-center justify-center px-4`} style={{ background: "var(--shell-bg)" }}>
         <div className="w-full max-w-sm rounded-lg border bg-card p-6 text-center shadow-sm">
           <div className="mb-4 flex justify-center">
             <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
@@ -126,7 +131,7 @@ export default function ShareLinkPage() {
   const isReady = order.status === "READY_FOR_PICKUP";
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--shell-bg)" }}>
+    <div className={`${THEME_ROOT} min-h-screen`} style={{ background: "var(--shell-bg)" }}>
       <div className={styles.topbar}>
         <div className={styles.brand}>
           <Image src="/reblind-logo-transparent.png" alt="Reblind" width={655} height={340} className={styles.brandLogo} priority />
