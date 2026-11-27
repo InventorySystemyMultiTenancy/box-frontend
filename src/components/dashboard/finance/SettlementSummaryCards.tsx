@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Sigma } from "lucide-react";
 import type { SettlementSummary } from "@/lib/types";
 
 const brl = (value: number) => value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -22,10 +22,15 @@ export function SettlementSummaryCards({
 }) {
   const openLabel = kind === "payable" ? "Em aberto a pagar" : "Em aberto a receber";
   const settledLabel = kind === "payable" ? "Total já pago" : "Total já recebido";
+  // Todas as contas do período/filtro (em aberto + já pagas/recebidas; canceladas não entram).
+  const allLabel = filtered ? "Total de contas do período" : "Total de contas";
+  const all = summary
+    ? { total: Math.round((summary.open.total + summary.settled.total) * 100) / 100, count: summary.open.count + summary.settled.count }
+    : null;
 
   return (
     <div className="grid gap-1">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-lg border bg-card p-3 shadow-sm">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Clock className="size-4" />
@@ -51,6 +56,14 @@ export function SettlementSummaryCards({
           </div>
           <div className="mt-1 text-xl font-bold">{summary ? brl(summary.settled.total) : "—"}</div>
           <div className="text-xs text-muted-foreground">{summary ? contas(summary.settled.count) : ""}</div>
+        </div>
+        <div className="rounded-lg border bg-card p-3 shadow-sm">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Sigma className="size-4" />
+            {allLabel}
+          </div>
+          <div className="mt-1 text-xl font-bold">{all ? brl(all.total) : "—"}</div>
+          <div className="text-xs text-muted-foreground">{all ? `${contas(all.count)} no total` : ""}</div>
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
